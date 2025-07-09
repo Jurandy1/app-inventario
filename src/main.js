@@ -37,7 +37,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     function loadInitialData() {
-        // Escuta por mudanças na coleção de datasets (relatórios e inventários salvos)
         if (state.unsubscribeDatasets) state.unsubscribeDatasets();
         state.unsubscribeDatasets = listenToCollection(DATASETS_COLLECTION, (datasets) => {
             state.datasets = datasets;
@@ -45,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             populateComparisonSelects(datasets);
         });
 
-        // Escuta por mudanças na sessão de coleta ao vivo
         if (state.unsubscribeLiveSession) state.unsubscribeLiveSession();
         state.unsubscribeLiveSession = listenToCollection(SESSION_COLLECTION, (items) => {
             state.liveSessionItems = items;
@@ -68,13 +66,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const unidadeInput = document.getElementById('item-unidade');
         const localInput = document.getElementById('item-local');
         
+        const batch = db.batch();
         for (let i = 0; i < quantity; i++) {
             const newItem = { ...item };
-            newItem.uuid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            await saveDocument(SESSION_COLLECTION, newItem.uuid, newItem);
+            const docId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            newItem.uuid = docId;
+            const docRef = db.collection(SESSION_COLLECTION).doc(docId);
+            batch.set(docRef, newItem);
         }
+        await batch.commit();
 
-        // Trava os campos
         unidadeInput.disabled = true;
         localInput.disabled = true;
         document.getElementById('clear-unidade-btn').classList.remove('hidden');
@@ -105,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     descricaoSistema: row['Descrição'] || row.Descricao,
                     fonte: 'SISTEMA'
                 };
-            } else { // inventario
+            } else {
                 const tombo = row.Tombo || row.tombo;
                 return {
                     unidade: row.UNIDADE || row.unidade,
@@ -123,12 +124,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             type: type,
             itemCount: items.length,
             createdAt: new Date().toISOString(),
-            items: items // Armazena todos os itens dentro do documento
+            items: items
         };
 
         const docId = `${type}_${Date.now()}`;
         await saveDocument(DATASETS_COLLECTION, docId, dataset);
-        document.getElementById(nameInputId).value = ''; // Limpa o nome
+        
+        // *** NOVA LINHA: MUDA PARA A ABA DE COMPARAÇÃO AUTOMATICAMENTE ***
+        document.getElementById('tab-comparacao').click();
     }
     
     async function handleRunComparison() {
@@ -140,6 +143,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        document.getElementById('analysis-results-container').classList.add('hidden');
+        
         const reportDataset = await getDocument(DATASETS_COLLECTION, reportId);
         
         let inventoryDataset;
@@ -155,8 +160,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         document.getElementById('analysis-results-container').classList.remove('hidden');
-        
-        // Executa as duas análises
         runComparison(inventoryDataset.items, reportDataset.items);
         runCrossUnitCheck(inventoryDataset.items, reportDataset.items);
     }

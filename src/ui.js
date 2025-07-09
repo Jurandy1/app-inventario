@@ -17,7 +17,7 @@ function renderFoundItems(items) {
     const listElement = document.getElementById('found-items-list');
     listElement.innerHTML = '';
     if (!items || items.length === 0) {
-        listElement.innerHTML = '<p class="text-slate-500 text-center">Nenhum item adicionado ainda.</p>';
+        listElement.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item adicionado ainda.</p>';
         return;
     }
     const sortedItems = [...items].sort((a, b) => (b.uuid || 0).localeCompare(a.uuid || 0));
@@ -38,24 +38,21 @@ function renderAllLists(datasets) {
     reportsList.innerHTML = '';
     inventoriesList.innerHTML = '';
 
-    datasets.forEach(dataset => {
-        const li = document.createElement('li');
-        li.className = 'flex justify-between items-center p-2 bg-slate-50 rounded';
-        li.innerHTML = `
-            <div>
-                <span class="font-medium">${dataset.name}</span>
-                <span class="text-xs text-slate-500 ml-2">(${dataset.itemCount} itens)</span>
-            </div>
-            <button data-id="${dataset.id}" class="delete-dataset-btn text-red-400 hover:text-red-600">&times;</button>
-        `;
-        if (dataset.type === 'relatorio') {
-            reportsList.appendChild(li);
-        } else {
-            inventoriesList.appendChild(li);
-        }
-    });
+    const reports = datasets.filter(ds => ds.type === 'relatorio');
+    const inventories = datasets.filter(ds => ds.type === 'inventario');
 
-    // Adiciona listeners para os novos botões de deletar
+    if (reports.length === 0) {
+        reportsList.innerHTML = '<p class="text-slate-500 text-sm text-center">Nenhum relatório carregado.</p>';
+    } else {
+        reports.forEach(dataset => addListItem(reportsList, dataset));
+    }
+
+    if (inventories.length === 0) {
+        inventoriesList.innerHTML = '<p class="text-slate-500 text-sm text-center">Nenhum inventário carregado.</p>';
+    } else {
+        inventories.forEach(dataset => addListItem(inventoriesList, dataset));
+    }
+
     document.querySelectorAll('.delete-dataset-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const docId = e.target.dataset.id;
@@ -66,23 +63,49 @@ function renderAllLists(datasets) {
     });
 }
 
+function addListItem(list, dataset) {
+    const li = document.createElement('li');
+    li.className = 'flex justify-between items-center p-2 bg-slate-50 rounded';
+    li.innerHTML = `
+        <div>
+            <span class="font-medium">${dataset.name}</span>
+            <span class="text-xs text-slate-500 ml-2">(${dataset.itemCount} itens)</span>
+        </div>
+        <button data-id="${dataset.id}" class="delete-dataset-btn text-red-400 hover:text-red-600 text-lg font-bold">&times;</button>
+    `;
+    list.appendChild(li);
+}
+
 function populateComparisonSelects(datasets) {
     const reportSelect = document.getElementById('select-report');
     const inventorySelect = document.getElementById('select-inventory');
-    reportSelect.innerHTML = '<option value="">Selecione...</option>';
-    inventorySelect.innerHTML = '<option value="">Selecione...</option>';
+    
+    const currentReportVal = reportSelect.value;
+    const currentInventoryVal = inventorySelect.value;
 
-    // Adiciona a sessão ao vivo como primeira opção no select de inventário
+    reportSelect.innerHTML = '<option value="">Carregue um Relatório do Sistema...</option>';
+    inventorySelect.innerHTML = '<option value="">Selecione um Inventário...</option>';
+
     inventorySelect.innerHTML += `<option value="live_session">-- Coleta ao Vivo --</option>`;
 
-    datasets.forEach(ds => {
-        const option = `<option value="${ds.id}">${ds.name}</option>`;
-        if (ds.type === 'relatorio') {
-            reportSelect.innerHTML += option;
-        } else {
-            inventorySelect.innerHTML += option;
-        }
-    });
+    const reports = datasets.filter(ds => ds.type === 'relatorio');
+    const inventories = datasets.filter(ds => ds.type === 'inventario');
+
+    if (reports.length > 0) {
+        reportSelect.innerHTML = '<option value="">Selecione um Relatório...</option>';
+        reports.forEach(ds => {
+            reportSelect.innerHTML += `<option value="${ds.id}">${ds.name}</option>`;
+        });
+    }
+
+    if (inventories.length > 0) {
+        inventories.forEach(ds => {
+            inventorySelect.innerHTML += `<option value="${ds.id}">${ds.name}</option>`;
+        });
+    }
+    
+    reportSelect.value = currentReportVal;
+    inventorySelect.value = currentInventoryVal;
 }
 
 function renderCrossUnitResults(items) {
