@@ -15,8 +15,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const SESSION_COLLECTION = 'sessionInventory';
 
     let state = {
-        datasets:,
-        liveSessionItems:,
+        datasets: [],
+        liveSessionItems: [],
         userId: null,
         unsubscribeLiveSession: null,
         unsubscribeDatasets: null,
@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const batch = db.batch();
         for (let i = 0; i < quantity; i++) {
-            const newItem = {...item };
+            const newItem = { ...item };
             const docId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             newItem.uuid = docId;
             const docRef = db.collection(SESSION_COLLECTION).doc(docId);
@@ -90,9 +90,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.focus();
     }
 
+    function sanitizeObject(obj) {
+        const sanitizedObj = {};
+        for (const key in obj) {
+            if (obj[key] !== undefined) {
+                sanitizedObj[key] = obj[key];
+            } else {
+                sanitizedObj[key] = ''; // Substitui undefined por uma string vazia
+            }
+        }
+        return sanitizedObj;
+    }
+
     async function handleDatasetUpload(csvData, type, form) {
         const statusEl = form.querySelector('div[id^="import-"]');
-        const nameInputId = type === 'relatorio'? 'new-report-name' : 'new-inventory-name';
+        const nameInputId = type === 'relatorio' ? 'new-report-name' : 'new-inventory-name';
         const name = document.getElementById(nameInputId).value;
         if (!name) {
             alert('Por favor, dê um nome ao arquivo.');
@@ -100,38 +112,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const items = csvData.map((row, index) => {
+            let item;
             if (type === 'relatorio') {
-                return {
+                item = {
                     unidade: row.UNIDADE,
-                    tombo: String(row.TOMBAMENTO |
-
-| `S/T_REL_${index}`),
-                    descricaoSistema: row |
-
-| row.Descricao,
+                    tombo: String(row.TOMBAMENTO || `S/T_REL_${index}`),
+                    descricaoSistema: row['Descrição'] || row.Descricao,
                     fonte: 'SISTEMA'
                 };
             } else {
-                const tombo = row.Tombo |
-
-| row.tombo;
-                return {
-                    unidade: row.UNIDADE |
-
-| row.unidade,
-                    local: row.Local |
-
-| row.local,
-                    descricaoInventario: row.Item |
-
-| row.item,
-                    tombo: String(tombo).trim().toUpperCase() === 'S/T'? `S/T_${Date.now()}` : String(tombo).trim(),
-                    estadoConservacao: row['Estado de Conservação'] |
-
-| row.estado,
+                const tombo = row.Tombo || row.tombo;
+                item = {
+                    unidade: row.UNIDADE || row.unidade,
+                    local: row.Local || row.local,
+                    descricaoInventario: row.Item || row.item,
+                    tombo: String(tombo || `S/T_INV_${Date.now()}`).trim().toUpperCase(),
+                    estadoConservacao: row['Estado de Conservação'] || row.estado,
                     fonte: 'INVENTARIO'
                 };
             }
+            // **CORREÇÃO CRÍTICA AQUI**
+            return sanitizeObject(item);
         });
 
         const datasetMetadata = {
@@ -144,15 +145,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const docId = `${type}_${Date.now()}`;
 
         try {
-            statusEl.textContent = 'Salvando metadados...';
+            statusEl.textContent = 'A salvar metadados...';
             await saveDocument(DATASETS_COLLECTION, docId, datasetMetadata);
 
-            const batchSize = 400; // Limite do Firestore é 500, usamos 400 por segurança.
-            for (let i = 0; i < items.length; i += batchSize) {
-                const batchItems = items.slice(i, i + batchSize);
-                statusEl.textContent = `Salvando itens ${i + 1} a ${i + batchItems.length}...`;
-                await saveItemsToSubcollection(DATASETS_COLLECTION, docId, 'items', batchItems);
-            }
+            statusEl.textContent = 'A salvar itens... (Isto pode demorar para ficheiros grandes)';
+            await saveItemsToSubcollection(DATASETS_COLLECTION, docId, 'items', items);
             
             statusEl.textContent = 'Upload concluído com sucesso!';
             statusEl.className = 'text-green-600';
@@ -171,7 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const reportId = document.getElementById('select-report').value;
         const inventoryId = document.getElementById('select-inventory').value;
 
-        if (!reportId ||!inventoryId) {
+        if (!reportId || !inventoryId) {
             alert('Por favor, selecione um relatório e um inventário para comparar.');
             return;
         }
@@ -187,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             inventoryDataset = await getDatasetWithItems(DATASETS_COLLECTION, inventoryId);
         }
 
-        if (!reportDataset ||!reportDataset.items ||!inventoryDataset ||!inventoryDataset.items) {
+        if (!reportDataset || !reportDataset.items || !inventoryDataset || !inventoryDataset.items) {
             alert('Não foi possível carregar os dados completos para a comparação.');
             return;
         }
@@ -205,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function updateSessionHeader(items) {
         const unidadeInput = document.getElementById('item-unidade');
-        if (items.length > 0 &&!unidadeInput.disabled) {
+        if (items.length > 0 && !unidadeInput.disabled) {
             const lastUnit = items[items.length - 1].unidade;
             unidadeInput.value = lastUnit;
         }
