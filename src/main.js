@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initializeListeners();
     } catch (error) {
         console.error("Falha na inicialização:", error);
+        document.getElementById('loading-overlay').innerHTML = `<p class="text-red-500">Falha ao ligar. Verifique o console (F12).</p>`;
     }
     
     function initializeListeners() {
