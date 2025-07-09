@@ -4,7 +4,9 @@ let db;
 let auth;
 
 function initFirebase(config) {
-    if (!config || !config.apiKey || config.apiKey.includes("COLE_SUA_API_KEY_AQUI")) {
+    if (!config ||!config.apiKey |
+
+| config.apiKey.includes("COLE_SUA_API_KEY_AQUI")) {
         return Promise.reject("Configuração do Firebase inválida.");
     }
     return new Promise((resolve, reject) => {
@@ -43,9 +45,10 @@ async function saveItemsToSubcollection(parentCollection, parentDocId, subcollec
     const subcollectionRef = db.collection(parentCollection).doc(parentDocId).collection(subcollectionName);
     
     items.forEach((item, index) => {
-        // IDs de documentos não podem conter certos caracteres como '/'
-        const cleanTombo = (item.tombo || '').toString().replace(/[\.\#\$\[\]\*\/]/g, '_');
-        const itemId = cleanTombo && !cleanTombo.startsWith('S/T_') ? cleanTombo : `${Date.now()}_${index}`;
+        const cleanTombo = (item.tombo |
+
+| '').toString().replace(/[\.\#\$\[\]\*\/]/g, '_');
+        const itemId = cleanTombo &&!cleanTombo.startsWith('S/T_')? cleanTombo : `${Date.now()}_${index}`;
         const docRef = subcollectionRef.doc(itemId);
         batch.set(docRef, item);
     });
@@ -62,7 +65,7 @@ async function getDatasetWithItems(collectionName, docId) {
     
     if (!doc.exists) return null;
     
-    const dataset = { id: doc.id, ...doc.data() };
+    const dataset = { id: doc.id,...doc.data() };
     
     const itemsSnapshot = await docRef.collection('items').get();
     dataset.items = itemsSnapshot.docs.map(itemDoc => itemDoc.data());
@@ -91,9 +94,9 @@ async function deleteDatasetWithItems(collectionName, docId) {
 function listenToCollection(collectionName, callback) {
     if (!db) throw new Error("Firestore não inicializado.");
     return db.collection(collectionName).orderBy("createdAt", "desc").onSnapshot(snapshot => {
-        const items = [];
+        const items =;
         snapshot.forEach(doc => {
-            items.push({ id: doc.id, ...doc.data() });
+            items.push({ id: doc.id,...doc.data() });
         });
         callback(items);
     }, error => {
