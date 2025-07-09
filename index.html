@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Inventário v4 (Avançado)</title>
+    <!-- Tailwind CSS (Gratuito via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome para Ícones (Gratuito via CDN) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PapaParse para ler CSV (Gratuito via CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- String-Similarity para comparação inteligente (Gratuito via CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/string-similarity/build/string-similarity.min.js"></script>
+    <!-- Estilos personalizados -->
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="bg-slate-100">
+
+    <!-- Tela de Carregamento -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-75 z-50 flex items-center justify-center">
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin text-blue-600 text-4xl"></i>
+            <p class="mt-2 text-slate-700">Conectando ao banco de dados online...</p>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 max-w-5xl">
+        <header class="bg-white p-4 rounded-lg shadow-md mb-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">Painel de Inventário Inteligente</h1>
+                <p id="session-unit-name" class="text-slate-600">Sessão de Coleta ao Vivo</p>
+            </div>
+            <div id="auth-status" class="text-right">
+                <p class="text-sm text-slate-500">Status: <span id="connection-status" class="font-bold text-red-500">Desconectado</span></p>
+                <p class="text-xs text-slate-400" id="user-id"></p>
+            </div>
+        </header>
+
+        <!-- Abas de Navegação -->
+        <div class="mb-4">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex space-x-4" aria-label="Tabs">
+                    <button id="tab-inventario" class="tab-button active"><i class="fas fa-keyboard mr-2"></i>Coleta ao Vivo</button>
+                    <button id="tab-comparacao" class="tab-button"><i class="fas fa-exchange-alt mr-2"></i>Análise e Comparação</button>
+                    <button id="tab-gerenciar" class="tab-button"><i class="fas fa-database mr-2"></i>Gerenciar Dados</button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Conteúdo das Abas -->
+        <main>
+            <!-- Aba de Inventário (Coleta ao Vivo) -->
+            <div id="content-inventario" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Coluna do Formulário -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold mb-4">Adicionar Item na Coleta</h2>
+                        <form id="add-item-form">
+                            <!-- Campo Unidade com trava -->
+                            <div class="relative">
+                                <label for="item-unidade" class="block text-sm font-medium text-slate-700">Unidade</label>
+                                <input type="text" id="item-unidade" class="input-field pr-10" placeholder="Ex: CRAS Centro" required>
+                                <button type="button" id="clear-unidade-btn" class="absolute right-2 top-8 text-slate-400 hover:text-red-500 hidden">&times;</button>
+                            </div>
+                            <!-- Campo Local com trava -->
+                            <div class="relative mt-4">
+                                <label for="item-local" class="block text-sm font-medium text-slate-700">Local</label>
+                                <input type="text" id="item-local" class="input-field pr-10" placeholder="Ex: Sala 01" required>
+                                <button type="button" id="clear-local-btn" class="absolute right-2 top-8 text-slate-400 hover:text-red-500 hidden">&times;</button>
+                            </div>
+                            <div class="mt-4">
+                                <label for="item-descricao" class="block text-sm font-medium text-slate-700">Item (Descrição)</label>
+                                <input type="text" id="item-descricao" class="input-field" placeholder="Ex: Cadeira giratória azul" required>
+                            </div>
+                            <div class="mt-4">
+                                <label for="item-tombo" class="block text-sm font-medium text-slate-700">Tombo (ou "S/T")</label>
+                                <input type="text" id="item-tombo" class="input-field" placeholder="Ex: 123456 ou S/T" required>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mt-4">
+                                <div>
+                                    <label for="item-estado" class="block text-sm font-medium text-slate-700">Estado</label>
+                                    <select id="item-estado" class="input-field">
+                                        <option>NOVO</option>
+                                        <option>BOM</option>
+                                        <option>REGULAR</option>
+                                        <option>AVARIADO</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="item-quantidade" class="block text-sm font-medium text-slate-700">Quantidade</label>
+                                    <input type="number" id="item-quantidade" class="input-field" value="1" min="1">
+                                </div>
+                            </div>
+                            <div class="mt-6">
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700"><i class="fas fa-plus mr-2"></i>Adicionar Item(ns)</button>
+                            </div>
+                        </form>
+                    </div>
+                    <!-- Coluna da Lista -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold mb-4">Itens na Coleta ao Vivo</h2>
+                        <div id="found-items-list" class="space-y-3 h-96 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba de Comparação -->
+            <div id="content-comparacao" class="tab-content hidden">
+                 <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Configurar Análise</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4 mb-4">
+                        <div>
+                            <label for="select-report" class="block text-sm font-medium text-slate-700">1. Escolha o Relatório do Sistema:</label>
+                            <select id="select-report" class="input-field"></select>
+                        </div>
+                        <div>
+                            <label for="select-inventory" class="block text-sm font-medium text-slate-700">2. Escolha o Inventário para Comparar:</label>
+                            <select id="select-inventory" class="input-field"></select>
+                        </div>
+                    </div>
+                    <button id="run-comparison-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700"><i class="fas fa-play mr-2"></i>Iniciar Análise Completa</button>
+                    
+                    <!-- Resultados da Análise -->
+                    <div id="analysis-results-container" class="mt-6 hidden">
+                        <h3 class="text-xl font-bold text-slate-800 mb-4">Resultados da Análise</h3>
+                        <!-- Análise de Unidade Cruzada -->
+                        <div id="cross-unit-results-container" class="mb-6"></div>
+                        <!-- Comparação Padrão -->
+                        <div id="comparison-results"></div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Aba de Gerenciamento de Dados -->
+            <div id="content-gerenciar" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Coluna de Upload -->
+                    <div>
+                        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                            <h2 class="text-xl font-semibold mb-2">Carregar Novo Relatório do Sistema</h2>
+                            <form id="upload-report-form">
+                                <input type="text" id="new-report-name" class="input-field mb-2" placeholder="Dê um nome ao relatório (Ex: Sistema GERAL 2025)" required>
+                                <input type="file" id="system-csv-input" accept=".csv" class="input-file" required>
+                                <button type="submit" class="mt-4 w-full bg-cyan-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-cyan-700"><i class="fas fa-upload mr-2"></i>Carregar Relatório</button>
+                            </form>
+                            <div id="import-system-status" class="mt-4"></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-semibold mb-2">Carregar Novo Inventário de Campo</h2>
+                             <form id="upload-inventory-form">
+                                <input type="text" id="new-inventory-name" class="input-field mb-2" placeholder="Dê um nome ao inventário (Ex: CRAS Centro 2025)" required>
+                                <input type="file" id="inventory-csv-input" accept=".csv" class="input-file" required>
+                                <button type="submit" class="mt-4 w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700"><i class="fas fa-file-import mr-2"></i>Carregar Inventário</button>
+                            </form>
+                            <div id="import-inventory-status" class="mt-4"></div>
+                        </div>
+                    </div>
+                    <!-- Coluna de Listas de Dados -->
+                    <div>
+                        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                            <h2 class="text-xl font-semibold mb-4">Relatórios Salvos</h2>
+                            <ul id="reports-list" class="space-y-2"></ul>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-semibold mb-4">Inventários Salvos</h2>
+                            <ul id="inventories-list" class="space-y-2"></ul>
+                        </div>
+                         <div class="mt-6">
+                             <button id="clear-session-btn" class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700"><i class="fas fa-trash mr-2"></i>Limpar Coleta ao Vivo</button>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts do Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+    <!-- Scripts da Aplicação -->
+    <script src="src/ui.js"></script>
+    <script src="src/formHandler.js"></script>
+    <script src="src/csvParser.js"></script>
+    <script src="src/comparisonEngine.js"></script>
+    <script src="src/firebaseService.js"></script>
+    <script src="src/main.js"></script>
+
+</body>
+</html>
