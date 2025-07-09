@@ -3,25 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Inventário v5.2 (Estável)</title>
-    <!-- Tailwind CSS (Gratuito via CDN) -->
+    <title>Painel de Inventário v7.2 (Final)</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome para Ícones (Gratuito via CDN) -->
+    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PapaParse para ler CSV (Gratuito via CDN) -->
+    <!-- PapaParse for CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- String-Similarity (LINK CORRIGIDO E VERIFICADO) -->
+    <!-- String-Similarity (CDN Verificado) -->
     <script src="https://cdn.jsdelivr.net/npm/string-similarity@4.0.4/umd/string-similarity.min.js"></script>
-    <!-- Estilos personalizados -->
-    <link rel="stylesheet" href="assets/styles.css">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-button.active { @apply border-blue-600 text-blue-600 bg-white; }
+        .tab-button { @apply px-4 py-2 font-medium text-sm rounded-t-lg border-b-2 border-transparent text-slate-500 hover:text-blue-600 hover:border-blue-300; }
+        .input-field { @apply mt-1 block w-full p-3 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base; }
+        .input-field:disabled { @apply bg-slate-100 text-slate-500 cursor-not-allowed; }
+        .input-file { @apply block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mt-2; }
+        #loading-overlay.hidden { display: none; }
+    </style>
 </head>
 <body class="bg-slate-100">
 
-    <!-- Tela de Carregamento -->
-    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-75 z-50 flex items-center justify-center">
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-75 z-50 flex items-center justify-center hidden">
         <div class="text-center">
             <i class="fas fa-spinner fa-spin text-blue-600 text-4xl"></i>
-            <p class="mt-2 text-slate-700">A ligar ao banco de dados online...</p>
+            <p id="loading-text" class="mt-2 text-slate-700">A processar...</p>
         </div>
     </div>
 
@@ -33,11 +40,9 @@
             </div>
             <div id="auth-status" class="text-right">
                 <p class="text-sm text-slate-500">Status: <span id="connection-status" class="font-bold text-red-500">Desligado</span></p>
-                <p class="text-xs text-slate-400" id="user-id"></p>
             </div>
         </header>
 
-        <!-- Abas de Navegação -->
         <div class="mb-4">
             <div class="border-b border-gray-200">
                 <nav class="-mb-px flex space-x-4" aria-label="Tabs">
@@ -48,12 +53,9 @@
             </div>
         </div>
 
-        <!-- Conteúdo das Abas -->
         <main>
-            <!-- Aba de Inventário (Coleta ao Vivo) -->
             <div id="content-inventario" class="tab-content">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Coluna do Formulário -->
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <h2 class="text-xl font-semibold mb-4">Adicionar Item na Coleta</h2>
                         <form id="add-item-form">
@@ -91,19 +93,21 @@
                                 </div>
                             </div>
                             <div class="mt-6">
-                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700"><i class="fas fa-plus mr-2"></i>Adicionar Item(ns)</button>
+                                <button type="submit" id="add-item-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-300">
+                                    <span id="add-item-btn-text"><i class="fas fa-plus mr-2"></i>Adicionar Item(ns)</span>
+                                </button>
                             </div>
                         </form>
                     </div>
-                    <!-- Coluna da Lista -->
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <h2 class="text-xl font-semibold mb-4">Itens na Coleta ao Vivo</h2>
-                        <div id="found-items-list" class="space-y-3 h-96 overflow-y-auto"></div>
+                        <div id="found-items-list" class="space-y-3 h-80 overflow-y-auto"></div>
+                        <div class="mt-4">
+                            <button id="finalize-session-btn" class="w-full bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-700"><i class="fas fa-check-circle mr-2"></i>Finalizar e Salvar Sessão</button>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Aba de Comparação -->
             <div id="content-comparacao" class="tab-content hidden">
                  <div class="bg-white p-6 rounded-lg shadow-md">
                     <h2 class="text-xl font-semibold mb-4">Configurar Análise</h2>
@@ -118,7 +122,6 @@
                         </div>
                     </div>
                     <button id="run-comparison-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700"><i class="fas fa-play mr-2"></i>Iniciar Análise Completa</button>
-                    
                     <div id="analysis-results-container" class="mt-6 hidden">
                         <h3 class="text-xl font-bold text-slate-800 mb-4">Resultados da Análise</h3>
                         <div id="cross-unit-results-container" class="mb-6"></div>
@@ -126,8 +129,6 @@
                     </div>
                  </div>
             </div>
-
-            <!-- Aba de Gerenciamento de Dados -->
             <div id="content-gerenciar" class="tab-content hidden">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
@@ -168,18 +169,508 @@
         </main>
     </div>
 
-    <!-- Scripts do Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ================== CONFIGURAÇÃO DA API ==================
+            const API_URL = "https://script.google.com/macros/s/AKfycbz5pzmW4shJcIC1ErRcRLhsxc0bnGEYo3zL2YvO9CMzfd29lYjIu5SbAUbRG2zc5z67/exec";
 
-    <!-- Scripts da Aplicação -->
-    <script src="src/ui.js"></script>
-    <script src="src/formHandler.js"></script>
-    <script src="src/csvParser.js"></script>
-    <script src="src/comparisonEngine.js"></script>
-    <script src="src/firebaseService.js"></script>
-    <script src="src/main.js"></script>
+            // ================== VARIÁVEIS GLOBAIS E ESTADO ==================
+            let state = {
+                datasets: [],
+                liveSessionItems: [],
+            };
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const loadingText = document.getElementById('loading-text');
 
+            // ================== DEFINIÇÃO DE TODAS AS FUNÇÕES ==================
+
+            // MÓDULO: API Service
+            async function apiCall(action, params = {}, method = 'GET', body = null) {
+                const url = new URL(API_URL);
+                url.searchParams.append('action', action);
+                for (const key in params) {
+                    url.searchParams.append(key, params[key]);
+                }
+                const options = { method, redirect: 'follow' };
+                if (body && method === 'POST') {
+                    options.body = JSON.stringify(body);
+                    options.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+                }
+                try {
+                    const response = await fetch(url.toString(), options);
+                    if (!response.ok) throw new Error(`Erro de rede: ${response.statusText}`);
+                    const result = await response.json();
+                    if (result.status === 'error') throw new Error(`Erro da API: ${result.message}`);
+                    return result.data;
+                } catch (error) {
+                    console.error(`Falha na chamada da API para a ação "${action}":`, error);
+                    alert(`Ocorreu um erro de comunicação com o servidor: ${error.message}`);
+                    throw error;
+                }
+            }
+            
+            // MÓDULO: UI
+            function setupTabs() {
+                const tabs = document.querySelectorAll('.tab-button');
+                const contents = document.querySelectorAll('.tab-content');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => t.classList.remove('active'));
+                        contents.forEach(c => c.classList.add('hidden'));
+                        tab.classList.add('active');
+                        document.getElementById(`content-${tab.id.split('-')[1]}`).classList.remove('hidden');
+                    });
+                });
+            }
+
+            function renderFoundItems(items) {
+                const listElement = document.getElementById('found-items-list');
+                listElement.innerHTML = '';
+                if (!items || items.length === 0) {
+                    listElement.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item adicionado ainda.</p>';
+                    return;
+                }
+                const sortedItems = [...items].sort((a, b) => (b.uuid || '0').localeCompare(a.uuid || '0'));
+                sortedItems.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'p-3 border rounded-md bg-slate-50 text-sm';
+                    itemDiv.innerHTML = `<p class="font-semibold">${item.descricaoInventario}</p><p class="text-slate-600">Tombo: ${item.tombo} | Local: ${item.local}</p>`;
+                    listElement.appendChild(itemDiv);
+                });
+            }
+
+            function renderAllLists(datasets) {
+                const reportsList = document.getElementById('reports-list');
+                const inventoriesList = document.getElementById('inventories-list');
+                reportsList.innerHTML = '';
+                inventoriesList.innerHTML = '';
+                const reports = datasets.filter(ds => ds.Type === 'relatorio');
+                const inventories = datasets.filter(ds => ds.Type === 'inventario');
+                if (reports.length === 0) reportsList.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Nenhum relatório carregado.</p>';
+                else reports.forEach(dataset => addListItem(reportsList, dataset));
+                if (inventories.length === 0) inventoriesList.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Nenhum inventário carregado.</p>';
+                else inventories.forEach(dataset => addListItem(inventoriesList, dataset));
+                
+                document.querySelectorAll('.delete-dataset-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const docId = e.target.dataset.id;
+                        if (confirm('Tem certeza que deseja apagar este conjunto de dados permanentemente?')) {
+                            setLoading(true, 'A apagar...');
+                            try {
+                                await apiCall('DELETE_DATASET', { id: docId }, 'POST');
+                                await refreshAllData();
+                            } catch (error) {
+                                // O erro já é mostrado pelo apiCall
+                            } finally {
+                                setLoading(false);
+                            }
+                        }
+                    });
+                });
+            }
+
+            function addListItem(list, dataset) {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center p-2 bg-slate-50 rounded';
+                li.innerHTML = `<div><span class="font-medium">${dataset.Name}</span><span class="text-xs text-slate-500 ml-2">(${dataset.ItemCount} itens)</span></div><button data-id="${dataset.ID}" class="delete-dataset-btn text-red-400 hover:text-red-600 text-lg font-bold">&times;</button>`;
+                list.appendChild(li);
+            }
+
+            function populateComparisonSelects(datasets) {
+                const reportSelect = document.getElementById('select-report');
+                const inventorySelect = document.getElementById('select-inventory');
+                const currentReportVal = reportSelect.value;
+                const currentInventoryVal = inventorySelect.value;
+                reportSelect.innerHTML = '';
+                inventorySelect.innerHTML = '';
+                inventorySelect.add(new Option("-- Coleta ao Vivo --", "live_session"));
+                const reports = datasets.filter(ds => ds.Type === 'relatorio');
+                const inventories = datasets.filter(ds => ds.Type === 'inventario');
+                if (reports.length === 0) {
+                    reportSelect.add(new Option("Carregue um Relatório...", "", true, true));
+                    reportSelect.disabled = true;
+                } else {
+                    reportSelect.disabled = false;
+                    reportSelect.add(new Option("Selecione um Relatório...", ""));
+                    reports.forEach(ds => reportSelect.add(new Option(ds.Name, ds.ID)));
+                }
+                if (inventories.length > 0) inventories.forEach(ds => inventorySelect.add(new Option(ds.Name, ds.ID)));
+                reportSelect.value = currentReportVal;
+                inventorySelect.value = currentInventoryVal;
+            }
+
+            function renderCrossUnitResults(items) {
+                const container = document.getElementById('cross-unit-results-container');
+                container.innerHTML = `<h4 class="text-lg font-semibold text-amber-700 border-b pb-2 mb-3">Análise de Unidade Cruzada</h4>`;
+                if (items.length === 0) {
+                    container.innerHTML += '<p class="text-sm text-slate-600">Nenhuma divergência de unidade encontrada.</p>';
+                    return;
+                }
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 border-l-4 border-amber-500 bg-amber-50 mb-2 rounded';
+                    div.innerHTML = `<p class="font-bold">Tombo: ${item.tombo}</p><p class="text-sm">Unidade no Relatório: <span class="font-medium text-red-600">${item.unidadeRelatorio}</span></p><p class="text-sm">Unidade no Inventário: <span class="font-medium text-green-600">${item.unidadeInventario}</span></p>`;
+                    container.appendChild(div);
+                });
+            }
+
+            function setLoading(isLoading, text = 'A carregar...') {
+                if (isLoading) {
+                    loadingText.textContent = text;
+                    loadingOverlay.classList.remove('hidden');
+                } else {
+                    loadingOverlay.classList.add('hidden');
+                }
+            }
+
+            // MÓDULO: Form Handler
+            function setupForm(onAddItem, onClearField) {
+                const form = document.getElementById('add-item-form');
+                form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    onAddItem();
+                });
+                document.getElementById('clear-unidade-btn').addEventListener('click', () => onClearField('item-unidade'));
+                document.getElementById('clear-local-btn').addEventListener('click', () => onClearField('item-local'));
+            }
+
+            // MÓDULO: CSV Parser
+            function setupCsvListener(formId, inputId, statusId, onDataParsed) {
+                const form = document.getElementById(formId);
+                const fileInput = document.getElementById(inputId);
+                const statusEl = document.getElementById(statusId);
+                form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    if (fileInput.files.length === 0) {
+                        statusEl.textContent = 'Por favor, selecione um ficheiro CSV.';
+                        statusEl.className = 'text-red-500';
+                        return;
+                    }
+                    const file = fileInput.files[0];
+                    statusEl.textContent = 'A processar o ficheiro...';
+                    statusEl.className = 'text-blue-500';
+                    Papa.parse(file, {
+                        header: true,
+                        dynamicTyping: true,
+                        skipEmptyLines: true,
+                        complete: (results) => onDataParsed(results.data, form, statusEl),
+                        error: (error) => {
+                            statusEl.textContent = `Erro ao processar: ${error.message}`;
+                            statusEl.className = 'text-red-500';
+                        }
+                    });
+                });
+            }
+
+            // MÓDULO: Comparison Engine
+            function runComparison(inventoryItems, reportItems) {
+                const resultsContainer = document.getElementById('comparison-results');
+                resultsContainer.innerHTML = '<p class="text-center p-4">A processar a comparação...</p>';
+                let sessionUnmatched = [...inventoryItems];
+                let masterUnmatched = [...reportItems];
+                let matches = [];
+                sessionUnmatched = sessionUnmatched.filter(sessionItem => {
+                    if (!sessionItem.tombo || String(sessionItem.tombo).startsWith('S/T_')) return true;
+                    const matchIndex = masterUnmatched.findIndex(masterItem => masterItem.tombo == sessionItem.tombo);
+                    if (matchIndex > -1) {
+                        const matchedMasterItem = masterUnmatched[matchIndex];
+                        matches.push({ ...sessionItem, descricaoSistema: matchedMasterItem.descricaoSistema, status: 'ENCONTRADO', matchType: 'Tombo' });
+                        masterUnmatched.splice(matchIndex, 1);
+                        return false;
+                    }
+                    return true;
+                });
+                sessionUnmatched.forEach(sessionItem => {
+                     if (masterUnmatched.length > 0 && typeof stringSimilarity !== 'undefined') {
+                        const bestMatch = stringSimilarity.findBestMatch((sessionItem.descricaoInventario || '').toLowerCase(), masterUnmatched.map(m => (m.descricaoSistema || '').toLowerCase()));
+                        if (bestMatch.bestMatch.rating > 0.7) {
+                            const masterItem = masterUnmatched[bestMatch.bestMatchIndex];
+                            matches.push({ ...sessionItem, status: 'ENCONTRADO (SUGESTÃO)', matchType: 'Descrição Similar', originalMaster: masterItem });
+                            masterUnmatched.splice(bestMatch.bestMatchIndex, 1);
+                            const sessionIndex = sessionUnmatched.findIndex(i => i.uuid === sessionItem.uuid);
+                            if(sessionIndex > -1) sessionUnmatched.splice(sessionIndex, 1);
+                        }
+                     }
+                });
+                const notFound = masterUnmatched.map(item => ({ ...item, status: 'NÃO ENCONTRADO' }));
+                const leftovers = sessionUnmatched.map(item => ({ ...item, status: 'SOBRA (NÃO CONSTA NO SISTEMA)' }));
+                renderComparisonResults([...matches, ...notFound, ...leftovers]);
+            }
+
+            function renderComparisonResults(results) {
+                const container = document.getElementById('comparison-results');
+                container.innerHTML = `<h4 class="text-lg font-semibold text-slate-700 border-b pb-2 mb-3">Análise de Itens Encontrados e Faltantes</h4>`;
+                if (results.length === 0) {
+                    container.innerHTML += '<p class="text-center p-4">Nenhum resultado para exibir.</p>';
+                    return;
+                }
+                const statusOrder = ['ENCONTRADO', 'ENCONTRADO (SUGESTÃO)', 'NÃO ENCONTRADO', 'SOBRA (NÃO CONSTA NO SISTEMA)'];
+                statusOrder.forEach(status => {
+                    const items = results.filter(r => r.status === status);
+                    if (items.length > 0) {
+                        const statusTitle = document.createElement('h5');
+                        statusTitle.className = 'text-md font-semibold mt-4 mb-2 text-slate-600';
+                        statusTitle.textContent = `${status} (${items.length})`;
+                        container.appendChild(statusTitle);
+                        items.forEach(item => {
+                            const div = document.createElement('div');
+                            let colorClass = 'border-slate-300';
+                            if (status.startsWith('ENCONTRADO')) colorClass = 'border-green-500';
+                            if (status === 'NÃO ENCONTRADO') colorClass = 'border-red-500';
+                            if (status.startsWith('SOBRA')) colorClass = 'border-yellow-500';
+                            div.className = `p-3 border-l-4 ${colorClass} bg-slate-50 mb-2 rounded`;
+                            let content = `<p class="font-bold">${item.descricaoInventario || item.descricaoSistema}</p><p class="text-sm text-slate-600">Tombo: ${item.tombo}</p>`;
+                            if (item.status === 'ENCONTRADO (SUGESTÃO)') {
+                                content += `<p class="text-xs text-blue-600">Sugestão baseada em: "${item.originalMaster.descricaoSistema}" (Tombo do sistema: ${item.originalMaster.tombo})</p>`;
+                            }
+                            div.innerHTML = content;
+                            container.appendChild(div);
+                        });
+                    }
+                });
+            }
+
+            function runCrossUnitCheck(inventoryItems, reportItems) {
+                const container = document.getElementById('cross-unit-results-container');
+                container.innerHTML = '';
+                const divergentItems = [];
+                const reportMap = new Map(reportItems.map(item => [item.tombo, item.unidade]));
+                inventoryItems.forEach(invItem => {
+                    if (invItem.tombo && !String(invItem.tombo).startsWith('S/T_')) {
+                        const reportUnit = reportMap.get(invItem.tombo);
+                        if (reportUnit && reportUnit !== invItem.unidade) {
+                            divergentItems.push({ tombo: invItem.tombo, unidadeRelatorio: reportUnit, unidadeInventario: invItem.unidade });
+                        }
+                    }
+                });
+                renderCrossUnitResults(divergentItems);
+            }
+
+            // ================== LÓGICA PRINCIPAL (CONTROLADOR) ==================
+            async function handleAddItem() {
+                const addBtn = document.getElementById('add-item-btn');
+                const btnText = document.getElementById('add-item-btn-text');
+                
+                addBtn.disabled = true;
+                btnText.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>A Salvar...';
+                
+                const unidadeInput = document.getElementById('item-unidade');
+                const tomboInput = document.getElementById('item-tombo');
+                const quantidadeInput = document.getElementById('item-quantidade');
+                const newItem = {
+                    unidade: unidadeInput.value.trim(),
+                    local: document.getElementById('item-local').value.trim(),
+                    descricaoInventario: document.getElementById('item-descricao').value.trim(),
+                    tombo: String(tomboInput.value).trim().toUpperCase() === 'S/T' ? `S/T_${Date.now()}` : String(tomboInput.value).trim(),
+                    estadoConservacao: document.getElementById('item-estado').value
+                };
+
+                try {
+                    await apiCall('ADD_LIVE_ITEM', {}, 'POST', { newItem, quantity: parseInt(quantidadeInput.value, 10) });
+                    state.liveSessionItems = await apiCall('GET_LIVE_SESSION');
+                    renderFoundItems(state.liveSessionItems);
+                    
+                    document.getElementById('item-descricao').value = '';
+                    document.getElementById('item-tombo').value = '';
+                    quantidadeInput.value = '1';
+                    document.getElementById('item-descricao').focus();
+                    
+                    unidadeInput.disabled = true;
+                    document.getElementById('item-local').disabled = true;
+                    document.getElementById('clear-unidade-btn').classList.remove('hidden');
+                    document.getElementById('clear-local-btn').classList.remove('hidden');
+
+                } catch (error) {
+                    // O erro já é mostrado pelo apiCall
+                } finally {
+                    addBtn.disabled = false;
+                    btnText.innerHTML = '<i class="fas fa-plus mr-2"></i>Adicionar Item(ns)';
+                }
+            }
+
+            function handleClearField(fieldId) {
+                const input = document.getElementById(fieldId);
+                input.disabled = false;
+                input.value = '';
+                document.getElementById(`clear-${fieldId.split('-')[1]}-btn`).classList.add('hidden');
+                input.focus();
+            }
+
+            function sanitizeObject(obj) {
+                const sanitizedObj = {};
+                for (const key in obj) {
+                    if (obj[key] !== undefined && obj[key] !== null) {
+                        sanitizedObj[key] = obj[key];
+                    } else {
+                        sanitizedObj[key] = '';
+                    }
+                }
+                return sanitizedObj;
+            }
+
+            async function handleDatasetUpload(csvData, type, form) {
+                const statusEl = form.querySelector('div[id^="import-"]');
+                const nameInputId = type === 'relatorio' ? 'new-report-name' : 'new-inventory-name';
+                const name = document.getElementById(nameInputId).value;
+                if (!name) {
+                    alert('Por favor, dê um nome ao ficheiro.');
+                    return;
+                }
+
+                const items = csvData.map((row, index) => {
+                    let item;
+                    if (type === 'relatorio') {
+                        item = {
+                            unidade: row.UNIDADE,
+                            tombo: String(row.TOMBAMENTO || `S/T_REL_${index}`),
+                            descricaoSistema: row['Descrição'] || row.Descricao,
+                            fonte: 'SISTEMA'
+                        };
+                    } else {
+                        const tombo = row.Tombo || row.tombo;
+                        item = {
+                            unidade: row.UNIDADE || row.unidade,
+                            local: row.Local || row.local,
+                            descricaoInventario: row.Item || row.item,
+                            tombo: String(tombo || `S/T_INV_${Date.now()}`).trim().toUpperCase(),
+                            estadoConservacao: row['Estado de Conservação'] || row.estado,
+                            fonte: 'INVENTARIO'
+                        };
+                    }
+                    return sanitizeObject(item);
+                });
+
+                setLoading(true, `A carregar ${name}...`);
+                try {
+                    await apiCall('UPLOAD_DATASET', {}, 'POST', { name, type, items });
+                    await refreshAllData();
+                    statusEl.textContent = 'Upload concluído com sucesso!';
+                    statusEl.className = 'text-green-600';
+                    form.reset();
+                    document.getElementById('tab-comparacao').click();
+                } catch (error) {
+                    statusEl.textContent = 'Erro ao salvar. Verifique o console (F12).';
+                    statusEl.className = 'text-red-500';
+                } finally {
+                    setLoading(false);
+                }
+            }
+            
+            async function handleRunComparison() {
+                const reportId = document.getElementById('select-report').value;
+                const inventoryId = document.getElementById('select-inventory').value;
+                if (!reportId || !inventoryId) {
+                    alert('Por favor, selecione um relatório e um inventário para comparar.');
+                    return;
+                }
+                
+                setLoading(true, 'A carregar dados para análise...');
+                try {
+                    const reportDatasetItems = await apiCall('GET_DATASET_ITEMS', { id: reportId });
+                    
+                    let inventoryDatasetItems;
+                    if (inventoryId === 'live_session') {
+                        inventoryDatasetItems = state.liveSessionItems;
+                    } else {
+                        inventoryDatasetItems = await apiCall('GET_DATASET_ITEMS', { id: inventoryId });
+                    }
+                    
+                    if (!reportDatasetItems || !inventoryDatasetItems) {
+                        throw new Error('Não foi possível carregar os dados completos para a comparação.');
+                    }
+
+                    document.getElementById('analysis-results-container').classList.remove('hidden');
+                    runComparison(inventoryDatasetItems, reportDatasetItems);
+                    runCrossUnitCheck(inventoryDatasetItems, reportDatasetItems);
+
+                } catch (error) {
+                    // O erro já é mostrado pelo apiCall
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            async function handleClearSession() {
+                if (confirm('Tem certeza que deseja apagar TODOS os itens da coleta ao vivo? Esta ação não pode ser desfeita.')) {
+                    setLoading(true, 'A limpar sessão...');
+                    await apiCall('CLEAR_LIVE_SESSION', {}, 'POST');
+                    state.liveSessionItems = [];
+                    renderFoundItems([]);
+                    setLoading(false);
+                }
+            }
+            
+            async function handleFinalizeSession() {
+                if (state.liveSessionItems.length === 0) {
+                    alert("Não há itens na coleta ao vivo para finalizar.");
+                    return;
+                }
+                const defaultName = `Inventário ${state.liveSessionItems[0].unidade || ''} - ${new Date().toLocaleDateString()}`;
+                const name = prompt("Dê um nome para este inventário finalizado:", defaultName);
+                
+                if (name) {
+                    setLoading(true, `A finalizar e salvar "${name}"...`);
+                    try {
+                        // Usa a mesma função de upload, mas com os dados da sessão ao vivo
+                        await apiCall('UPLOAD_DATASET', {}, 'POST', { name, type: 'inventario', items: state.liveSessionItems });
+                        // Depois de salvar, limpa a sessão ao vivo
+                        await apiCall('CLEAR_LIVE_SESSION', {}, 'POST');
+                        state.liveSessionItems = [];
+                        renderFoundItems([]);
+                        alert(`Sessão "${name}" salva com sucesso!`);
+                        await refreshAllData();
+                    } catch (error) {
+                        // O erro já é mostrado pelo apiCall
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+            }
+
+            async function refreshAllData() {
+                setLoading(true, 'A atualizar dados...');
+                try {
+                    const [datasets, liveSession] = await Promise.all([
+                        apiCall('GET_ALL_DATASETS_META'),
+                        apiCall('GET_LIVE_SESSION')
+                    ]);
+                    state.datasets = datasets;
+                    state.liveSessionItems = liveSession;
+                    renderAllLists(state.datasets);
+                    populateComparisonSelects(state.datasets);
+                    renderFoundItems(state.liveSessionItems);
+                } catch (error) {
+                    // O erro já é mostrado pelo apiCall
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            // --- INICIALIZAÇÃO DA APLICAÇÃO ---
+            async function main() {
+                setLoading(true, 'A ligar ao servidor...');
+                try {
+                    await refreshAllData();
+                    document.getElementById('connection-status').textContent = 'Ligado';
+                    document.getElementById('connection-status').className = 'font-bold text-green-500';
+                    
+                    setupTabs();
+                    setupForm(handleAddItem, handleClearField);
+                    setupCsvListener('upload-report-form', 'system-csv-input', 'import-system-status', handleDatasetUpload);
+                    setupCsvListener('upload-inventory-form', 'inventory-csv-input', 'import-inventory-status', handleDatasetUpload);
+                    document.getElementById('run-comparison-btn').addEventListener('click', handleRunComparison);
+                    document.getElementById('clear-session-btn').addEventListener('click', handleClearSession);
+                    document.getElementById('finalize-session-btn').addEventListener('click', handleFinalizeSession);
+
+                } catch (error) {
+                    document.getElementById('loading-overlay').innerHTML = `<p class="text-red-500 p-4">Falha grave ao carregar os dados iniciais. Verifique o URL da API e a sua ligação à internet.</p>`;
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            main();
+        });
+    </script>
 </body>
 </html>
