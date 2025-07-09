@@ -31,31 +31,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('connection-status').className = 'font-bold text-green-500';
         document.getElementById('user-id').textContent = `ID: ${userId.substring(0, 8)}...`;
         
-        // Inicia os "ouvintes" que atualizam a aplicação em tempo real
         initializeListeners();
-
     } catch (error) {
-        // (código de erro)
+        console.error("Falha na inicialização:", error);
     }
     
     function initializeListeners() {
-        console.log("Inicializando todos os ouvintes de dados...");
-
-        // Garante que os ouvintes antigos são desligados antes de criar novos
         if (state.unsubscribeDatasets) state.unsubscribeDatasets();
-        if (state.unsubscribeLiveSession) state.unsubscribeLiveSession();
-
-        // OUVINTE 1: Fica a observar a coleção de relatórios e inventários salvos
         state.unsubscribeDatasets = listenToCollection(DATASETS_COLLECTION, (datasets) => {
-            console.log('Ouvinte de Datasets recebeu dados:', datasets.length, 'itens.');
             state.datasets = datasets;
-            renderAllLists(datasets); // Atualiza as listas na aba "Gerenciar"
-            populateComparisonSelects(datasets); // ATUALIZA OS MENUS SUSPENSOS NA ABA "ANÁLISE"
+            renderAllLists(datasets);
+            populateComparisonSelects(datasets);
         });
 
-        // OUVINTE 2: Fica a observar a coleção da "Coleta ao Vivo"
+        if (state.unsubscribeLiveSession) state.unsubscribeLiveSession();
         state.unsubscribeLiveSession = listenToCollection(SESSION_COLLECTION, (items) => {
-            console.log('Ouvinte da Sessão ao Vivo recebeu dados:', items.length, 'itens.');
             state.liveSessionItems = items;
             renderFoundItems(items);
             updateSessionHeader(items);
@@ -65,8 +55,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- CONFIGURAÇÃO DA UI ---
     setupTabs();
     setupForm(handleAddItem, handleClearField);
-    setupCsvListener('upload-report-form', 'system-csv-input', 'import-system-status', (data) => handleDatasetUpload(data, 'relatorio'));
-    setupCsvListener('upload-inventory-form', 'inventory-csv-input', 'import-inventory-status', (data) => handleDatasetUpload(data, 'inventario'));
+    setupCsvListener('upload-report-form', 'system-csv-input', 'import-system-status', (data, form) => handleDatasetUpload(data, 'relatorio', form));
+    setupCsvListener('upload-inventory-form', 'inventory-csv-input', 'import-inventory-status', (data, form) => handleDatasetUpload(data, 'inventario', form));
     document.getElementById('run-comparison-btn').addEventListener('click', handleRunComparison);
     document.getElementById('clear-session-btn').addEventListener('click', handleClearSession);
 
@@ -100,7 +90,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.focus();
     }
 
-    async function handleDatasetUpload(csvData, type) {
+    async function handleDatasetUpload(csvData, type, form) {
+        const statusEl = form.querySelector('div[id^="import-"]');
         const nameInputId = type === 'relatorio' ? 'new-report-name' : 'new-inventory-name';
         const name = document.getElementById(nameInputId).value;
         if (!name) {
@@ -129,18 +120,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        const dataset = {
+        const datasetMetadata = {
             name: name,
             type: type,
             itemCount: items.length,
             createdAt: new Date().toISOString(),
-            items: items
         };
 
         const docId = `${type}_${Date.now()}`;
-        await saveDocument(DATASETS_COLLECTION, docId, dataset);
-        
-        document.getElementById('tab-comparacao').click();
+
+        try {
+            statusEl.textContent = 'Salvando metadados...';
+            await saveDocument(DATASETS_COLLECTION, docId, datasetMetadata);
+
+            const batchSize = 400; // Limite do Firestore é 500, usamos 400 por segurança.
+            for (let i = 0; i < items.length; i += batchSize) {
+                const batchItems = items.slice(i, i + batchSize);
+                statusEl.textContent = `Salvando itens ${i + 1} a ${i + batchItems.length}...`;
+                await saveItemsToSubcollection(DATASETS_COLLECTION, docId, 'items', batchItems);
+            }
+            
+            statusEl.textContent = 'Upload concluído com sucesso!';
+            statusEl.className = 'text-green-600';
+            form.reset();
+            document.getElementById('tab-comparacao').click();
+
+        } catch (error) {
+            console.error("ERRO AO CARREGAR O DATASET:", error);
+            statusEl.textContent = 'Erro ao salvar. Verifique o console (F12).';
+            statusEl.className = 'text-red-500';
+            await deleteDatasetWithItems(DATASETS_COLLECTION, docId);
+        }
     }
     
     async function handleRunComparison() {
@@ -154,17 +164,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('analysis-results-container').classList.add('hidden');
         
-        const reportDataset = await getDocument(DATASETS_COLLECTION, reportId);
+        const reportDataset = await getDatasetWithItems(DATASETS_COLLECTION, reportId);
         
         let inventoryDataset;
         if (inventoryId === 'live_session') {
             inventoryDataset = { name: 'Coleta ao Vivo', items: state.liveSessionItems };
         } else {
-            inventoryDataset = await getDocument(DATASETS_COLLECTION, inventoryId);
+            inventoryDataset = await getDatasetWithItems(DATASETS_COLLECTION, inventoryId);
         }
 
-        if (!reportDataset || !inventoryDataset) {
-            alert('Não foi possível carregar os dados selecionados.');
+        if (!reportDataset || !reportDataset.items || !inventoryDataset || !inventoryDataset.items) {
+            alert('Não foi possível carregar os dados completos para a comparação.');
             return;
         }
 
