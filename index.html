@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Inventário v4 (Avançado)</title>
+    <title>Painel de Inventário v5 (Estável)</title>
     <!-- Tailwind CSS (Gratuito via CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome para Ícones (Gratuito via CDN) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- PapaParse para ler CSV (Gratuito via CDN) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- String-Similarity para comparação inteligente (Gratuito via CDN) -->
-    <script src="https://cdn.jsdelivr.net/npm/string-similarity/build/string-similarity.min.js"></script>
+    <!-- String-Similarity (LINK CORRIGIDO) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/string-similarity/4.0.4/string-similarity.min.js"></script>
     <!-- Estilos personalizados -->
     <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -21,7 +21,7 @@
     <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-75 z-50 flex items-center justify-center">
         <div class="text-center">
             <i class="fas fa-spinner fa-spin text-blue-600 text-4xl"></i>
-            <p class="mt-2 text-slate-700">Conectando ao banco de dados online...</p>
+            <p class="mt-2 text-slate-700">A ligar ao banco de dados online...</p>
         </div>
     </div>
 
@@ -32,7 +32,7 @@
                 <p id="session-unit-name" class="text-slate-600">Sessão de Coleta ao Vivo</p>
             </div>
             <div id="auth-status" class="text-right">
-                <p class="text-sm text-slate-500">Status: <span id="connection-status" class="font-bold text-red-500">Desconectado</span></p>
+                <p class="text-sm text-slate-500">Status: <span id="connection-status" class="font-bold text-red-500">Desligado</span></p>
                 <p class="text-xs text-slate-400" id="user-id"></p>
             </div>
         </header>
@@ -43,7 +43,7 @@
                 <nav class="-mb-px flex space-x-4" aria-label="Tabs">
                     <button id="tab-inventario" class="tab-button active"><i class="fas fa-keyboard mr-2"></i>Coleta ao Vivo</button>
                     <button id="tab-comparacao" class="tab-button"><i class="fas fa-exchange-alt mr-2"></i>Análise e Comparação</button>
-                    <button id="tab-gerenciar" class="tab-button"><i class="fas fa-database mr-2"></i>Gerenciar Dados</button>
+                    <button id="tab-gerenciar" class="tab-button"><i class="fas fa-database mr-2"></i>Gerir Dados</button>
                 </nav>
             </div>
         </div>
@@ -57,13 +57,11 @@
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <h2 class="text-xl font-semibold mb-4">Adicionar Item na Coleta</h2>
                         <form id="add-item-form">
-                            <!-- Campo Unidade com trava -->
                             <div class="relative">
                                 <label for="item-unidade" class="block text-sm font-medium text-slate-700">Unidade</label>
                                 <input type="text" id="item-unidade" class="input-field pr-10" placeholder="Ex: CRAS Centro" required>
                                 <button type="button" id="clear-unidade-btn" class="absolute right-2 top-8 text-slate-400 hover:text-red-500 hidden">&times;</button>
                             </div>
-                            <!-- Campo Local com trava -->
                             <div class="relative mt-4">
                                 <label for="item-local" class="block text-sm font-medium text-slate-700">Local</label>
                                 <input type="text" id="item-local" class="input-field pr-10" placeholder="Ex: Sala 01" required>
@@ -121,12 +119,9 @@
                     </div>
                     <button id="run-comparison-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700"><i class="fas fa-play mr-2"></i>Iniciar Análise Completa</button>
                     
-                    <!-- Resultados da Análise -->
                     <div id="analysis-results-container" class="mt-6 hidden">
                         <h3 class="text-xl font-bold text-slate-800 mb-4">Resultados da Análise</h3>
-                        <!-- Análise de Unidade Cruzada -->
                         <div id="cross-unit-results-container" class="mb-6"></div>
-                        <!-- Comparação Padrão -->
                         <div id="comparison-results"></div>
                     </div>
                  </div>
@@ -135,7 +130,6 @@
             <!-- Aba de Gerenciamento de Dados -->
             <div id="content-gerenciar" class="tab-content hidden">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Coluna de Upload -->
                     <div>
                         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                             <h2 class="text-xl font-semibold mb-2">Carregar Novo Relatório do Sistema</h2>
@@ -156,7 +150,6 @@
                             <div id="import-inventory-status" class="mt-4"></div>
                         </div>
                     </div>
-                    <!-- Coluna de Listas de Dados -->
                     <div>
                         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                             <h2 class="text-xl font-semibold mb-4">Relatórios Salvos</h2>
