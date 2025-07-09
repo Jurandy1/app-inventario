@@ -42,13 +42,13 @@ function renderAllLists(datasets) {
     const inventories = datasets.filter(ds => ds.type === 'inventario');
 
     if (reports.length === 0) {
-        reportsList.innerHTML = '<p class="text-slate-500 text-sm text-center">Nenhum relatório carregado.</p>';
+        reportsList.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Nenhum relatório carregado.</p>';
     } else {
         reports.forEach(dataset => addListItem(reportsList, dataset));
     }
 
     if (inventories.length === 0) {
-        inventoriesList.innerHTML = '<p class="text-slate-500 text-sm text-center">Nenhum inventário carregado.</p>';
+        inventoriesList.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Nenhum inventário carregado.</p>';
     } else {
         inventories.forEach(dataset => addListItem(inventoriesList, dataset));
     }
@@ -77,33 +77,40 @@ function addListItem(list, dataset) {
 }
 
 function populateComparisonSelects(datasets) {
+    console.log("UI: Populando menus suspensos de comparação...");
     const reportSelect = document.getElementById('select-report');
     const inventorySelect = document.getElementById('select-inventory');
     
+    // Guarda os valores selecionados atualmente para tentar restaurá-los
     const currentReportVal = reportSelect.value;
     const currentInventoryVal = inventorySelect.value;
 
-    reportSelect.innerHTML = '<option value="">Carregue um Relatório do Sistema...</option>';
-    inventorySelect.innerHTML = '<option value="">Selecione um Inventário...</option>';
+    // Limpa e prepara os menus
+    reportSelect.innerHTML = '';
+    inventorySelect.innerHTML = '';
 
-    inventorySelect.innerHTML += `<option value="live_session">-- Coleta ao Vivo --</option>`;
+    // Adiciona a opção da sessão ao vivo
+    inventorySelect.add(new Option("-- Coleta ao Vivo --", "live_session"));
 
     const reports = datasets.filter(ds => ds.type === 'relatorio');
     const inventories = datasets.filter(ds => ds.type === 'inventario');
 
-    if (reports.length > 0) {
-        reportSelect.innerHTML = '<option value="">Selecione um Relatório...</option>';
-        reports.forEach(ds => {
-            reportSelect.innerHTML += `<option value="${ds.id}">${ds.name}</option>`;
-        });
+    if (reports.length === 0) {
+        reportSelect.add(new Option("Carregue um Relatório do Sistema...", "", true, true));
+        reportSelect.disabled = true;
+    } else {
+        reportSelect.disabled = false;
+        reportSelect.add(new Option("Selecione um Relatório...", ""));
+        reports.forEach(ds => reportSelect.add(new Option(ds.name, ds.id)));
     }
 
-    if (inventories.length > 0) {
-        inventories.forEach(ds => {
-            inventorySelect.innerHTML += `<option value="${ds.id}">${ds.name}</option>`;
-        });
+    if (inventories.length === 0) {
+        // Apenas a "Coleta ao Vivo" estará disponível
+    } else {
+        inventories.forEach(ds => inventorySelect.add(new Option(ds.name, ds.id)));
     }
     
+    // Tenta restaurar a seleção anterior
     reportSelect.value = currentReportVal;
     inventorySelect.value = currentInventoryVal;
 }
