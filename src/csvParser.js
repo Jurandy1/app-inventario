@@ -13,8 +13,8 @@ function setupCsvListener(formId, inputId, statusId, onDataParsed) {
             return;
         }
 
-        const file = fileInput.files[0];
-        statusEl.textContent = 'Processando arquivo...';
+        const file = fileInput.files;
+        statusEl.textContent = 'Lendo arquivo...';
         statusEl.className = 'text-blue-500';
 
         Papa.parse(file, {
@@ -22,11 +22,8 @@ function setupCsvListener(formId, inputId, statusId, onDataParsed) {
             dynamicTyping: true,
             skipEmptyLines: true,
             complete: (results) => {
-                onDataParsed(results.data);
-                statusEl.textContent = `Sucesso! ${results.data.length} registros importados.`;
-                statusEl.className = 'text-green-600';
-                fileInput.value = '';
-                form.reset();
+                // Passa os dados e o próprio formulário para a função de callback
+                onDataParsed(results.data, form);
             },
             error: (error) => {
                 console.error('Erro ao analisar o CSV:', error);
