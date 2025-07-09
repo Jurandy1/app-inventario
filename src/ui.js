@@ -16,16 +16,11 @@ function setupTabs() {
 function renderFoundItems(items) {
     const listElement = document.getElementById('found-items-list');
     listElement.innerHTML = '';
-    if (!items |
-
-| items.length === 0) {
+    if (!items || items.length === 0) {
         listElement.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item adicionado ainda.</p>';
         return;
     }
-    const sortedItems = [...items].sort((a, b) => (b.uuid |
-
-| 0).localeCompare(a.uuid |
-| 0));
+    const sortedItems = [...items].sort((a, b) => (b.uuid || 0).localeCompare(a.uuid || 0));
     sortedItems.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'p-3 border rounded-md bg-slate-50 text-sm';
