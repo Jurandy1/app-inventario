@@ -31,21 +31,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('connection-status').className = 'font-bold text-green-500';
         document.getElementById('user-id').textContent = `ID: ${userId.substring(0, 8)}...`;
         
-        loadInitialData();
+        // Inicia os "ouvintes" que atualizam a aplicação em tempo real
+        initializeListeners();
+
     } catch (error) {
-        // ... (código de erro)
+        // (código de erro)
     }
     
-    function loadInitialData() {
+    function initializeListeners() {
+        console.log("Inicializando todos os ouvintes de dados...");
+
+        // Garante que os ouvintes antigos são desligados antes de criar novos
         if (state.unsubscribeDatasets) state.unsubscribeDatasets();
+        if (state.unsubscribeLiveSession) state.unsubscribeLiveSession();
+
+        // OUVINTE 1: Fica a observar a coleção de relatórios e inventários salvos
         state.unsubscribeDatasets = listenToCollection(DATASETS_COLLECTION, (datasets) => {
+            console.log('Ouvinte de Datasets recebeu dados:', datasets.length, 'itens.');
             state.datasets = datasets;
-            renderAllLists(datasets);
-            populateComparisonSelects(datasets);
+            renderAllLists(datasets); // Atualiza as listas na aba "Gerenciar"
+            populateComparisonSelects(datasets); // ATUALIZA OS MENUS SUSPENSOS NA ABA "ANÁLISE"
         });
 
-        if (state.unsubscribeLiveSession) state.unsubscribeLiveSession();
+        // OUVINTE 2: Fica a observar a coleção da "Coleta ao Vivo"
         state.unsubscribeLiveSession = listenToCollection(SESSION_COLLECTION, (items) => {
+            console.log('Ouvinte da Sessão ao Vivo recebeu dados:', items.length, 'itens.');
             state.liveSessionItems = items;
             renderFoundItems(items);
             updateSessionHeader(items);
@@ -130,7 +140,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const docId = `${type}_${Date.now()}`;
         await saveDocument(DATASETS_COLLECTION, docId, dataset);
         
-        // *** NOVA LINHA: MUDA PARA A ABA DE COMPARAÇÃO AUTOMATICAMENTE ***
         document.getElementById('tab-comparacao').click();
     }
     
