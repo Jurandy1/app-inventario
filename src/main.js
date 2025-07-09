@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { userId } = await initFirebase(firebaseConfig);
         state.userId = userId;
         document.getElementById('loading-overlay').style.display = 'none';
-        document.getElementById('connection-status').textContent = 'Conectado';
+        document.getElementById('connection-status').textContent = 'Ligado';
         document.getElementById('connection-status').className = 'font-bold text-green-500';
         document.getElementById('user-id').textContent = `ID: ${userId.substring(0, 8)}...`;
         
@@ -93,10 +93,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function sanitizeObject(obj) {
         const sanitizedObj = {};
         for (const key in obj) {
-            if (obj[key] !== undefined) {
-                sanitizedObj[key] = obj[key];
+            if (obj[key] === undefined || obj[key] === null) {
+                sanitizedObj[key] = ''; // Substitui undefined/null por uma string vazia
             } else {
-                sanitizedObj[key] = ''; // Substitui undefined por uma string vazia
+                sanitizedObj[key] = obj[key];
             }
         }
         return sanitizedObj;
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nameInputId = type === 'relatorio' ? 'new-report-name' : 'new-inventory-name';
         const name = document.getElementById(nameInputId).value;
         if (!name) {
-            alert('Por favor, dê um nome ao arquivo.');
+            alert('Por favor, dê um nome ao ficheiro.');
             return;
         }
 
@@ -131,7 +131,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     fonte: 'INVENTARIO'
                 };
             }
-            // **CORREÇÃO CRÍTICA AQUI**
             return sanitizeObject(item);
         });
 
