@@ -57,7 +57,7 @@ function renderAllLists(datasets) {
         btn.addEventListener('click', async (e) => {
             const docId = e.target.dataset.id;
             if (confirm('Tem certeza que deseja apagar este conjunto de dados permanentemente?')) {
-                await deleteDocument('datasets', docId);
+                await deleteDatasetWithItems('datasets', docId);
             }
         });
     });
@@ -77,26 +77,22 @@ function addListItem(list, dataset) {
 }
 
 function populateComparisonSelects(datasets) {
-    console.log("UI: Populando menus suspensos de comparação...");
     const reportSelect = document.getElementById('select-report');
     const inventorySelect = document.getElementById('select-inventory');
     
-    // Guarda os valores selecionados atualmente para tentar restaurá-los
     const currentReportVal = reportSelect.value;
     const currentInventoryVal = inventorySelect.value;
 
-    // Limpa e prepara os menus
     reportSelect.innerHTML = '';
     inventorySelect.innerHTML = '';
 
-    // Adiciona a opção da sessão ao vivo
     inventorySelect.add(new Option("-- Coleta ao Vivo --", "live_session"));
 
     const reports = datasets.filter(ds => ds.type === 'relatorio');
     const inventories = datasets.filter(ds => ds.type === 'inventario');
 
     if (reports.length === 0) {
-        reportSelect.add(new Option("Carregue um Relatório do Sistema...", "", true, true));
+        reportSelect.add(new Option("Carregue um Relatório...", "", true, true));
         reportSelect.disabled = true;
     } else {
         reportSelect.disabled = false;
@@ -104,13 +100,10 @@ function populateComparisonSelects(datasets) {
         reports.forEach(ds => reportSelect.add(new Option(ds.name, ds.id)));
     }
 
-    if (inventories.length === 0) {
-        // Apenas a "Coleta ao Vivo" estará disponível
-    } else {
+    if (inventories.length > 0) {
         inventories.forEach(ds => inventorySelect.add(new Option(ds.name, ds.id)));
     }
     
-    // Tenta restaurar a seleção anterior
     reportSelect.value = currentReportVal;
     inventorySelect.value = currentInventoryVal;
 }
@@ -121,7 +114,7 @@ function renderCrossUnitResults(items) {
         <h4 class="text-lg font-semibold text-amber-700 border-b pb-2 mb-3">Análise de Unidade Cruzada</h4>
     `;
     if (items.length === 0) {
-        container.innerHTML += '<p class="text-sm text-slate-600">Nenhuma divergência de unidade encontrada para os tombamentos correspondentes.</p>';
+        container.innerHTML += '<p class="text-sm text-slate-600">Nenhuma divergência de unidade encontrada.</p>';
         return;
     }
     items.forEach(item => {
