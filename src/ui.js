@@ -1,130 +1,18 @@
-// src/ui.js
-
-function setupTabs() {
-    const tabs = document.querySelectorAll('.tab-button');
-    const contents = document.querySelectorAll('.tab-content');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.add('hidden'));
-            tab.classList.add('active');
-            document.getElementById(`content-${tab.id.split('-')[1]}`).classList.remove('hidden');
-        });
-    });
-}
-
-function renderFoundItems(items) {
-    const listElement = document.getElementById('found-items-list');
-    listElement.innerHTML = '';
-    if (!items || items.length === 0) {
-        listElement.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item adicionado ainda.</p>';
-        return;
-    }
-    const sortedItems = [...items].sort((a, b) => (b.uuid || '0').localeCompare(a.uuid || '0'));
-    sortedItems.forEach(item => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'p-3 border rounded-md bg-slate-50 text-sm';
-        itemDiv.innerHTML = `
-            <p class="font-semibold">${item.descricaoInventario}</p>
-            <p class="text-slate-600">Tombo: ${item.tombo} | Local: ${item.local}</p>
-        `;
-        listElement.appendChild(itemDiv);
-    });
-}
-
-function renderAllLists(datasets) {
-    const reportsList = document.getElementById('reports-list');
-    const inventoriesList = document.getElementById('inventories-list');
-    reportsList.innerHTML = '';
-    inventoriesList.innerHTML = '';
-
-    const reports = datasets.filter(ds => ds.type === 'relatorio');
-    const inventories = datasets.filter(ds => ds.type === 'inventario');
-
-    if (reports.length === 0) {
-        reportsList.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Nenhum relatório carregado.</p>';
-    } else {
-        reports.forEach(dataset => addListItem(reportsList, dataset));
-    }
-
-    if (inventories.length === 0) {
-        inventoriesList.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Nenhum inventário carregado.</p>';
-    } else {
-        inventories.forEach(dataset => addListItem(inventoriesList, dataset));
-    }
-
-    document.querySelectorAll('.delete-dataset-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const docId = e.target.dataset.id;
-            if (confirm('Tem certeza que deseja apagar este conjunto de dados permanentemente?')) {
-                await deleteDatasetWithItems('datasets', docId);
-            }
-        });
-    });
-}
-
-function addListItem(list, dataset) {
-    const li = document.createElement('li');
-    li.className = 'flex justify-between items-center p-2 bg-slate-50 rounded';
-    li.innerHTML = `
-        <div>
-            <span class="font-medium">${dataset.name}</span>
-            <span class="text-xs text-slate-500 ml-2">(${dataset.itemCount} itens)</span>
-        </div>
-        <button data-id="${dataset.id}" class="delete-dataset-btn text-red-400 hover:text-red-600 text-lg font-bold">&times;</button>
-    `;
-    list.appendChild(li);
-}
-
-function populateComparisonSelects(datasets) {
-    const reportSelect = document.getElementById('select-report');
-    const inventorySelect = document.getElementById('select-inventory');
-    
-    const currentReportVal = reportSelect.value;
-    const currentInventoryVal = inventorySelect.value;
-
-    reportSelect.innerHTML = '';
-    inventorySelect.innerHTML = '';
-
-    inventorySelect.add(new Option("-- Coleta ao Vivo --", "live_session"));
-
-    const reports = datasets.filter(ds => ds.type === 'relatorio');
-    const inventories = datasets.filter(ds => ds.type === 'inventario');
-
-    if (reports.length === 0) {
-        reportSelect.add(new Option("Carregue um Relatório...", "", true, true));
-        reportSelect.disabled = true;
-    } else {
-        reportSelect.disabled = false;
-        reportSelect.add(new Option("Selecione um Relatório...", ""));
-        reports.forEach(ds => reportSelect.add(new Option(ds.name, ds.id)));
-    }
-
-    if (inventories.length > 0) {
-        inventories.forEach(ds => inventorySelect.add(new Option(ds.name, ds.id)));
-    }
-    
-    reportSelect.value = currentReportVal;
-    inventorySelect.value = currentInventoryVal;
-}
-
-function renderCrossUnitResults(items) {
-    const container = document.getElementById('cross-unit-results-container');
-    container.innerHTML = `
-        <h4 class="text-lg font-semibold text-amber-700 border-b pb-2 mb-3">Análise de Unidade Cruzada</h4>
-    `;
-    if (items.length === 0) {
-        container.innerHTML += '<p class="text-sm text-slate-600">Nenhuma divergência de unidade encontrada.</p>';
-        return;
-    }
-    items.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'p-3 border-l-4 border-amber-500 bg-amber-50 mb-2 rounded';
-        div.innerHTML = `
-            <p class="font-bold">Tombo: ${item.tombo}</p>
-            <p class="text-sm">Unidade no Relatório: <span class="font-medium text-red-600">${item.unidadeRelatorio}</span></p>
-            <p class="text-sm">Unidade no Inventário: <span class="font-medium text-green-600">${item.unidadeInventario}</span></p>
-        `;
-        container.appendChild(div);
-    });
-}
+function switchTab(tabId){document.querySelectorAll(".tab-content").forEach(e=>{e.classList.add("hidden")}),document.querySelectorAll(".tab").forEach(e=>{e.classList.remove("tab-active")}),document.getElementById(`panel-${tabId}`).classList.remove("hidden"),document.getElementById(`tab-${tabId}`).classList.add("tab-active")}function renderLiveInventory(){const e=document.getElementById("live-inventory-output");if(e.innerHTML="",""===state.liveInventory.length)return void(e.innerHTML='<p class="text-gray-500">Nenhum item coletado ainda. Adicione um item acima.</p>');const t=document.createElement("ul");t.className="divide-y divide-gray-200",state.liveInventory.forEach(a=>{const s=document.createElement("li");s.className="py-3 flex justify-between items-center",s.innerHTML=`
+            <div>
+                <span class="font-bold">${a.tombo||"SEM TOMBO"}</span> - ${a.item}
+                <span class="block text-xs text-gray-500">${a.unidade} | ${a.local} | ${a.estado}</span>
+            </div>
+            <i class="fas fa-trash delete-btn" data-tombo="${a.tombo}"></i>
+        `,s.querySelector(".delete-btn").addEventListener("click",handleDeleteLiveItem),t.appendChild(s)}),e.appendChild(t)}function renderComparisonResults(e){const t=document.getElementById("comparison-results");t.innerHTML=`
+        ${createResultsTable("Itens Encontrados (Sistema x Inventário)",["Tombamento","Descrição","Responsavel","Local","Status"],e.found)}
+        ${createResultsTable("Itens Faltantes no Inventário (Consta no Sistema)",["TOMBAMENTO","Descricao","Responsavel","DataUltimoMovimento","Status"],e.missingInInventory)}
+        ${createResultsTable("Itens Sobrando no Inventário (Não Consta no Sistema)",["Tombo","Item","Unidade","Local","Estado"],e.missingInReport)}
+    `,t.classList.remove("hidden")}function createResultsTable(e,t,a){if(0===a.length)return"";const s=t.map(e=>`<th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${e}</th>`).join(""),i=a.map(e=>{const a=t.map(t=>{const a=Object.keys(e).find(e=>e.toLowerCase()===t.toLowerCase().replace(/ /g,""))||t.toLowerCase();return`<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${e[a]||""}</td>`}).join("");return`<tr>${a}</tr>`}).join("");return`
+        <div class="mt-8">
+            <h3 class="text-xl font-semibold text-gray-800">${e} (${a.length})</h3>
+            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 mt-2">
+                <thead><tr>${s}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${i}</tbody>
+            </table></div>
+        </div>`}
