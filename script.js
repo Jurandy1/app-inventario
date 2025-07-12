@@ -299,7 +299,7 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
     let observations = [];
 
     systemMap.forEach((sysRow, tomboNorm) => {
-      if (inventoryMap.has(tomboNorm) ) {
+      if (inventoryMap.has(tomboNorm)) {
         const invRow = inventoryMap.get(tomboNorm);
         matches.push({ tombo: tomboNorm, descSystem: sysRow[2], descInventory: invRow[2], nf: sysRow[4], fornecedor: sysRow[7], fullSystem: sysRow.join(', ') });
       } else {
