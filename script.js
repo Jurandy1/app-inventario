@@ -203,7 +203,7 @@ document.getElementById('uploadSistemaBtn').addEventListener('click', async () =
   }
 });
 
-// Upload inventários anteriores (atualizado para mapear colunas: Unidade (field), Local (D), Item (B), Tombo (C), Estado (E), Quantidade=1)
+// Upload inventários anteriores
 document.getElementById('uploadInventariosBtn').addEventListener('click', async () => {
   const unidade = document.getElementById('unidadeInventario').value.trim();
   if (!unidade) return showToast('toastError', 'Informe a unidade!');
@@ -214,32 +214,22 @@ document.getElementById('uploadInventariosBtn').addEventListener('click', async 
   loading.show();
   try {
     let allData = [];
-    let parsed;
     if (files.length > 0) {
       for (let file of files) {
-        parsed = await parseExcel(file);
-        parsed.forEach(row => {
-          if (row.length >= 5) { // Verifica 5 colunas
-            const newRow = [unidade, row[3] || '', row[1] || '', row[2] || '', row[4] || '', 1]; // A: unidade field, B: Local (D), C: Item (B), D: Tombo (C), E: Estado (E), F: 1
-            allData.push(newRow);
-          }
-        });
+        const parsed = await parseExcel(file);
+        if (parsed[0].length < 4) throw new Error('Formato inválido! Espere colunas A:D.');
+        allData = allData.concat(parsed);
       }
     } else if (paste) {
-      parsed = parsePaste(paste);
-      parsed.forEach(row => {
-        if (row.length >= 5) {
-          const newRow = [unidade, row[3] || '', row[1] || '', row[2] || '', row[4] || '', 1];
-          allData.push(newRow);
-        }
-      });
+      const parsed = parsePaste(paste);
+      if (parsed[0].length < 4) throw new Error('Formato inválido! Espere colunas A:D.');
+      allData = parsed;
     }
-    if (allData.length === 0) throw new Error('Nenhum dado válido encontrado!');
     await fetch(SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'appendReport', sheetName: 'Inventario', data: allData, unidadeUpload: unidade })
     });
-    showToast('toastSuccess', 'Uploads de inventários concluídos com sucesso!');
+    showToast('toastSuccess', 'Uploads concluídos!');
     await popularUnidades();
   } catch (error) {
     showToast('toastError', 'Erro no upload: ' + error.message);
@@ -280,7 +270,8 @@ async function fetchInventarios() {
 document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchInventarios);
 
 // Lógica de análise
-document.getElementById('compararBtn').addEventListener('click', async () => {
+document.getElementById('compararBtn').addEventListener('click', async (e) => {
+  e.preventDefault();
   const unidade = document.getElementById('unidadeComparar').value;
   if (!unidade) return showToast('toastError', 'Selecione uma unidade!');
   const loading = new bootstrap.Modal(document.getElementById('loadingModal'));
@@ -296,7 +287,7 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
       range: 'Inventario!A:J'
     });
     const inventoryData = inventoryResponse.result.values || [];
-    const inventoryFiltered = inventoryData.filter(row => (row[0] || row[9])?.toLowerCase() === unidade);
+    const inventoryFiltered = inventoryData.filter(row => (row[0] || row[9])?.toLowerCase() === unidade.toLowerCase());
 
     const normalizeTombo = tombo => tombo ? parseInt(tombo.replace(/^0+/, ''), 10).toString() : '';
 
@@ -345,25 +336,15 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
         </div>
       </div>
       <div class="card mb-3">
-        <div class="card-header bg-warning text-dark">Tombos Não Encontrados no Físico</div>
+        <div class="card-header bg-warning text-dark">Faltando no Físico</div>
         <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-striped">
-              <thead><tr><th>Tombo</th><th>Desc. Sistema</th><th>Info Completa Sistema</th></tr></thead>
-            <tbody>${missingPhysical.map(mp => `<tr><td>${mp.tombo}</td><td>${mp.desc}</td><td>${mp.fullSystem}</td></tr>`).join('')}</tbody>
-            </table>
-          </div>
+          <ul class="list-group">${missingPhysical.map(mp => `<li class="list-group-item">Tombo: ${mp.tombo}, Desc: ${mp.desc}, Info Sistema: ${mp.fullSystem}</li>`).join('')}</ul>
         </div>
       </div>
       <div class="card mb-3">
-        <div class="card-header bg-danger text-white">Tombos Não Encontrados no Sistema</div>
+        <div class="card-header bg-danger text-white">Faltando no Sistema</div>
         <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-striped">
-              <thead><tr><th>Tombo</th><th>Desc. Inventário</th></tr></thead>
-            <tbody>${missingSystem.map(ms => `<tr><td>${ms.tombo}</td><td>${ms.desc}</td></tr>`).join('')}</tbody>
-            </table>
-          </div>
+          <ul class="list-group">${missingSystem.map(ms => `<li class="list-group-item">Tombo: ${ms.tombo}, Desc: ${ms.desc}</li>`).join('')}</ul>
         </div>
       </div>
       <div class="card">
@@ -386,7 +367,7 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   let csv = 'Tipo;Tombo;Desc Inventario;Desc Sistema;NF;Fornecedor;Info Sistema;Observacao\n';
   matches.forEach(m => csv += `Match;${m.tombo};${m.descInventory};${m.descSystem};${m.nf};${m.fornecedor};${m.fullSystem};\n`);
   missingPhysical.forEach(mp => csv += `MissingPhysical;${mp.tombo};;${mp.desc};;${mp.fullSystem};\n`);
-  missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;;\n`);
+  missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;\n`);
   observations.forEach(o => csv += `Observation;;;;;;${o}\n`);
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -396,7 +377,7 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   a.click();
 });
 
-// Parsear Excel (atualizado para pular cabeçalho)
+// Parsear Excel
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -404,15 +385,9 @@ function parseExcel(file) {
       try {
         const data = e.target.result;
         const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0]; // Ignora abas extras
+        const sheetName = workbook.SheetNames[0];
         const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-        // Pula cabeçalho se a primeira linha contém palavras como 'Unidade', 'Item', etc.
-        const headers = sheet[0];
-        if (Array.isArray(headers) && (headers.includes('Unidade') || headers.includes('Item') || headers.includes('Tombamento'))) {
-          resolve(sheet.slice(1));
-        } else {
-          resolve(sheet);
-        }
+        resolve(sheet);
       } catch (error) {
         reject(error);
       }
