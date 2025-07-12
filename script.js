@@ -367,7 +367,7 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   matches.forEach(m => csv += `Match;${m.tombo};${m.descInventory};${m.descSystem};${m.fullSystem};\n`);
   missingPhysical.forEach(mp => csv += `MissingPhysical;${mp.tombo};;${mp.desc};${mp.fullSystem};\n`);
   missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;\n`);
-  observations.forEach(o => csv += `Observation;;;;;${o}\n`);
+  observations.forEach(o => csv += `Observation;;;;;${o}\n`;
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
