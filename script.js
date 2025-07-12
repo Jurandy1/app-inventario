@@ -299,9 +299,9 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
     let observations = [];
 
     systemMap.forEach((sysRow, tomboNorm) => {
-      if (inventoryMap.has(tomboNorm)) {
+      if (inventoryMap.has(tomboNorm) ) {
         const invRow = inventoryMap.get(tomboNorm);
-        matches.push({ tombo: tomboNorm, descSystem: sysRow[2], descInventory: invRow[2], fullSystem: sysRow.join(', ') });
+        matches.push({ tombo: tomboNorm, descSystem: sysRow[2], descInventory: invRow[2], nf: sysRow[4], fornecedor: sysRow[7], fullSystem: sysRow.join(', ') });
       } else {
         missingPhysical.push({ tombo: tomboNorm, desc: sysRow[2], fullSystem: sysRow.join(', ') });
         const other = systemData.slice(1).find(r => normalizeTombo(r[0]) === tomboNorm && (r[0] || r[12])?.toLowerCase() !== unidade);
@@ -328,22 +328,32 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
         <div class="card-body">
           <div class="table-responsive">
             <table class="table table-striped">
-              <thead><tr><th>Tombo</th><th>Desc. Inventário</th><th>Desc. Sistema</th><th>Info Completa Sistema</th></tr></thead>
-            <tbody>${matches.map(m => `<tr><td>${m.tombo}</td><td>${m.descInventory}</td><td>${m.descSystem}</td><td>${m.fullSystem}</td></tr>`).join('')}</tbody>
+              <thead><tr><th>Tombo</th><th>Desc. Inventário</th><th>Desc. Sistema</th><th>NF</th><th>Fornecedor</th><th>Info Completa Sistema</th></tr></thead>
+            <tbody>${matches.map(m => `<tr><td>${m.tombo}</td><td>${m.descInventory}</td><td>${m.descSystem}</td><td>${m.nf}</td><td>${m.fornecedor}</td><td>${m.fullSystem}</td></tr>`).join('')}</tbody>
             </table>
           </div>
         </div>
       </div>
       <div class="card mb-3">
-        <div class="card-header bg-warning text-dark">Faltando no Físico</div>
+        <div class="card-header bg-warning text-dark">Tombos Não Encontrados no Físico</div>
         <div class="card-body">
-          <ul class="list-group">${missingPhysical.map(mp => `<li class="list-group-item">Tombo: ${mp.tombo}, Desc: ${mp.desc}, Info Sistema: ${mp.fullSystem}</li>`).join('')}</ul>
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead><tr><th>Tombo</th><th>Desc. Sistema</th><th>Info Completa Sistema</th></tr></thead>
+            <tbody>${missingPhysical.map(mp => `<tr><td>${mp.tombo}</td><td>${mp.desc}</td><td>${mp.fullSystem}</td></tr>`).join('')}</tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div class="card mb-3">
-        <div class="card-header bg-danger text-white">Faltando no Sistema</div>
+        <div class="card-header bg-danger text-white">Tombos Não Encontrados no Sistema</div>
         <div class="card-body">
-          <ul class="list-group">${missingSystem.map(ms => `<li class="list-group-item">Tombo: ${ms.tombo}, Desc: ${ms.desc}</li>`).join('')}</ul>
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead><tr><th>Tombo</th><th>Desc. Inventário</th></tr></thead>
+            <tbody>${missingSystem.map(ms => `<tr><td>${ms.tombo}</td><td>${ms.desc}</td></tr>`).join('')}</tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div class="card">
@@ -363,11 +373,11 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
 
 // Exportar CSV
 document.getElementById('exportCsv').addEventListener('click', () => {
-  let csv = 'Tipo;Tombo;Desc Inventario;Desc Sistema;Info Sistema;Observacao\n';
-  matches.forEach(m => csv += `Match;${m.tombo};${m.descInventory};${m.descSystem};${m.fullSystem};\n`);
-  missingPhysical.forEach(mp => csv += `MissingPhysical;${mp.tombo};;${mp.desc};${mp.fullSystem};\n`);
-  missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;\n`);
-  observations.forEach(o => csv += `Observation;;;;;${o}\n`;
+  let csv = 'Tipo;Tombo;Desc Inventario;Desc Sistema;NF;Fornecedor;Info Sistema;Observacao\n';
+  matches.forEach(m => csv += `Match;${m.tombo};${m.descInventory};${m.descSystem};${m.nf};${m.fornecedor};${m.fullSystem};\n`);
+  missingPhysical.forEach(mp => csv += `MissingPhysical;${mp.tombo};;${mp.desc};;${mp.fullSystem};\n`);
+  missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;;\n`);
+  observations.forEach(o => csv += `Observation;;;;;;${o}\n`);
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -376,7 +386,7 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   a.click();
 });
 
-// Parsear Excel
+// Parsear Excel (atualizado para pular cabeçalho)
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -384,9 +394,15 @@ function parseExcel(file) {
       try {
         const data = e.target.result;
         const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
+        const sheetName = workbook.SheetNames[0]; // Ignora abas extras, usa a primeira
         const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-        resolve(sheet);
+        // Pula cabeçalho se presente
+        const headers = sheet[0];
+        if (Array.isArray(headers) && headers.includes('Tombamento') || headers.includes('Item')) {
+          resolve(sheet.slice(1)); // Pula a primeira linha se for cabeçalho
+        } else {
+          resolve(sheet);
+        }
       } catch (error) {
         reject(error);
       }
