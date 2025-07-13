@@ -5,9 +5,9 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby99cTAFdCucXd1EQ7rV
 const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-// **IMPORTANTE**: Ajuste este índice se a coluna "Tipo de Entrada" no seu relatório do sistema for diferente.
-// Coluna A=0, B=1, C=2, D=3, E=4, F=5...
-const SISTEMA_TIPO_ENTRADA_COL_INDEX = 5; // Assumindo que é a coluna F
+// **IMPORTANTE**: Ajuste do índice da coluna "Tipo de Entrada" para D.
+// Coluna A=0, B=1, C=2, D=3...
+const SISTEMA_TIPO_ENTRADA_COL_INDEX = 3; // Coluna D
 
 // Variáveis de estado global
 let accessToken = null;
@@ -319,7 +319,7 @@ async function fetchAndDisplayInventarios() {
 }
 
 // =================================================================================
-// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 3.0)
+// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 4.0)
 // =================================================================================
 async function handleAnalysis() {
   const unidade = document.getElementById('unidadeComparar').value;
@@ -340,13 +340,18 @@ async function handleAnalysis() {
       carregarRelatorioSistema(),
     ]);
 
-    const resultado = compararInventariosV3(dadosInventario, dadosSistema, unidade);
+    const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidade);
     
     analysisReportData = resultado;
-    renderAnalysisResultsV3(resultado, unidade);
+    renderAnalysisResultsV4(resultado, unidade);
     document.getElementById('exportCsvBtn').classList.remove('d-none');
+    
+    // Salva a última unidade selecionada no localStorage
+    localStorage.setItem('lastAnalysisUnit', unidade);
+
   } catch (error) {
     showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
+    console.error(error);
   } finally {
     loadingModal.hide();
   }
@@ -367,119 +372,163 @@ async function carregarRelatorioSistema() {
 }
 
 /**
- * Calcula a similaridade entre duas strings usando o coeficiente de Dice baseado em bigramas.
- * @param {string} str1 Primeira string.
- * @param {string} str2 Segunda string.
+ * Normaliza a descrição para uma comparação mais eficaz.
+ * Remove acentos, caracteres especiais, e padroniza espaços.
+ * @param {string} str A string a ser normalizada.
+ * @returns {string} A string normalizada.
+ */
+function normalizeDescription(str) {
+    if (!str) return '';
+    return str
+        .toString()
+        .trim()
+        .toLowerCase()
+        .normalize("NFD") // Decompõe acentos
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[^\w\s]/gi, '') // Remove caracteres especiais (exceto letras, números e espaços)
+        .replace(/\s+/g, ' '); // Padroniza múltiplos espaços para um só
+}
+
+/**
+ * Calcula a similaridade entre duas strings usando o coeficiente de Dice.
+ * @param {string} str1 Primeira string (já normalizada).
+ * @param {string} str2 Segunda string (já normalizada).
  * @returns {number} Um valor entre 0 (nenhuma similaridade) e 1 (similaridade total).
  */
 function stringSimilarity(str1, str2) {
-    if (!str1 || !str2) return 0;
-    str1 = str1.toLowerCase().replace(/\s+/g, '');
-    str2 = str2.toLowerCase().replace(/\s+/g, '');
     if (str1 === str2) return 1;
+    if (str1.length < 2 || str2.length < 2) return 0;
 
     const getBigrams = (s) => {
-        const bigrams = new Set();
+        const bigrams = new Map();
         for (let i = 0; i < s.length - 1; i++) {
-            bigrams.add(s.substring(i, i + 2));
+            const bigram = s.substring(i, i + 2);
+            bigrams.set(bigram, (bigrams.get(bigram) || 0) + 1);
         }
         return bigrams;
     };
 
     const bigrams1 = getBigrams(str1);
     const bigrams2 = getBigrams(str2);
-    const intersection = new Set([...bigrams1].filter(x => bigrams2.has(x)));
+    
+    let intersectionSize = 0;
+    for (const [bigram, count1] of bigrams1.entries()) {
+        if (bigrams2.has(bigram)) {
+            intersectionSize += Math.min(count1, bigrams2.get(bigram));
+        }
+    }
 
-    return (2 * intersection.size) / (bigrams1.size + bigrams2.size);
+    return (2 * intersectionSize) / (str1.length + str2.length - 2);
 }
 
-function compararInventariosV3(inventario, sistema, unidade) {
+function compararInventariosV4(inventario, sistema, unidade) {
     const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
-    const normalizeDesc = desc => desc ? String(desc).trim().toLowerCase() : '';
 
     let incorporacoes = [];
-    let sistemaParaAnalise = [];
+    let sistemaParaAnalise = new Map();
+    let inventarioComTombo = new Map();
+    let inventarioSemTombo = [];
 
-    // 1. Separar itens de "INCORPORAÇÃO" e filtrar pela unidade
-    sistema.forEach(row => {
-        const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
+    // 1. Pré-processamento e separação dos dados
+    sistema.forEach((row, index) => {
         const unidadeSistema = (row[12] || '').trim().toLowerCase();
-
         if (unidadeSistema === unidade.toLowerCase()) {
+            const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
             if (tipoEntrada.includes('incorporação')) {
                 incorporacoes.push({ sysRow: row });
             } else {
-                sistemaParaAnalise.push(row);
+                const tomboNorm = normalizeTombo(row[0]);
+                if (tomboNorm) sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
             }
         }
     });
 
-    const systemMap = new Map(sistemaParaAnalise.map(row => [normalizeTombo(row[0]), row]));
-    const inventoryMap = new Map(inventario.map(row => [normalizeTombo(row[3]), row]));
-    
-    let matches = [], divergences = [], matchedByDescription = [];
-    let sTItems = []; // Itens do inventário sem tombo
-
-    // 2. Separar itens do inventário com e sem tombo
-    inventoryMap.forEach((invRow, tomboNorm) => {
-        if (!tomboNorm || tomboNorm.toLowerCase() === 's/t') {
-            sTItems.push(invRow);
+    inventario.forEach((row, index) => {
+        const tomboNorm = normalizeTombo(row[3]);
+        if (tomboNorm && tomboNorm.toLowerCase() !== 's/t') {
+            inventarioComTombo.set(tomboNorm, { invRow: row, originalIndex: index });
+        } else {
+            inventarioSemTombo.push({ invRow: row, originalIndex: index });
         }
     });
 
-    // 3. Conciliação por Tombo
-    systemMap.forEach((sysRow, tomboNorm) => {
-        if (inventoryMap.has(tomboNorm)) {
-            const invRow = inventoryMap.get(tomboNorm);
-            if (normalizeDesc(invRow[2]) === normalizeDesc(sysRow[2])) {
-                matches.push({ tombo: sysRow[0], invRow, sysRow });
+    let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [];
+
+    // 2. Conciliação por Tombo
+    inventarioComTombo.forEach((invData, tomboNorm) => {
+        if (sistemaParaAnalise.has(tomboNorm)) {
+            const sysData = sistemaParaAnalise.get(tomboNorm);
+            if (normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[2])) {
+                matches.push({ ...invData, ...sysData });
             } else {
-                divergences.push({ tombo: sysRow[0], invRow, sysRow });
+                divergences.push({ ...invData, ...sysData });
             }
-            inventoryMap.delete(tomboNorm); // Remove dos pendentes
-            systemMap.delete(tomboNorm); // Remove dos pendentes
+            inventarioComTombo.delete(tomboNorm);
+            sistemaParaAnalise.delete(tomboNorm);
         }
     });
 
-    // 4. Conciliação por Descrição para itens S/T
-    const systemItemsList = Array.from(systemMap.values()); // Itens do sistema que sobraram
-    sTItems.forEach(invRow => {
-        let bestMatch = { score: 0.7, sysRow: null }; // Threshold de 70%
-        for (const sysRow of systemItemsList) {
-            const score = stringSimilarity(invRow[2], sysRow[2]);
-            if (score > bestMatch.score) {
-                bestMatch = { score, sysRow };
-            }
-        }
+    // 3. Conciliação por Descrição para itens S/T
+    const sistemaRestante = Array.from(sistemaParaAnalise.values());
+    inventarioSemTombo.forEach((invData, invIndex) => {
+        if (!invData) return; // Item já pode ter sido combinado
+        
+        // 3a. Busca por match exato de descrição
+        let exactMatchIndex = sistemaRestante.findIndex(sysData => 
+            sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[2])
+        );
 
-        if (bestMatch.sysRow) {
-            const tomboNorm = normalizeTombo(bestMatch.sysRow[0]);
-            matchedByDescription.push({ invRow, sysRow: bestMatch.sysRow, score: bestMatch.score });
-            systemMap.delete(tomboNorm); // Remove o item do sistema que foi combinado
-            // Remove o item s/t do mapa de inventário para não aparecer como pendente
-            const invTomboNorm = normalizeTombo(invRow[3]);
-            if(inventoryMap.has(invTomboNorm)) inventoryMap.delete(invTomboNorm);
+        if (exactMatchIndex !== -1) {
+            const sysData = sistemaRestante[exactMatchIndex];
+            matchedByExactDesc.push({ ...invData, ...sysData });
+            sistemaParaAnalise.delete(normalizeTombo(sysData.sysRow[0]));
+            sistemaRestante[exactMatchIndex] = null; // Marca como usado
+            inventarioSemTombo[invIndex] = null; // Marca como usado
+            return; // Pula para o próximo item do inventário
         }
     });
     
-    // 5. O que sobrou são os itens pendentes
-    const remainingSystem = Array.from(systemMap.values()).map(sysRow => ({ sysRow }));
-    const remainingInventory = Array.from(inventoryMap.values()).map(invRow => ({ invRow }));
+    // Filtra os que já foram combinados
+    let inventarioSemTomboRestante = inventarioSemTombo.filter(Boolean);
+    let sistemaAindaRestante = sistemaRestante.filter(Boolean);
+
+    // 3b. Busca por similaridade
+    inventarioSemTomboRestante.forEach((invData, invIndex) => {
+        if (!invData) return;
+        let bestMatch = { score: 0.75, sysData: null, sysIndex: -1 }; // Threshold de 75%
+        
+        sistemaAindaRestante.forEach((sysData, sysIndex) => {
+             if (!sysData) return;
+             const score = stringSimilarity(normalizeDescription(invData.invRow[2]), normalizeDescription(sysData.sysRow[2]));
+             if (score > bestMatch.score) {
+                 bestMatch = { score, sysData, sysIndex };
+             }
+        });
+
+        if (bestMatch.sysData) {
+            matchedBySimilarDesc.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
+            sistemaParaAnalise.delete(normalizeTombo(bestMatch.sysData.sysRow[0]));
+            sistemaAindaRestante[bestMatch.sysIndex] = null;
+            inventarioSemTomboRestante[invIndex] = null;
+        }
+    });
+    
+    // 4. O que sobrou são os itens pendentes
+    const remainingSystem = Array.from(sistemaParaAnalise.values());
+    const remainingInventory = [...Array.from(inventarioComTombo.values()), ...inventarioSemTomboRestante.filter(Boolean)];
 
     return { 
-        matches, 
-        divergences, 
-        incorporacoes,
-        matchedByDescription,
-        remainingSystem,
-        remainingInventory,
-        totalSystem: sistemaParaAnalise.length,
+        matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc,
+        remainingSystem, remainingInventory,
+        totalSystem: sistemaParaAnalise.size + matches.length + divergences.length + matchedByExactDesc.length + matchedBySimilarDesc.length,
         totalInventory: inventario.length
     };
 }
 
-function renderAnalysisResultsV3(data, unidade) {
-    const { matches, divergences, incorporacoes, matchedByDescription, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
+
+function renderAnalysisResultsV4(data, unidade) {
+    const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
+    const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length;
 
     const summaryContainer = document.getElementById('analiseSummary');
     summaryContainer.innerHTML = `
@@ -487,7 +536,7 @@ function renderAnalysisResultsV3(data, unidade) {
         <div class="row">
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Itens no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-secondary"><h6><i class="bi bi-clipboard-check me-2"></i>Itens no Inventário</h6><span class="fs-4">${totalInventory}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${matches.length + matchedByDescription.length}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${totalConciliado}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-exclamation-triangle-fill me-2"></i>Pendentes</h6><span class="fs-4">${remainingSystem.length + remainingInventory.length}</span></div></div>
         </div>
     `;
@@ -496,24 +545,27 @@ function renderAnalysisResultsV3(data, unidade) {
     const resultsContainer = document.getElementById('resultadoComparacao');
     resultsContainer.innerHTML = '';
 
-    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', ['Tombo', 'Descrição', 'Local', 'Estado'], matches.map(m => [m.tombo, m.invRow[2], m.invRow[1], m.invRow[4]]));
-    if (matchedByDescription.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Itens S/T)', 'bg-info-subtle', ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade'], matchedByDescription.map(m => [m.sysRow[0], m.invRow[2], m.sysRow[2], `${(m.score * 100).toFixed(0)}%`]));
-    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-subtle', ['Tombo', 'Descrição Inventário', 'Descrição Sistema'], divergences.map(d => [d.tombo, d.invRow[2], d.sysRow[2]]));
+    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', ['Tombo', 'Descrição', 'Local', 'Estado'], matches.map(m => [m.sysRow[0], m.invRow[2], m.invRow[1], m.invRow[4]]));
+    if (matchedByExactDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Match Exato)', 'bg-info-subtle', ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema'], matchedByExactDesc.map(m => [m.sysRow[0], m.invRow[2], m.sysRow[2]]));
+    if (matchedBySimilarDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Similaridade)', 'bg-info-subtle', ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade'], matchedBySimilarDesc.map(m => [m.sysRow[0], m.invRow[2], m.sysRow[2], `${(m.score * 100).toFixed(0)}%`]));
+    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-subtle', ['Tombo', 'Descrição Inventário', 'Descrição Sistema'], divergences.map(d => [d.sysRow[0], d.invRow[2], d.sysRow[2]]));
     if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Análise)', 'bg-light', ['Tombo', 'Descrição Sistema', 'Nota Fiscal'], incorporacoes.map(i => [i.sysRow[0], i.sysRow[2], i.sysRow[4]]));
     if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor'], remainingSystem.map(m => [m.sysRow[0], m.sysRow[2], m.sysRow[4], m.sysRow[7]]));
     if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], remainingInventory.map(m => [m.invRow[3], m.invRow[2], m.invRow[1], m.invRow[4]]));
 }
 
+
 function exportAnalysisToCsv() {
-  const { matches, divergences, incorporacoes, matchedByDescription, remainingSystem, remainingInventory } = analysisReportData;
+  const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory } = analysisReportData;
   if (!analysisReportData) return;
 
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
   let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Observacao\n';
 
-  matches.forEach(m => csvContent += ['Conciliado por Tombo', m.tombo, m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
-  matchedByDescription.forEach(m => csvContent += ['Conciliado por Descricao', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
-  divergences.forEach(d => csvContent += ['Divergencia', d.tombo, d.invRow[2], d.sysRow[2], d.invRow[1], d.invRow[4], d.sysRow[4], d.sysRow[7], 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
+  matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
+  matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
+  matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
+  divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[0], d.invRow[2], d.sysRow[2], d.invRow[1], d.invRow[4], d.sysRow[4], d.sysRow[7], 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
   incorporacoes.forEach(i => csvContent += ['Incorporacao', i.sysRow[0], '', i.sysRow[2], '', '', i.sysRow[4], i.sysRow[7], 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
   remainingSystem.forEach(m => csvContent += ['Pendente no Sistema', m.sysRow[0], '', m.sysRow[2], '', '', m.sysRow[4], m.sysRow[7], 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n');
   remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
@@ -538,13 +590,18 @@ async function popularUnidadesParaAnalise() {
     if (result.status !== 'success') throw new Error(result.message);
 
     const select = document.getElementById('unidadeComparar');
-    const currentValue = select.value;
     select.innerHTML = '<option value="">Selecione uma unidade...</option>';
     result.unidades.sort().forEach(u => {
       const option = new Option(u, u);
       select.add(option);
     });
-    select.value = currentValue;
+
+    // Recupera e define a última unidade selecionada
+    const lastUnit = localStorage.getItem('lastAnalysisUnit');
+    if (lastUnit) {
+        select.value = lastUnit;
+    }
+
   } catch (error) {
     showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
   }
