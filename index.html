@@ -40,7 +40,7 @@
             <div class="card-body text-center">
                 <h3 class="card-title">Bem-vindo!</h3>
                 <p class="card-text text-muted">Faça login com sua conta Google para gerenciar seus inventários.</p>
-                <div id="signin-button" class="btn btn-primary btn-lg"><i class="bi bi-google me-2"></i>Login com Google</div>
+                <div id="signin-button"></div>
             </div>
         </div>
     </div>
@@ -50,6 +50,7 @@
             <li class="nav-item" role="presentation"><a class="nav-link active" data-bs-toggle="tab" href="#inventario" role="tab">Inventário</a></li>
             <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#uploads" role="tab">Uploads</a></li>
             <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" id="inventarios-tab" href="#inventarios" role="tab">Consultar Inventários</a></li>
+            <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" id="relatorios-tab" href="#relatorios" role="tab">Relatórios do Sistema</a></li>
             <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#analise" role="tab">Análise Profissional</a></li>
         </ul>
 
@@ -171,6 +172,18 @@
                     <div class="card-body">
                         <div id="inventariosAccordion" class="accordion">
                             <p class="text-muted">Nenhum inventário encontrado. Comece adicionando itens ou fazendo upload.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Nova Aba de Relatórios do Sistema -->
+            <div class="tab-pane fade" id="relatorios" role="tabpanel">
+                <div class="card">
+                    <div class="card-header fw-bold bg-white">Relatórios do Sistema Carregados</div>
+                    <div class="card-body">
+                        <div id="relatoriosAccordion" class="accordion">
+                             <p class="text-muted">Nenhum relatório do sistema encontrado. Faça o upload na aba "Uploads".</p>
                         </div>
                     </div>
                 </div>
