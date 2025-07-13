@@ -8,10 +8,10 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 // Variáveis de estado global
 let accessToken = null;
-let analysisReportData = {};
+let analysisReportData = {}; // Armazena os dados do último relatório gerado
 
 // =================================================================================
-// FLUXO DE AUTENTICAÇÃO (Simplificado)
+// FLUXO DE AUTENTICAÇÃO E CARREGAMENTO INICIAL
 // =================================================================================
 window.onload = () => {
   // Inicializa o cliente do Google Identity Services para login
@@ -21,6 +21,11 @@ window.onload = () => {
   });
   // Anexa todos os event listeners da UI
   setupEventListeners();
+  // Renderiza o botão de login do Google
+  google.accounts.id.renderButton(
+    document.getElementById('signin-button'),
+    { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' } 
+  );
 };
 
 // Lida com a resposta do login do Google
@@ -30,7 +35,7 @@ function handleCredentialResponse(response) {
   requestAccessToken();
 }
 
-// Solicita o token de acesso OAuth2 APENAS para o Drive
+// Solicita o token de acesso OAuth2 para o Drive
 function requestAccessToken() {
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -38,9 +43,9 @@ function requestAccessToken() {
     callback: (tokenResponse) => {
       if (tokenResponse && tokenResponse.access_token) {
         accessToken = tokenResponse.access_token;
-        initializeAppLogic(); // Inicia o app após obter o token
+        initializeAppLogic(); // Inicia a lógica principal do app após obter o token
       } else {
-        showToast('toastError', 'Falha na autorização para fazer upload de fotos.');
+        showToast('toastError', 'Falha na autorização para fazer upload de fotos. Tente fazer login novamente.');
       }
     },
   });
@@ -56,17 +61,17 @@ function handleSignoutClick() {
   }
   google.accounts.id.disableAutoSelect();
   // Atualiza a UI para o estado "deslogado"
-  document.getElementById('auth-container').style.display = 'none';
-  document.getElementById('login-container').style.display = 'block';
-  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('auth-container').classList.add('d-none');
+  document.getElementById('login-container').classList.remove('d-none');
+  document.getElementById('main-content').classList.add('d-none');
 }
 
 // Atualiza a UI para o estado "logado"
 function updateUiForSignIn(userName) {
   document.getElementById('user-name').textContent = `Olá, ${userName}`;
-  document.getElementById('auth-container').style.display = 'block';
-  document.getElementById('login-container').style.display = 'none';
-  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('auth-container').classList.remove('d-none');
+  document.getElementById('login-container').classList.add('d-none');
+  document.getElementById('main-content').classList.remove('d-none');
 }
 
 // =================================================================================
@@ -114,9 +119,9 @@ function autoSaveDraft() {
 // MANIPULADORES DE EVENTOS (EVENT LISTENERS)
 // =================================================================================
 function setupEventListeners() {
-  document.getElementById('signin-button').addEventListener('click', () => google.accounts.id.prompt());
+  // O botão de login é renderizado pelo Google, não precisa de listener de clique direto
   document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
-  setInterval(autoSaveDraft, 30000);
+  setInterval(autoSaveDraft, 30000); // Salva rascunho a cada 30s
 
   document.getElementById('salvarUnidade').addEventListener('click', () => {
     const unidade = document.getElementById('unidadeInicial').value.trim();
@@ -203,7 +208,10 @@ async function uploadFileToDrive(file) {
     body: form
   });
 
-  if (!response.ok) throw new Error('Falha no upload para o Drive.');
+  if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Falha no upload para o Drive: ${errorData.error.message}`);
+  }
   const result = await response.json();
   return `https://drive.google.com/uc?id=${result.id}`;
 }
@@ -221,10 +229,11 @@ async function fetchConcluidos() {
     tbody.innerHTML = '';
     result.items.forEach(row => {
       const tr = document.createElement('tr');
+      // Colunas: Unidade, Local, Item, Tombo, Estado, Quantidade, Foto
       tr.innerHTML = `
         <td>${row[0] || ''}</td><td>${row[1] || ''}</td><td>${row[2] || ''}</td>
         <td>${row[3] || ''}</td><td>${row[4] || ''}</td><td>${row[5] || ''}</td>
-        <td>${row[6] ? `<a href="${row[6]}" target="_blank" class="btn btn-sm btn-outline-primary">Ver</a>` : 'N/A'}</td>
+        <td>${row[6] ? `<a href="${row[6]}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-camera"></i> Ver</a>` : 'N/A'}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -270,10 +279,10 @@ async function handleUpload(type) {
     const result = await response.json();
     if (result.status !== 'success') throw new Error(result.message);
 
-    showToast('toastSuccess', `Upload de '${type}' concluído!`);
+    showToast('toastSuccess', `Upload de '${type}' concluído com sucesso!`);
     fileInput.value = '';
     pasteArea.value = '';
-    await popularUnidadesParaAnalise();
+    await popularUnidadesParaAnalise(); // Atualiza a lista de unidades para análise
   } catch (error) {
     showToast('toastError', `Erro no upload: ${error.message}`);
   } finally {
@@ -292,21 +301,22 @@ async function fetchAndDisplayInventarios() {
     accordionContainer.innerHTML = '';
 
     if (Object.keys(inventariosAgrupados).length === 0) {
-      accordionContainer.innerHTML = '<p>Nenhum inventário cadastrado ainda.</p>';
+      accordionContainer.innerHTML = '<p class="text-muted">Nenhum inventário cadastrado ainda.</p>';
       return;
     }
 
     Object.keys(inventariosAgrupados).sort().forEach((unidade, index) => {
       const { Site, Upload } = inventariosAgrupados[unidade];
+      const totalItens = (Site?.length || 0) + (Upload?.length || 0);
       const accordionItem = `
         <div class="accordion-item">
           <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${index}">
-            ${unidade} <span class="badge bg-secondary ms-2">${Site.length + Upload.length} itens</span>
+            ${unidade} <span class="badge bg-secondary ms-2">${totalItens} itens</span>
           </button></h2>
           <div id="collapse-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
             <div class="accordion-body">
-              ${createTableHtml('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site, [2, 3, 1, 4])}
-              ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload, [2, 3, 1, 4])}
+              ${createTableHtml('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site || [], [2, 3, 1, 4])}
+              ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload || [], [2, 3, 1, 4])}
             </div>
           </div>
         </div>`;
@@ -317,57 +327,9 @@ async function fetchAndDisplayInventarios() {
   }
 }
 
-// Função para buscar os dados do Relatório do Sistema
-async function carregarRelatorioSistema() {
-  try {
-    const response = await fetch(SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "getRelatorioSistema" })
-    });
-    const result = await response.json();
-    if (result.status === "success") {
-      return result.data;
-    } else {
-      showToast('toastError', `Erro ao buscar dados do sistema: ${result.message}`);
-      return [];
-    }
-  } catch (error) {
-    showToast('toastError', 'Falha de comunicação ao buscar dados do sistema.');
-    return [];
-  }
-}
-
-// Função para buscar os dados de inventário de uma unidade específica
-async function fetchInventarioDaUnidade(unidade) {
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidade)}`);
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-    return result.items;
-  } catch (error) {
-    showToast('toastError', `Não foi possível carregar os itens da unidade: ${error.message}`);
-    return [];
-  }
-}
-
-// Função para buscar todos os dados de inventário para observações
-async function fetchTodosInventarios() {
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    let allItems = [];
-    Object.values(result.data).forEach(group => {
-      allItems.push(...group.Site, ...group.Upload);
-    });
-    return allItems;
-  } catch (error) {
-    showToast('toastError', `Erro ao buscar todos inventários: ${error.message}`);
-    return [];
-  }
-}
-
+// =================================================================================
+// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 2.0)
+// =================================================================================
 async function handleAnalysis() {
   const unidade = document.getElementById('unidadeComparar').value;
   if (!unidade) {
@@ -377,21 +339,24 @@ async function handleAnalysis() {
   
   const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
   loadingModal.show();
-  document.getElementById('exportCsvBtn').classList.add('disabled');
+  document.getElementById('exportCsvBtn').classList.add('d-none');
+  document.getElementById('analiseSummary').classList.add('d-none');
+  document.getElementById('resultadoComparacao').innerHTML = '';
+
   try {
-    // Busca os dados em paralelo
+    // Busca os dados em paralelo para mais performance
     const [dadosInventario, dadosSistema, todosInventarios] = await Promise.all([
       fetchInventarioDaUnidade(unidade),
       carregarRelatorioSistema(),
-      fetchTodosInventarios() // Adicionado para observações
+      fetchTodosInventarios()
     ]);
 
-    // Compara os dados
-    const resultado = compararInventarios(dadosInventario, dadosSistema, todosInventarios, unidade);
+    // Compara os dados com a nova lógica
+    const resultado = compararInventariosV2(dadosInventario, dadosSistema, todosInventarios, unidade);
     
-    analysisReportData = resultado;
-    renderAnalysisResults(analysisReportData);
-    document.getElementById('exportCsvBtn').classList.remove('d-none', 'disabled');
+    analysisReportData = resultado; // Salva para exportação
+    renderAnalysisResultsV2(analysisReportData, unidade); // Renderiza os novos resultados
+    document.getElementById('exportCsvBtn').classList.remove('d-none');
   } catch (error) {
     showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
   } finally {
@@ -399,53 +364,78 @@ async function handleAnalysis() {
   }
 }
 
-function compararInventarios(inventario, sistema, todosInventarios, unidade) {
+async function fetchInventarioDaUnidade(unidade) {
+  const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidade)}`);
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.message);
+  return result.items;
+}
+
+async function carregarRelatorioSistema() {
+  const response = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "getRelatorioSistema" }) });
+  const result = await response.json();
+  if (result.status === "success") return result.data;
+  throw new Error(result.message || 'Erro ao buscar dados do sistema.');
+}
+
+async function fetchTodosInventarios() {
+  const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.message);
+  let allItems = [];
+  Object.values(result.data).forEach(group => {
+    if(group.Site) allItems.push(...group.Site);
+    if(group.Upload) allItems.push(...group.Upload);
+  });
+  return allItems;
+}
+
+function compararInventariosV2(inventario, sistema, todosInventarios, unidade) {
   const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
+  const normalizeDesc = desc => desc ? String(desc).trim().toLowerCase() : '';
 
   const systemMap = new Map();
+  // Filtra o relatório do sistema pela unidade selecionada antes de mapear
   sistema.forEach(row => {
+    // Coluna 12 (M) é a unidade no relatório do sistema
     if ((row[12] || '').trim().toLowerCase() === unidade.toLowerCase()) {
-      systemMap.set(normalizeTombo(row[0]), row);
+      const tomboNorm = normalizeTombo(row[0]);
+      if (tomboNorm) systemMap.set(tomboNorm, row);
     }
   });
 
   const inventoryMap = new Map();
   inventario.forEach(row => {
-    inventoryMap.set(normalizeTombo(row[3]), row);
+    const tomboNorm = normalizeTombo(row[3]); // Coluna 3 (D) é o tombo no inventário
+    if (tomboNorm) inventoryMap.set(tomboNorm, row);
   });
 
   const allInventoryMap = new Map();
   todosInventarios.forEach(row => {
     const tomboNorm = normalizeTombo(row[3]);
-    if (!allInventoryMap.has(tomboNorm)) {
-      allInventoryMap.set(tomboNorm, row[0]); // Unidade do item
+    if (tomboNorm && !allInventoryMap.has(tomboNorm)) {
+      allInventoryMap.set(tomboNorm, row[0] || row[9]); // Unidade do item
     }
   });
 
-  let matches = [], missingPhysical = [], missingSystem = [], observations = [];
+  let matches = [], missingPhysical = [], missingSystem = [], divergences = [], observations = [];
 
   systemMap.forEach((sysRow, tomboNorm) => {
     if (inventoryMap.has(tomboNorm)) {
       const invRow = inventoryMap.get(tomboNorm);
-      matches.push({
-        tombo: sysRow[0],
-        descInventory: invRow[2],
-        descSystem: sysRow[2],
-        nf: sysRow[4],
-        fornecedor: sysRow[7],
-        fullSystem: sysRow
-      });
+      // Compara descrição para achar divergências
+      if (normalizeDesc(invRow[2]) !== normalizeDesc(sysRow[2])) {
+        divergences.push({ tombo: sysRow[0], invRow, sysRow });
+      } else {
+        matches.push({ tombo: sysRow[0], invRow, sysRow });
+      }
     } else {
-      missingPhysical.push({
-        tombo: sysRow[0],
-        desc: sysRow[2],
-        fullSystem: sysRow
-      });
-      // Observação: Verifica se existe em outra unidade
+      missingPhysical.push({ tombo: sysRow[0], sysRow });
+      // Checa se o item faltante pode estar em outra unidade
       if (allInventoryMap.has(tomboNorm)) {
         const outraUnidade = allInventoryMap.get(tomboNorm);
-        if (outraUnidade.toLowerCase() !== unidade.toLowerCase()) {
-          observations.push(`Item com tombo ${sysRow[0]} pode estar na unidade "${outraUnidade}" - sugiro transferência.`);
+        if (outraUnidade && outraUnidade.toLowerCase() !== unidade.toLowerCase()) {
+          observations.push(`Item com tombo ${sysRow[0]} (Sistema: ${sysRow[2]}) foi encontrado no inventário da unidade "${outraUnidade}". Sugerir transferência.`);
         }
       }
     }
@@ -453,34 +443,73 @@ function compararInventarios(inventario, sistema, todosInventarios, unidade) {
 
   inventoryMap.forEach((invRow, tomboNorm) => {
     if (!systemMap.has(tomboNorm)) {
-      missingSystem.push({
-        tombo: invRow[3],
-        desc: invRow[2]
-      });
+      missingSystem.push({ tombo: invRow[3], invRow });
     }
   });
 
-  return { matches, missingPhysical, missingSystem, observations };
+  return { matches, divergences, missingPhysical, missingSystem, observations, totalSystem: systemMap.size, totalInventory: inventoryMap.size };
 }
 
+function renderAnalysisResultsV2({ matches, divergences, missingPhysical, missingSystem, observations, totalSystem, totalInventory }, unidade) {
+    const summaryContainer = document.getElementById('analiseSummary');
+    summaryContainer.innerHTML = `
+        <h5 class="mb-3">Resumo da Análise para: <strong>${unidade}</strong></h5>
+        <div class="row">
+            <div class="col-md-3 mb-2"><div class="card p-2 analysis-summary-card bg-light">Itens no Sistema: ${totalSystem}</div></div>
+            <div class="col-md-3 mb-2"><div class="card p-2 analysis-summary-card bg-light">Itens no Inventário: ${totalInventory}</div></div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Encontrados</h6><span class="fs-4">${matches.length}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-info"><h6><i class="bi bi-arrow-left-right me-2"></i>Divergências</h6><span class="fs-4">${divergences.length}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-search me-2"></i>Faltando no Físico</h6><span class="fs-4">${missingPhysical.length}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-danger"><h6><i class="bi bi-plus-circle-fill me-2"></i>Sobrando no Físico</h6><span class="fs-4">${missingSystem.length}</span></div></div>
+        </div>
+    `;
+    summaryContainer.classList.remove('d-none');
+
+    const resultsContainer = document.getElementById('resultadoComparacao');
+    resultsContainer.innerHTML = ''; // Limpa resultados anteriores
+
+    // Renderiza as tabelas
+    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Encontrados (Matches)', 'bg-success-subtle', ['Tombo', 'Descrição', 'Local', 'Estado'], matches.map(m => [m.tombo, m.invRow[2], m.invRow[1], m.invRow[4]]));
+    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição', 'bg-info-subtle', ['Tombo', 'Descrição Inventário', 'Descrição Sistema'], divergences.map(d => [d.tombo, d.invRow[2], d.sysRow[2]]));
+    if (missingPhysical.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Faltando no Inventário Físico (Existem no Sistema)', 'bg-warning-subtle', ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor'], missingPhysical.map(m => [m.tombo, m.sysRow[2], m.sysRow[4], m.sysRow[7]]));
+    if (missingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Sobrando no Inventário Físico (Não existem no Sistema)', 'bg-danger-subtle', ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], missingSystem.map(m => [m.tombo, m.invRow[2], m.invRow[1], m.invRow[4]]));
+    
+    // Renderiza Observações
+    if (observations.length > 0) {
+        resultsContainer.innerHTML += `
+        <div class="card mb-3">
+            <div class="card-header bg-primary-subtle fw-bold">Observações e Sugestões (${observations.length})</div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul>
+            </div>
+        </div>`;
+    }
+}
+
+
 function exportAnalysisToCsv() {
-  const { matches, missingPhysical, missingSystem, observations } = analysisReportData;
-  if (!matches || !missingPhysical || !missingSystem) return;
+  const { matches, divergences, missingPhysical, missingSystem, observations } = analysisReportData;
+  if (!analysisReportData) return;
 
-  const headers = ['Tipo', 'Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor', 'Info Completa Sistema', 'Observação'];
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
-  let csvContent = headers.join(';') + '\n';
+  let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Observacao\n';
 
-  matches.forEach(m => csvContent += ['Match', m.tombo, m.descInventory, m.descSystem, m.nf, m.fornecedor, m.fullSystem.join(','), ''].map(escapeCsvCell).join(';') + '\n');
-  missingPhysical.forEach(mp => csvContent += ['Faltando no Físico', mp.tombo, '', mp.desc, '', '', mp.fullSystem.join(','), ''].map(escapeCsvCell).join(';') + '\n');
-  missingSystem.forEach(ms => csvContent += ['Faltando no Sistema', ms.tombo, ms.desc, '', '', '', '', ''].map(escapeCsvCell).join(';') + '\n');
-  observations.forEach(o => csvContent += ['Observação', '', '', '', '', '', '', o].map(escapeCsvCell).join(';') + '\n');
+  matches.forEach(m => csvContent += ['Match', m.tombo, m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
+  divergences.forEach(d => csvContent += ['Divergencia', d.tombo, d.invRow[2], d.sysRow[2], d.invRow[1], d.invRow[4], d.sysRow[4], d.sysRow[7], 'Descricoes diferentes'].map(escapeCsvCell).join(';') + '\n');
+  missingPhysical.forEach(m => csvContent += ['Faltando no Fisico', m.tombo, '', m.sysRow[2], '', '', m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
+  missingSystem.forEach(m => csvContent += ['Sobrando no Fisico', m.tombo, m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', 'Item nao consta no sistema'].map(escapeCsvCell).join(';') + '\n');
+  observations.forEach(o => csvContent += ['Observacao', '', '', '', '', '', '', '', o].map(escapeCsvCell).join(';') + '\n');
 
   const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `relatorio_analise_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(link.href);
 }
 
@@ -489,19 +518,18 @@ function exportAnalysisToCsv() {
 // =================================================================================
 async function popularUnidadesParaAnalise() {
   try {
-    const response = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'listarUnidades' })
-    });
+    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidades' }) });
     const result = await response.json();
     if (result.status !== 'success') throw new Error(result.message);
 
     const select = document.getElementById('unidadeComparar');
+    const currentValue = select.value;
     select.innerHTML = '<option value="">Selecione uma unidade...</option>';
     result.unidades.sort().forEach(u => {
       const option = new Option(u, u);
       select.add(option);
     });
+    select.value = currentValue; // Mantém a unidade selecionada se ela ainda existir
   } catch (error) {
     showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
   }
@@ -513,7 +541,7 @@ function parseExcel(file) {
     reader.onload = (e) => {
       try {
         const workbook = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
-        resolve(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 }));
+        resolve(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" }));
       } catch (error) { reject(error); }
     };
     reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
@@ -526,7 +554,7 @@ function parsePastedText(text) {
 }
 
 function createTableHtml(title, headers, data, dataIndices) {
-  if (!data || data.length === 0) return '';
+  if (!data || data.length === 0) return title ? `<h5>${title}</h5><p class="text-muted">Nenhum item encontrado.</p>` : '';
   let table = `<h5>${title} (${data.length})</h5><div class="table-responsive"><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
   data.forEach(row => {
     table += '<tr>';
@@ -536,31 +564,25 @@ function createTableHtml(title, headers, data, dataIndices) {
   return table + '</tbody></table></div>';
 }
 
-function renderAnalysisResults({ matches, missingPhysical, missingSystem, observations }) {
-  const renderTable = (title, count, bgColor, textColor, headers, data, keys) => `
+function createDetailedTable(title, headerBgClass, headers, data) {
+    let tableHtml = `
     <div class="card mb-3">
-      <div class="card-header ${bgColor} ${textColor} fw-bold">${title} - ${count}</div>
-      <div class="card-body">${createTableHtml('', headers, data, keys)}</div>
-    </div>`;
-
-  let html = renderTable('Itens Encontrados (Matches)', matches.length, 'bg-success', 'text-white', 
-    ['Tombo', 'Desc. Inventário', 'Desc. Sistema', 'Nota Fiscal'], matches, ['tombo', 'descInventory', 'descSystem', 'nf']);
-
-  html += renderTable('Itens Faltando no Inventário Físico', missingPhysical.length, 'bg-warning', 'text-dark', 
-    ['Tombo', 'Descrição'], missingPhysical, ['tombo', 'desc']);
-
-  html += renderTable('Itens Sobrando (Não Constam no Sistema)', missingSystem.length, 'bg-danger', 'text-white', 
-    ['Tombo', 'Descrição'], missingSystem, ['tombo', 'desc']);
-
-  if (observations.length > 0) {
-    html += `<div class="card mb-3"><div class="card-header bg-info text-dark fw-bold">Observações - ${observations.length}</div><div class="card-body"><ul class="list-group">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul></div></div>`;
-  }
-
-  document.getElementById('resultadoComparacao').innerHTML = html;
+        <div class="card-header fw-bold ${headerBgClass}">${title} (${data.length})</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm mb-0">
+                    <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                    <tbody>`;
+    data.forEach(row => {
+        tableHtml += `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`;
+    });
+    tableHtml += `</tbody></table></div></div></div>`;
+    return tableHtml;
 }
 
-function showToast(id, message) {
-  const toastEl = document.getElementById(id);
+
+function showToast(type, message) {
+  const toastEl = document.getElementById(type);
   if (toastEl) {
     toastEl.querySelector('.toast-body').textContent = message;
     new bootstrap.Toast(toastEl).show();
