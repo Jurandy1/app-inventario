@@ -1,3 +1,4 @@
+<DOCUMENT filename="script.js">
 // =================================================================================
 // CONFIGURAÇÃO E INICIALIZAÇÃO
 // =================================================================================
@@ -115,7 +116,7 @@ function autoSaveDraft() {
 // =================================================================================
 function setupEventListeners() {
   document.getElementById('signin-button').addEventListener('click', () => google.accounts.id.prompt());
-  document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
+  document.getElementById('signout-button').addEventListener('click', handleSignoutClick());
   setInterval(autoSaveDraft, 30000);
 
   document.getElementById('salvarUnidade').addEventListener('click', () => {
@@ -164,7 +165,7 @@ async function handleInventoryFormSubmit(e) {
       photoUrl = await uploadFileToDrive(file);
     }
 
-    const data = {
+    const data = await {
       action: 'saveItem',
       unidade: document.getElementById('unidade').value,
       local: document.getElementById('local').value,
@@ -234,87 +235,87 @@ async function fetchConcluidos() {
 }
 
 async function handleUpload(type) {
-    const unidade = document.getElementById(type === 'Sistema' ? 'unidadeSistema' : 'unidadeInventario').value.trim();
-    if (!unidade) return showToast('toastError', 'Informe o nome da unidade para o upload.');
+  const unidade = document.getElementById(type === 'Sistema' ? 'unidadeSistema' : 'unidadeInventario').value.trim();
+  if (!unidade) return showToast('toastError', 'Informe o nome da unidade para o upload.');
 
-    const fileInput = document.getElementById(type === 'Sistema' ? 'relatorioSistema' : 'inventariosAntigos');
-    const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
-    const files = fileInput.files;
-    const pasteText = pasteArea.value.trim();
+  const fileInput = document.getElementById(type === 'Sistema' ? 'relatorioSistema' : 'inventariosAntigos');
+  const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
+  const files = fileInput.files;
+  const pasteText = pasteArea.value.trim();
 
-    if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
+  if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
 
-    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-    loadingModal.show();
-    try {
-        let data = [];
-        if (files.length > 0) {
-            for (const file of files) {
-                const parsed = await parseExcel(file);
-                data.push(...parsed.slice(1));
-            }
-        } else if (pasteText) {
-            data.push(...parsePastedText(pasteText).slice(1));
-        }
-        if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
-
-        const response = await fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'appendReport',
-                sheetName: type === 'Sistema' ? 'RelatorioSistema' : 'Inventario',
-                data: data,
-                unidadeUpload: unidade
-            })
-        });
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
-
-        showToast('toastSuccess', `Upload de '${type}' concluído!`);
-        fileInput.value = '';
-        pasteArea.value = '';
-        await popularUnidadesParaAnalise();
-    } catch (error) {
-        showToast('toastError', `Erro no upload: ${error.message}`);
-    } finally {
-        loadingModal.hide();
+  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+  loadingModal.show();
+  try {
+    let data = [];
+    if (files.length > 0) {
+      for (const file of files) {
+        const parsed = await parseExcel(file);
+        data.push(...parsed.slice(1)); // Ignora cabeçalho
+      }
+    } else if (pasteText) {
+      data.push(...parsePastedText(pasteText).slice(1)); // Ignora cabeçalho se presente
     }
+    if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
+
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'appendReport',
+        sheetName: type === 'Sistema' ? 'RelatorioSistema' : 'Inventario',
+        data: data,
+        unidadeUpload: unidade
+      })
+    });
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
+
+    showToast('toastSuccess', `Upload de '${type}' concluído!`);
+    fileInput.value = '';
+    pasteArea.value = '';
+    await popularUnidadesParaAnalise();
+  } catch (error) {
+    showToast('toastError', `Erro no upload: ${error.message}`);
+  } finally {
+    loadingModal.hide();
+  }
 }
 
 async function fetchAndDisplayInventarios() {
-    try {
-        const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
 
-        const inventariosAgrupados = result.data;
-        const accordionContainer = document.getElementById('inventariosAccordion');
-        accordionContainer.innerHTML = '';
+    const inventariosAgrupados = result.data;
+    const accordionContainer = document.getElementById('inventariosAccordion');
+    accordionContainer.innerHTML = '';
 
-        if (Object.keys(inventariosAgrupados).length === 0) {
-            accordionContainer.innerHTML = '<p>Nenhum inventário cadastrado ainda.</p>';
-            return;
-        }
-
-        Object.keys(inventariosAgrupados).sort().forEach((unidade, index) => {
-            const { Site, Upload } = inventariosAgrupados[unidade];
-            const accordionItem = `
-                <div class="accordion-item">
-                    <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${index}">
-                        ${unidade} <span class="badge bg-secondary ms-2">${Site.length + Upload.length} itens</span>
-                    </button></h2>
-                    <div id="collapse-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
-                        <div class="accordion-body">
-                            ${createTableHtml('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site, [2, 3, 1, 4])}
-                            ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload, [2, 3, 1, 4])}
-                        </div>
-                    </div>
-                </div>`;
-            accordionContainer.innerHTML += accordionItem;
-        });
-    } catch (error) {
-        showToast('toastError', `Erro ao buscar inventários: ${error.message}`);
+    if (Object.keys(inventariosAgrupados).length === 0) {
+      accordionContainer.innerHTML = '<p>Nenhum inventário cadastrado ainda.</p>';
+      return;
     }
+
+    Object.keys(inventariosAgrupados).sort().forEach((unidade, index) => {
+      const { Site, Upload } = inventariosAgrupados[unidade];
+      const accordionItem = `
+        <div class="accordion-item">
+          <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${index}">
+            ${unidade} <span class="badge bg-secondary ms-2">${Site.length + Upload.length} itens</span>
+          </button></h2>
+          <div id="collapse-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
+            <div class="accordion-body">
+              ${createTableHtml('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site, [2, 3, 1, 4])}
+              ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload, [2', '3', '1', '4'])}
+            </div>
+          </div>
+        </div>`;
+      accordionContainer.innerHTML += accordionItem;
+    });
+  } catch (error) {
+    showToast('toastError', `Erro ao buscar inventários: ${error.message}`);
+  }
 }
 
 // Função para buscar os dados do Relatório do Sistema
@@ -328,12 +329,10 @@ async function carregarRelatorioSistema() {
     if (result.status === "success") {
       return result.data;
     } else {
-      console.error("Erro ao carregar Relatório do Sistema:", result.message);
       showToast('toastError', `Erro ao buscar dados do sistema: ${result.message}`);
       return [];
     }
   } catch (error) {
-    console.error("Erro na requisição do Relatório do Sistema:", error);
     showToast('toastError', 'Falha de comunicação ao buscar dados do sistema.');
     return [];
   }
@@ -341,125 +340,172 @@ async function carregarRelatorioSistema() {
 
 // Função para buscar os dados de inventário de uma unidade específica
 async function fetchInventarioDaUnidade(unidade) {
-    try {
-        const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidade)}`);
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
-        return result.items;
-    } catch (error) {
-        showToast('toastError', `Não foi possível carregar os itens da unidade: ${error.message}`);
-        return [];
-    }
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidade)}`);
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
+    return result.items;
+  } catch (error) {
+    showToast('toastError', `Não foi possível carregar os itens da unidade: ${error.message}`);
+    return [];
+  }
 }
 
+// Função para buscar todos os dados de inventário para observações
+async function fetchTodosInventarios() {
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
+
+    let allItems = [];
+    Object.values(result.data).forEach(group => {
+      allItems.push(...group.Site, ...group.Upload);
+    });
+    return allItems;
+  } catch (error) {
+    showToast('toastError', `Erro ao buscar todos inventários: ${error.message}`);
+    return [];
+  }
+}
 
 async function handleAnalysis() {
-    const unidade = document.getElementById('unidadeComparar').value;
-    if (!unidade) {
-        showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
-        return;
-    }
+  const unidade = document.getElementById('unidadeComparar').value;
+  if (!unidade) {
+    showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
+    return;
+  }
+  
+  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+  loadingModal.show();
+  document.getElementById('exportCsvBtn').classList.add('disabled');
+  try {
+    // Busca os dados em paralelo
+    const [dadosInventario, dadosSistema, todosInventarios] = await Promise.all([
+      fetchInventarioDaUnidade(unidade),
+      carregarRelatorioSistema(),
+      fetchTodosInventarios() // Adicionado para observações
+    ]);
+
+    // Compara os dados
+    const resultado = compararInventarios(dadosInventario, dadosSistema, todosInventarios, unidade);
     
-    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-    loadingModal.show();
-    document.getElementById('exportCsvBtn').classList.add('d-none');
-    try {
-        // Busca os dados do inventário e do sistema em paralelo
-        const [dadosInventario, dadosSistema] = await Promise.all([
-            fetchInventarioDaUnidade(document.getElementById('unidade').value),
-            carregarRelatorioSistema()
-        ]);
+    analysisReportData = resultado;
+    renderAnalysisResults(analysisReportData);
+    document.getElementById('exportCsvBtn').classList.remove('d-none', 'disabled');
+  } catch (error) {
+    showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
+  } finally {
+    loadingModal.hide();
+  }
+}
 
-        // Compara os dados
-        const resultado = compararInventarios(dadosInventario, dadosSistema, unidade);
-        
-        analysisReportData = resultado;
-        renderAnalysisResults(analysisReportData);
-        document.getElementById('exportCsvBtn').classList.remove('d-none');
-    } catch (error) {
-        showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
-    } finally {
-        loadingModal.hide();
+function compararInventarios(inventario, sistema, todosInventarios, unidade) {
+  const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
+
+  const systemMap = new Map();
+  sistema.forEach(row => {
+    if ((row[12] || '').trim().toLowerCase() === unidade.toLowerCase()) {
+      systemMap.set(normalizeTombo(row[0]), row);
     }
+  });
+
+  const inventoryMap = new Map();
+  inventario.forEach(row => {
+    inventoryMap.set(normalizeTombo(row[3]), row);
+  });
+
+  const allInventoryMap = new Map();
+  todosInventarios.forEach(row => {
+    const tomboNorm = normalizeTombo(row[3]);
+    if (!allInventoryMap.has(tomboNorm)) {
+      allInventoryMap.set(tomboNorm, row[0]); // Unidade do item
+    }
+  });
+
+  let matches = [], missingPhysical = [], missingSystem = [], observations = [];
+
+  systemMap.forEach((sysRow, tomboNorm) => {
+    if (inventoryMap.has(tomboNorm)) {
+      const invRow = inventoryMap.get(tomboNorm);
+      matches.push({
+        tombo: sysRow[0],
+        descInventory: invRow[2],
+        descSystem: sysRow[2],
+        nf: sysRow[4],
+        fornecedor: sysRow[7],
+        fullSystem: sysRow
+      });
+    } else {
+      missingPhysical.push({
+        tombo: sysRow[0],
+        desc: sysRow[2],
+        fullSystem: sysRow
+      });
+      // Observação: Verifica se existe em outra unidade
+      if (allInventoryMap.has(tomboNorm)) {
+        const outraUnidade = allInventoryMap.get(tomboNorm);
+        if (outraUnidade.toLowerCase() !== unidade.toLowerCase()) {
+          observations.push(`Item com tombo ${sysRow[0]} pode estar na unidade "${outraUnidade}" - sugiro transferência.`);
+        }
+      }
+    }
+  });
+
+  inventoryMap.forEach((invRow, tomboNorm) => {
+    if (!systemMap.has(tomboNorm)) {
+      missingSystem.push({
+        tombo: invRow[3],
+        desc: invRow[2]
+      });
+    }
+  });
+
+  return { matches, missingPhysical, missingSystem, observations };
 }
-
-function compararInventarios(inventario, sistema, unidade) {
-    const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
-
-    const systemMap = new Map();
-    sistema.forEach(row => {
-        // Assumindo que a unidade no RelatorioSistema está na coluna M (índice 12)
-        // e o tombo na coluna A (índice 0)
-        if ((row[12] || '').trim().toLowerCase() === unidade.toLowerCase()) {
-            systemMap.set(normalizeTombo(row[0]), row);
-        }
-    });
-
-    const inventoryMap = new Map();
-    inventario.forEach(row => {
-        // Assumindo que o tombo no Inventario está na coluna D (índice 3)
-        inventoryMap.set(normalizeTombo(row[3]), row);
-    });
-
-    let matches = [], missingPhysical = [], missingSystem = [];
-
-    systemMap.forEach((sysRow, tomboNorm) => {
-        if (inventoryMap.has(tomboNorm)) {
-            const invRow = inventoryMap.get(tomboNorm);
-            matches.push({ tombo: sysRow[0], descInventory: invRow[2], descSystem: sysRow[2], nf: sysRow[4], fornecedor: sysRow[7], fullSystem: sysRow });
-        } else {
-            missingPhysical.push({ tombo: sysRow[0], desc: sysRow[2], fullSystem: sysRow });
-        }
-    });
-
-    inventoryMap.forEach((invRow, tomboNorm) => {
-        if (!systemMap.has(tomboNorm)) {
-            missingSystem.push({ tombo: invRow[3], desc: invRow[2] });
-        }
-    });
-
-    return { matches, missingPhysical, missingSystem, observations: [] };
-}
-
 
 function exportAnalysisToCsv() {
-    const { matches, missingPhysical, missingSystem, observations } = analysisReportData;
-    if (!matches && !missingPhysical && !missingSystem) return;
+  const { matches, missingPhysical, missingSystem, observations } = analysisReportData;
+  if (!matches || !missingPhysical || !missingSystem) return;
 
-    const headers = ['Tipo', 'Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor', 'Info Completa Sistema', 'Observação'];
-    const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
-    let csvContent = headers.join(';') + '\n';
+  const headers = ['Tipo', 'Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor', 'Info Completa Sistema', 'Observação'];
+  const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
+  let csvContent = headers.join(';') + '\n';
 
-    matches.forEach(m => csvContent += ['Match', m.tombo, m.descInventory, m.descSystem, m.nf, m.fornecedor, m.fullSystem.join(','), ''].map(escapeCsvCell).join(';') + '\n');
-    missingPhysical.forEach(mp => csvContent += ['Faltando no Físico', mp.tombo, '', mp.desc, '', '', mp.fullSystem.join(','), ''].map(escapeCsvCell).join(';') + '\n');
-    missingSystem.forEach(ms => csvContent += ['Faltando no Sistema', ms.tombo, ms.desc, '', '', '', '', ''].map(escapeCsvCell).join(';') + '\n');
-    observations.forEach(o => csvContent += ['Observação', '', '', '', '', '', '', o].map(escapeCsvCell).join(';') + '\n');
+  matches.forEach(m => csvContent += ['Match', m.tombo, m.descInventory, m.descSystem, m.nf, m.fornecedor, m.fullSystem.join(','), ''].map(escapeCsvCell).join(';') + '\n');
+  missingPhysical.forEach(mp => csvContent += ['Faltando no Físico', mp.tombo, '', mp.desc, '', '', mp.fullSystem.join(','), ''].map(escapeCsvCell).join(';') + '\n');
+  missingSystem.forEach(ms => csvContent += ['Faltando no Sistema', ms.tombo, ms.desc, '', '', '', '', ''].map(escapeCsvCell).join(';') + '\n');
+  observations.forEach(o => csvContent += ['Observação', '', '', '', '', '', '', o].map(escapeCsvCell).join(';') + '\n');
 
-    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `relatorio_analise_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+  const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `relatorio_analise_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 // =================================================================================
 // FUNÇÕES AUXILIARES E DE UI
 // =================================================================================
 async function popularUnidadesParaAnalise() {
-    try {
-        const response = await fetch(`${SCRIPT_URL}?action=buscarTodasUnidades`);
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'listarUnidades' })
+    });
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
 
-        const select = document.getElementById('unidadeComparar');
-        select.innerHTML = '<option value="">Selecione uma unidade...</option>';
-        result.unidades.sort().forEach(u => {
-            select.add(new Option(u, u.toLowerCase()));
-        });
-    } catch(error) {
-        showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
-    }
+    const select = document.getElementById('unidadeComparar');
+    select.innerHTML = '<option value="">Selecione uma unidade...</option>';
+    result.unidades.sort().forEach(u => {
+      const option = new Option(u, u);
+      select.add(option);
+    });
+  } catch (error) {
+    showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
+  }
 }
 
 function parseExcel(file) {
@@ -477,31 +523,41 @@ function parseExcel(file) {
 }
 
 function parsePastedText(text) {
-  return text.split('\n').filter(line => line.trim()).map(line => line.split('\t').map(cell => cell.trim()));
+  return text.split('\n').filter(line => line.trim()).map(line => line.split(/\t|;/).map(cell => cell.trim()));
 }
 
 function createTableHtml(title, headers, data, dataIndices) {
-    if (!data || data.length === 0) return '';
-    let table = `<h5>${title} (${data.length})</h5><div class="table-responsive"><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
-    data.forEach(row => {
-        table += '<tr>';
-        dataIndices.forEach(index => table += `<td>${row[index] || ''}</td>`);
-        table += '</tr>';
-    });
-    return table + '</tbody></table></div>';
+  if (!data || data.length === 0) return '';
+  let table = `<h5>${title} (${data.length})</h5><div class="table-responsive"><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  data.forEach(row => {
+    table += '<tr>';
+    dataIndices.forEach(index => table += `<td>${row[index] || ''}</td>`);
+    table += '</tr>';
+  });
+  return table + '</tbody></table></div>';
 }
 
 function renderAnalysisResults({ matches, missingPhysical, missingSystem, observations }) {
-    const renderTable = (title, count, bgColor, textColor, headers, data, indices) => `
-        <div class="card mb-3">
-            <div class="card-header ${bgColor} ${textColor} fw-bold">${title} - ${count}</div>
-            <div class="card-body">${createTableHtml('', headers, data, indices)}</div>
-        </div>`;
-    
-    document.getElementById('resultadoComparacao').innerHTML = 
-        renderTable('Itens Encontrados (Matches)', matches.length, 'bg-success', 'text-white', ['Tombo', 'Descrição', 'Nota Fiscal'], matches, ['tombo', 'descInventory', 'nf']) +
-        renderTable('Itens Faltando no Inventário Físico', missingPhysical.length, 'bg-warning', 'text-dark', ['Tombo', 'Descrição'], missingPhysical, ['tombo', 'desc']) +
-        renderTable('Itens Sobrando (Não Constam no Sistema)', missingSystem.length, 'bg-danger', 'text-white', ['Tombo', 'Descrição'], missingSystem, ['tombo', 'desc']);
+  const renderTable = (title, count, bgColor, textColor, headers, data, keys) => `
+    <div class="card mb-3">
+      <div class="card-header ${bgColor} ${textColor} fw-bold">${title} - ${count}</div>
+      <div class="card-body">${createTableHtml('', headers, data, keys)}</div>
+    </div>`;
+
+  let html = renderTable('Itens Encontrados (Matches)', matches.length, 'bg-success', 'text-white', 
+    ['Tombo', 'Desc. Inventário', 'Desc. Sistema', 'Nota Fiscal'], matches, ['tombo', 'descInventory', 'descSystem', 'nf']);
+
+  html += renderTable('Itens Faltando no Inventário Físico', missingPhysical.length, 'bg-warning', 'text-dark', 
+    ['Tombo', 'Descrição'], missingPhysical, ['tombo', 'desc']);
+
+  html += renderTable('Itens Sobrando (Não Constam no Sistema)', missingSystem.length, 'bg-danger', 'text-white', 
+    ['Tombo', 'Descrição'], missingSystem, ['tombo', 'desc']);
+
+  if (observations.length > 0) {
+    html += `<div class="card mb-3"><div class="card-header bg-info text-dark fw-bold">Observações - ${observations.length}</div><div class="card-body"><ul class="list-group">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul></div></div>`;
+  }
+
+  document.getElementById('resultadoComparacao').innerHTML = html;
 }
 
 function showToast(id, message) {
@@ -511,4 +567,4 @@ function showToast(id, message) {
     new bootstrap.Toast(toastEl).show();
   }
 }
-
+</DOCUMENT>
