@@ -1,3 +1,4 @@
+<DOCUMENT filename="script.js">
 // =================================================================================
 // CONFIGURAÇÃO E INICIALIZAÇÃO
 // =================================================================================
@@ -146,6 +147,10 @@ function setupEventListeners() {
   document.getElementById('relatorios-tab').addEventListener('shown.bs.tab', fetchAndDisplayRelatorios);
   document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
   document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
+  document.getElementById('analise-tab').addEventListener('shown.bs.tab', async () => {
+      await popularUnidadesSistema();
+      await popularUnidadesInventario();
+  });
 }
 
 // =================================================================================
@@ -363,39 +368,42 @@ async function fetchAndDisplayRelatorios() {
 // LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 4.0)
 // =================================================================================
 async function handleAnalysis() {
-  const unidade = document.getElementById('unidadeComparar').value;
-  if (!unidade) {
-    showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
-    return;
-  }
-  
-  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-  loadingModal.show();
-  document.getElementById('exportCsvBtn').classList.add('d-none');
-  document.getElementById('analiseSummary').classList.add('d-none');
-  document.getElementById('resultadoComparacao').innerHTML = '';
-
-  try {
-    const [dadosInventario, dadosSistema] = await Promise.all([
-      fetchInventarioDaUnidade(unidade),
-      carregarRelatorioSistema(),
-    ]);
-
-    const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidade);
+    const unidadeSistema = document.getElementById('unidadeSistemaComparar').value;
+    const unidadeInventario = document.getElementById('unidadeInventarioComparar').value;
+    if (!unidadeSistema || !unidadeInventario) {
+        showToast('toastError', 'Selecione as unidades para o sistema e inventário!');
+        return;
+    }
     
-    analysisReportData = resultado;
-    renderAnalysisResultsV4(resultado, unidade);
-    document.getElementById('exportCsvBtn').classList.remove('d-none');
-    
-    // Salva a última unidade selecionada no localStorage
-    localStorage.setItem('lastAnalysisUnit', unidade);
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    loadingModal.show();
+    document.getElementById('exportCsvBtn').classList.add('d-none');
+    document.getElementById('analiseSummary').classList.add('d-none');
+    document.getElementById('resultadoComparacao').innerHTML = '';
 
-  } catch (error) {
-    showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
-    console.error(error);
-  } finally {
-    loadingModal.hide();
-  }
+    try {
+        const [dadosInventario, dadosSistema] = await Promise.all([
+            fetchInventarioDaUnidade(unidadeInventario),
+            carregarRelatorioSistema(),
+        ]);
+
+        // Filtre dadosSistema pela unidadeSistema
+        const dadosSistemaFiltrados = dadosSistema.filter(row => (row[12] || '').trim().toLowerCase() === unidadeSistema.toLowerCase());
+
+        const resultado = compararInventariosV4(dadosInventario, dadosSistemaFiltrados, unidadeInventario);
+        
+        analysisReportData = resultado;
+        renderAnalysisResultsV4(resultado, `${unidadeSistema} (Sistema) vs ${unidadeInventario} (Inventário)`);
+        document.getElementById('exportCsvBtn').classList.remove('d-none');
+        
+        localStorage.setItem('lastAnalysisUnit', unidadeInventario);
+
+    } catch (error) {
+        showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
+        console.error(error);
+    } finally {
+        loadingModal.hide();
+    }
 }
 
 async function fetchInventarioDaUnidade(unidade) {
@@ -450,7 +458,7 @@ function stringSimilarity(str1, str2) {
     return (2 * intersectionSize) / (str1.length + str2.length - 2);
 }
 
-function compararInventariosV4(inventario, sistema, unidade) {
+function compararInventariosV4(inventario, sistema, unidadeInventario) {
     const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
 
     let incorporacoes = [];
@@ -459,15 +467,12 @@ function compararInventariosV4(inventario, sistema, unidade) {
     let inventarioSemTombo = [];
 
     sistema.forEach((row, index) => {
-        const unidadeSistema = (row[12] || '').trim().toLowerCase();
-        if (unidadeSistema === unidade.toLowerCase()) {
-            const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
-            if (tipoEntrada.includes('incorporação')) {
-                incorporacoes.push({ sysRow: row });
-            } else {
-                const tomboNorm = normalizeTombo(row[0]);
-                if (tomboNorm) sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
-            }
+        const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
+        if (tipoEntrada.includes('incorporação')) {
+            incorporacoes.push({ sysRow: row });
+        } else {
+            const tomboNorm = normalizeTombo(row[0]);
+            if (tomboNorm) sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
         }
     });
 
@@ -548,13 +553,13 @@ function compararInventariosV4(inventario, sistema, unidade) {
 }
 
 
-function renderAnalysisResultsV4(data, unidade) {
+function renderAnalysisResultsV4(data, tituloUnidades) {
     const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
     const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length;
 
     const summaryContainer = document.getElementById('analiseSummary');
     summaryContainer.innerHTML = `
-        <h5 class="mb-3">Resumo da Análise para: <strong>${unidade}</strong></h5>
+        <h5 class="mb-3">Resumo da Análise: <strong>${tituloUnidades}</strong></h5>
         <div class="row">
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Itens no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-secondary"><h6><i class="bi bi-clipboard-check me-2"></i>Itens no Inventário</h6><span class="fs-4">${totalInventory}</span></div></div>
@@ -628,6 +633,57 @@ async function popularUnidadesParaAnalise() {
   }
 }
 
+async function popularUnidadesSistema() {
+    try {
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidadesSistema' }) });
+        const result = await response.json();
+        if (result.status !== 'success') throw new Error(result.message);
+
+        const select = document.getElementById('unidadeSistemaComparar');
+        select.innerHTML = '<option value="">Selecione uma unidade...</option>';
+        result.unidades.sort().forEach(u => select.add(new Option(u, u)));
+
+        // Listener para auto-seleção
+        select.addEventListener('change', autoSelectMatchingUnit);
+    } catch (error) {
+        showToast('toastError', `Erro ao carregar unidades do sistema: ${error.message}`);
+    }
+}
+
+async function popularUnidadesInventario() {
+    try {
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidadesInventario' }) });
+        const result = await response.json();
+        if (result.status !== 'success') throw new Error(result.message);
+
+        const select = document.getElementById('unidadeInventarioComparar');
+        select.innerHTML = '<option value="">Selecione uma unidade...</option>';
+        result.unidades.sort().forEach(u => select.add(new Option(u, u)));
+
+        const lastUnit = localStorage.getItem('lastAnalysisUnit');
+        if (lastUnit) {
+            select.value = lastUnit;
+            document.getElementById('unidadeSistemaComparar').value = lastUnit; // Tenta match inicial
+        }
+    } catch (error) {
+        showToast('toastError', `Erro ao carregar unidades do inventário: ${error.message}`);
+    }
+}
+
+// Função para auto-selecionar unidade matching
+function autoSelectMatchingUnit() {
+    const selectedSistema = this.value;
+    const inventarioSelect = document.getElementById('unidadeInventarioComparar');
+    if (selectedSistema && inventarioSelect.options) {
+        for (let option of inventarioSelect.options) {
+            if (option.value.toLowerCase() === selectedSistema.toLowerCase()) {
+                inventarioSelect.value = option.value;
+                break;
+            }
+        }
+    }
+}
+
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -691,3 +747,4 @@ function showToast(type, message) {
     new bootstrap.Toast(toastEl).show();
   }
 }
+</DOCUMENT>
