@@ -438,6 +438,23 @@ function normalizeDescription(str) {
         .replace(/\s+/g, ' '); 
 }
 
+function levenshteinDistance(s1, s2) {
+  const matrix = Array.from({ length: s1.length + 1 }, () => Array(s2.length + 1).fill(0));
+  for (let i = 0; i <= s1.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= s2.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= s1.length; i++) {
+    for (let j = 1; j <= s2.length; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,     // deleção
+        matrix[i][j - 1] + 1,     // inserção
+        matrix[i - 1][j - 1] + cost // substituição
+      );
+    }
+  }
+  return matrix[s1.length][s2.length];
+}
+
 function stringSimilarity(str1, str2) {
     if (str1 === str2) return 1;
     if (str1.length < 2 || str2.length < 2) return 0;
@@ -461,7 +478,10 @@ function stringSimilarity(str1, str2) {
         }
     }
 
-    return (2 * intersectionSize) / (str1.length + str2.length - 2);
+    const bigramScore = (2 * intersectionSize) / (str1.length + str2.length - 2);
+    const levDist = levenshteinDistance(str1, str2);
+    const levScore = 1 - (levDist / Math.max(str1.length, str2.length));
+    return (bigramScore + levScore) / 2; // Média para melhor precisão
 }
 
 function compararInventariosV4(inventario, sistema, unidade) {
@@ -495,7 +515,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
 
-    let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [];
+    let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [], needsManualReview = [];
 
     inventarioComTombo.forEach((invData, tomboNorm) => {
         if (sistemaParaAnalise.has(tomboNorm)) {
@@ -533,7 +553,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
 
     inventarioSemTomboRestante.forEach((invData, invIndex) => {
         if (!invData) return;
-        let bestMatch = { score: 0.75, sysData: null, sysIndex: -1 };
+        let bestMatch = { score: 0.6, sysData: null, sysIndex: -1 }; // Threshold aumentado para 0.6
         
         sistemaAindaRestante.forEach((sysData, sysIndex) => {
              if (!sysData) return;
@@ -544,18 +564,29 @@ function compararInventariosV4(inventario, sistema, unidade) {
         });
 
         if (bestMatch.sysData) {
-            matchedBySimilarDesc.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
+            if (bestMatch.score >= 0.6) {
+                matchedBySimilarDesc.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
+            } else {
+                needsManualReview.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
+            }
             sistemaParaAnalise.delete(normalizeTombo(bestMatch.sysData.sysRow[SISTEMA_COLUMNS.TOMBAMENTO]));
             sistemaAindaRestante[bestMatch.sysIndex] = null;
             inventarioSemTomboRestante[invIndex] = null;
         }
     });
     
-    const remainingSystem = Array.from(sistemaParaAnalise.values());
+    let remainingSystem = Array.from(sistemaParaAnalise.values());
     const remainingInventory = [...Array.from(inventarioComTombo.values()), ...inventarioSemTomboRestante.filter(Boolean)];
 
+    const currentYear = new Date().getFullYear();
+    remainingSystem = remainingSystem.map(item => {
+      const cadastroDate = new Date(item.sysRow[SISTEMA_COLUMNS.CADASTRO]);
+      item.isNew = !isNaN(cadastroDate.getTime()) && cadastroDate.getFullYear() >= 2023 && cadastroDate.getFullYear() <= currentYear;
+      return item;
+    });
+
     return { 
-        matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc,
+        matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, needsManualReview,
         remainingSystem, remainingInventory,
         totalSystem: sistema.length,
         totalInventory: inventario.length
@@ -563,7 +594,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
 }
 
 function renderAnalysisResultsV4(data, unidade) {
-    const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
+    const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, needsManualReview, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
     const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length;
 
     const summaryContainer = document.getElementById('analiseSummary');
@@ -599,10 +630,24 @@ function renderAnalysisResultsV4(data, unidade) {
         ['Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Cadastro', 'Valor NF'], 
         divergences.map(d => [d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], ...getSysData(d.sysRow)])
     );
-    if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', 
+
+    const pendingNew = remainingSystem.filter(m => m.isNew);
+    const pendingOld = remainingSystem.filter(m => !m.isNew);
+
+    if (pendingNew.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Novos (Cadastro 2023-2025)', 'bg-warning-subtle', 
         ['Tombo', 'Descrição Sistema', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
+        pendingNew.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
+    if (pendingOld.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Antigos (Antes de 2023)', 'bg-danger-subtle', 
+        ['Tombo', 'Descrição Sistema', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
+        pendingOld.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
+    );
+
+    if (needsManualReview.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes para Revisão Manual (Baixa Similaridade)', 'bg-danger-subtle', 
+        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade', 'Cadastro', 'Valor NF'], 
+        needsManualReview.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
+    );
+
     if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', 
         ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], 
         remainingInventory.map(m => [m.invRow[3], m.invRow[2], m.invRow[1], m.invRow[4]])
@@ -614,7 +659,7 @@ function renderAnalysisResultsV4(data, unidade) {
 }
 
 function exportAnalysisToCsv() {
-  const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory } = analysisReportData;
+  const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, needsManualReview, remainingSystem, remainingInventory } = analysisReportData;
   if (!analysisReportData) return;
 
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
@@ -627,11 +672,16 @@ function exportAnalysisToCsv() {
   matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
   divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.invRow[1], d.invRow[4], ...getSysData(d.sysRow), 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
   
-  remainingSystem.forEach(m => csvContent += ['Pendente no Sistema', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', m.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(m.sysRow), 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n');
+  remainingSystem.forEach(m => {
+    const category = m.isNew ? 'Pendente Novo no Sistema' : 'Pendente Antigo no Sistema';
+    csvContent += [category, m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', m.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(m.sysRow), 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n';
+  });
   
   remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
   
   incorporacoes.forEach(i => csvContent += ['Incorporacao (para Baixa)', i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', i.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(i.sysRow), 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
+
+  needsManualReview.forEach(m => csvContent += ['Pendente Revisao Manual (Baixa Similaridade)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade baixa de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
 
   const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
