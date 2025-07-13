@@ -51,7 +51,7 @@
             <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#uploads" role="tab">Uploads</a></li>
             <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" id="inventarios-tab" href="#inventarios" role="tab">Consultar Inventários</a></li>
             <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" id="relatorios-tab" href="#relatorios" role="tab">Relatórios do Sistema</a></li>
-            <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#analise" role="tab">Análise Profissional</a></li>
+            <li class="nav-item" role="presentation"><a class="nav-link" id="analise-tab" data-bs-toggle="tab" href="#analise" role="tab">Análise Profissional</a></li>
         </ul>
 
         <div class="tab-content">
@@ -177,7 +177,7 @@
                 </div>
             </div>
             
-            <!-- Nova Aba de Relatórios do Sistema -->
+            <!-- Aba de Relatórios do Sistema -->
             <div class="tab-pane fade" id="relatorios" role="tabpanel">
                 <div class="card">
                     <div class="card-header fw-bold bg-white">Relatórios do Sistema Carregados</div>
@@ -194,10 +194,11 @@
                 <div class="card">
                     <div class="card-header fw-bold bg-white">Análise Profissional de Inventário</div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <label for="unidadeComparar" class="form-label">Selecione a Unidade para Analisar</label>
-                            <select class="form-select" id="unidadeComparar"></select>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                             <label for="unidadeComparar" class="form-label fw-bold mb-0 me-3">Unidade para Análise:</label>
+                             <button id="recarregarUnidades" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Recarregar Lista</button>
                         </div>
+                        <select class="form-select mb-3" id="unidadeComparar"></select>
                         <button id="compararBtn" class="btn btn-success me-2"><i class="bi bi-bar-chart-line-fill me-2"></i>Gerar Relatório</button>
                         <button id="exportCsvBtn" class="btn btn-secondary d-none"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar para CSV</button>
                     </div>
