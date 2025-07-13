@@ -17,23 +17,28 @@ let analysisReportData = {}; // Armazena os dados do último relatório gerado
 // FLUXO DE AUTENTICAÇÃO E CARREGAMENTO INICIAL
 // =================================================================================
 window.onload = () => {
+  // Inicializa o serviço de identidade do Google
   google.accounts.id.initialize({
     client_id: CLIENT_ID,
     callback: handleCredentialResponse,
   });
+  // Configura todos os event listeners da página
   setupEventListeners();
+  // Renderiza o botão de login do Google
   google.accounts.id.renderButton(
     document.getElementById('signin-button'),
     { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' } 
   );
 };
 
+// Função chamada após o login bem-sucedido
 function handleCredentialResponse(response) {
   const profile = JSON.parse(atob(response.credential.split('.')[1]));
   updateUiForSignIn(profile.name);
-  requestAccessToken();
+  requestAccessToken(); // Solicita o token de acesso para o Drive
 }
 
+// Solicita o token de acesso para APIs como o Google Drive
 function requestAccessToken() {
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -41,7 +46,7 @@ function requestAccessToken() {
     callback: (tokenResponse) => {
       if (tokenResponse && tokenResponse.access_token) {
         accessToken = tokenResponse.access_token;
-        initializeAppLogic();
+        initializeAppLogic(); // Inicia a lógica principal do app após obter o token
       } else {
         showToast('toastError', 'Falha na autorização para fazer upload de fotos. Tente fazer login novamente.');
       }
@@ -50,16 +55,16 @@ function requestAccessToken() {
   tokenClient.requestAccessToken();
 }
 
+// Lida com o clique no botão de sair
 function handleSignoutClick() {
   if (accessToken) {
     google.accounts.oauth2.revoke(accessToken, () => { accessToken = null; });
   }
   google.accounts.id.disableAutoSelect();
-  document.getElementById('auth-container').classList.add('d-none');
-  document.getElementById('login-container').classList.remove('d-none');
-  document.getElementById('main-content').classList.add('d-none');
+  updateUiForSignOut();
 }
 
+// Atualiza a interface para o estado "logado"
 function updateUiForSignIn(userName) {
   document.getElementById('user-name').textContent = `Olá, ${userName}`;
   document.getElementById('auth-container').classList.remove('d-none');
@@ -67,16 +72,24 @@ function updateUiForSignIn(userName) {
   document.getElementById('main-content').classList.remove('d-none');
 }
 
+// Atualiza a interface para o estado "deslogado"
+function updateUiForSignOut() {
+    document.getElementById('auth-container').classList.add('d-none');
+    document.getElementById('login-container').classList.remove('d-none');
+    document.getElementById('main-content').classList.add('d-none');
+}
+
 // =================================================================================
 // LÓGICA PRINCIPAL DO APLICATIVO
 // =================================================================================
 async function initializeAppLogic() {
-  loadDraft();
-  checkUnidadeFixada();
-  await fetchConcluidos();
-  await popularUnidadesParaAnalise();
+  loadDraft(); // Carrega rascunho salvo
+  checkUnidadeFixada(); // Verifica se uma unidade de trabalho já foi definida
+  await fetchConcluidos(); // Busca itens já inventariados para a unidade atual
+  await popularUnidadesParaAnalise(); // Popula o dropdown de análise
 }
 
+// Verifica se a unidade está no localStorage, senão, abre o modal para definição
 function checkUnidadeFixada() {
   const unidadeFixada = localStorage.getItem('unidadeFixada');
   if (!unidadeFixada) {
@@ -86,6 +99,7 @@ function checkUnidadeFixada() {
   }
 }
 
+// Carrega o rascunho do formulário do localStorage
 function loadDraft() {
   const draft = JSON.parse(localStorage.getItem('draft'));
   if (draft) {
@@ -96,6 +110,7 @@ function loadDraft() {
   }
 }
 
+// Salva o estado atual do formulário como rascunho
 function autoSaveDraft() {
   const formData = {
     unidade: document.getElementById('unidade').value,
@@ -113,8 +128,9 @@ function autoSaveDraft() {
 // =================================================================================
 function setupEventListeners() {
   document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
-  setInterval(autoSaveDraft, 30000);
+  setInterval(autoSaveDraft, 30000); // Salva rascunho a cada 30 segundos
 
+  // Salva a unidade de trabalho definida no modal
   document.getElementById('salvarUnidade').addEventListener('click', () => {
     const unidade = document.getElementById('unidadeInicial').value.trim();
     if (unidade) {
@@ -125,12 +141,14 @@ function setupEventListeners() {
     }
   });
 
+  // Reseta a unidade fixada
   document.getElementById('resetUnidade').addEventListener('click', () => {
     localStorage.removeItem('unidadeFixada');
     document.getElementById('unidade').value = '';
     new bootstrap.Modal(document.getElementById('unidadeModal')).show();
   });
 
+  // Permite editar o campo "local"
   document.getElementById('editLocal').addEventListener('click', () => {
     const localInput = document.getElementById('local');
     localInput.readOnly = false;
@@ -142,7 +160,6 @@ function setupEventListeners() {
   document.getElementById('uploadSistemaBtn').addEventListener('click', () => handleUpload('Sistema'));
   document.getElementById('uploadInventariosBtn').addEventListener('click', () => handleUpload('Inventario'));
   document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchAndDisplayInventarios);
-  // Listener para a nova aba de relatórios
   document.getElementById('relatorios-tab').addEventListener('shown.bs.tab', fetchAndDisplayRelatorios);
   document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
   document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
@@ -320,7 +337,6 @@ async function fetchAndDisplayInventarios() {
   }
 }
 
-// Nova função para buscar e exibir os relatórios do sistema
 async function fetchAndDisplayRelatorios() {
     try {
         const response = await fetch(`${SCRIPT_URL}?action=buscarRelatoriosAgrupados`);
@@ -360,7 +376,7 @@ async function fetchAndDisplayRelatorios() {
 
 
 // =================================================================================
-// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 4.0)
+// LÓGICA DE ANÁLISE DE INVENTÁRIO (CORRIGIDA)
 // =================================================================================
 async function handleAnalysis() {
   const unidade = document.getElementById('unidadeComparar').value;
@@ -376,18 +392,19 @@ async function handleAnalysis() {
   document.getElementById('resultadoComparacao').innerHTML = '';
 
   try {
+    // Busca os dados do inventário da unidade selecionada e o relatório COMPLETO do sistema
     const [dadosInventario, dadosSistema] = await Promise.all([
       fetchInventarioDaUnidade(unidade),
       carregarRelatorioSistema(),
     ]);
 
+    // A função de comparação agora recebe o relatório do sistema completo
     const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidade);
     
-    analysisReportData = resultado;
+    analysisReportData = resultado; // Salva para exportação
     renderAnalysisResultsV4(resultado, unidade);
     document.getElementById('exportCsvBtn').classList.remove('d-none');
     
-    // Salva a última unidade selecionada no localStorage
     localStorage.setItem('lastAnalysisUnit', unidade);
 
   } catch (error) {
@@ -450,6 +467,7 @@ function stringSimilarity(str1, str2) {
     return (2 * intersectionSize) / (str1.length + str2.length - 2);
 }
 
+// LÓGICA DE COMPARAÇÃO ATUALIZADA
 function compararInventariosV4(inventario, sistema, unidade) {
     const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
 
@@ -458,19 +476,22 @@ function compararInventariosV4(inventario, sistema, unidade) {
     let inventarioComTombo = new Map();
     let inventarioSemTombo = [];
 
+    // --- MUDANÇA PRINCIPAL AQUI ---
+    // Processa TODAS as linhas do relatório do sistema, sem filtrar por unidade.
+    // A comparação é feita contra o relatório completo.
     sistema.forEach((row, index) => {
-        const unidadeSistema = (row[12] || '').trim().toLowerCase();
-        if (unidadeSistema === unidade.toLowerCase()) {
-            const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
-            if (tipoEntrada.includes('incorporação')) {
-                incorporacoes.push({ sysRow: row });
-            } else {
-                const tomboNorm = normalizeTombo(row[0]);
-                if (tomboNorm) sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
+        const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
+        if (tipoEntrada.includes('incorporação')) {
+            incorporacoes.push({ sysRow: row });
+        } else {
+            const tomboNorm = normalizeTombo(row[0]);
+            if (tomboNorm) {
+                sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
             }
         }
     });
 
+    // Separa os itens do inventário físico (da unidade selecionada) em com e sem tombo
     inventario.forEach((row, index) => {
         const tomboNorm = normalizeTombo(row[3]);
         if (tomboNorm && tomboNorm.toLowerCase() !== 's/t') {
@@ -482,6 +503,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
 
     let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [];
 
+    // 1. Cruzamento por Tombo (a lógica aqui permanece a mesma)
     inventarioComTombo.forEach((invData, tomboNorm) => {
         if (sistemaParaAnalise.has(tomboNorm)) {
             const sysData = sistemaParaAnalise.get(tomboNorm);
@@ -495,6 +517,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
 
+    // 2. Cruzamento por Descrição Exata (para itens sem tombo)
     const sistemaRestante = Array.from(sistemaParaAnalise.values());
     inventarioSemTombo.forEach((invData, invIndex) => {
         if (!invData) return;
@@ -513,6 +536,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
     
+    // 3. Cruzamento por Descrição Similar
     let inventarioSemTomboRestante = inventarioSemTombo.filter(Boolean);
     let sistemaAindaRestante = sistemaRestante.filter(Boolean);
 
@@ -542,7 +566,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
     return { 
         matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc,
         remainingSystem, remainingInventory,
-        totalSystem: sistemaParaAnalise.size + matches.length + divergences.length + matchedByExactDesc.length + matchedBySimilarDesc.length,
+        totalSystem: sistema.length, // O total do sistema agora reflete o relatório completo
         totalInventory: inventario.length
     };
 }
@@ -554,9 +578,9 @@ function renderAnalysisResultsV4(data, unidade) {
 
     const summaryContainer = document.getElementById('analiseSummary');
     summaryContainer.innerHTML = `
-        <h5 class="mb-3">Resumo da Análise para: <strong>${unidade}</strong></h5>
+        <h5 class="mb-3">Resumo da Análise para o Inventário de: <strong>${unidade}</strong></h5>
         <div class="row">
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Itens no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Total no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-secondary"><h6><i class="bi bi-clipboard-check me-2"></i>Itens no Inventário</h6><span class="fs-4">${totalInventory}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${totalConciliado}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-exclamation-triangle-fill me-2"></i>Pendentes</h6><span class="fs-4">${remainingSystem.length + remainingInventory.length}</span></div></div>
@@ -613,7 +637,7 @@ async function popularUnidadesParaAnalise() {
 
     const select = document.getElementById('unidadeComparar');
     select.innerHTML = '<option value="">Selecione uma unidade...</option>';
-    result.unidades.sort().forEach(u => {
+    result.unidades.forEach(u => {
       const option = new Option(u, u);
       select.add(option);
     });
