@@ -13,7 +13,7 @@ const SISTEMA_COLUMNS = {
     DESCRICAO: 2,
     TIPO_ENTRADA: 3,
     NOTA_FISCAL: 4,
-    VALOR_NF: 5, // ATENÇÃO: Assumindo que a Coluna F é o "Valor da NF". Ajuste se necessário.
+    VALOR_NF: 9, // CORRIGIDO: Apontando para a coluna J (índice 9).
     FORNECEDOR: 7,
     UNIDADE: 12
 };
@@ -595,7 +595,7 @@ function renderAnalysisResultsV4(data, unidade) {
     const resultsContainer = document.getElementById('resultadoComparacao');
     resultsContainer.innerHTML = '';
 
-    const getSysData = (row) => [formatDate(row[SISTEMA_COLUMNS.CADASTRO]), row[SISTEMA_COLUMNS.VALOR_NF]];
+    const getSysData = (row) => [formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
 
     if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', 
         ['Tombo', 'Descrição', 'Local', 'Estado', 'Cadastro', 'Valor NF'], 
@@ -615,7 +615,7 @@ function renderAnalysisResultsV4(data, unidade) {
     );
     if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', 
         ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), m.sysRow[SISTEMA_COLUMNS.VALOR_NF]])
+        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
     if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', 
         ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], 
@@ -623,7 +623,7 @@ function renderAnalysisResultsV4(data, unidade) {
     );
     if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Baixa)', 'bg-light', 
         ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Cadastro', 'Valor NF'], 
-        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), i.sysRow[SISTEMA_COLUMNS.VALOR_NF]])
+        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(i.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
 }
 
@@ -634,7 +634,7 @@ function exportAnalysisToCsv() {
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
   let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Cadastro_Sistema;Valor_NF_Sistema;Observacao\n';
 
-  const getSysData = (row) => [row[SISTEMA_COLUMNS.NOTA_FISCAL], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), row[SISTEMA_COLUMNS.VALOR_NF]];
+  const getSysData = (row) => [row[SISTEMA_COLUMNS.NOTA_FISCAL], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
 
   matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), ''].map(escapeCsvCell).join(';') + '\n');
   matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
@@ -660,7 +660,6 @@ function exportAnalysisToCsv() {
 // =================================================================================
 // FUNÇÕES AUXILIARES E DE UI
 // =================================================================================
-// --- NOVA FUNÇÃO HELPER PARA FORMATAR A DATA ---
 function formatDate(dateString) {
   if (!dateString) return '';
   try {
@@ -676,6 +675,18 @@ function formatDate(dateString) {
   } catch (error) {
     return dateString; // Em caso de erro, retorna o valor original
   }
+}
+
+// --- NOVA FUNÇÃO HELPER PARA FORMATAR VALOR MONETÁRIO ---
+function formatCurrency(value) {
+  if (value === null || value === undefined || value === '') return '';
+  // Remove R$, pontos de milhar e substitui vírgula por ponto para conversão
+  const sanitizedValue = String(value).replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
+  const number = parseFloat(sanitizedValue);
+  if (isNaN(number)) {
+    return value; // Retorna o valor original se não for um número
+  }
+  return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 async function popularUnidadesParaAnalise() {
