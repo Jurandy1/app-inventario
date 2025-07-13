@@ -6,7 +6,7 @@ const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-// ATUALIZADO: Mapeamento da nova estrutura de 9 colunas do Relatório do Sistema
+// Mapeamento da estrutura de 9 colunas do Relatório do Sistema
 const SISTEMA_COLUMNS = {
     TOMBAMENTO: 0,
     ESPECIE: 1,
@@ -463,7 +463,6 @@ function stringSimilarity(str1, str2) {
     return (2 * intersectionSize) / (str1.length + str2.length - 2);
 }
 
-// --- FUNÇÃO DE COMPARAÇÃO ATUALIZADA ---
 function compararInventariosV4(inventario, sistema, unidade) {
     const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
 
@@ -472,10 +471,8 @@ function compararInventariosV4(inventario, sistema, unidade) {
     let inventarioComTombo = new Map();
     let inventarioSemTombo = [];
 
-    // 1. Filtra o relatório do sistema para conter apenas itens "DISPONÍVEL"
     const sistemaDisponivel = sistema.filter(row => (row[SISTEMA_COLUMNS.STATUS] || '').trim().toUpperCase() === 'DISPONÍVEL');
 
-    // 2. Processa o relatório filtrado: separa itens de "INCORPORAÇÃO" dos demais
     sistemaDisponivel.forEach((row, index) => {
         const tipoEntrada = (row[SISTEMA_COLUMNS.TIPO_ENTRADA] || '').toLowerCase();
         if (tipoEntrada.includes('incorporação')) {
@@ -488,7 +485,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
 
-    // 3. Processa o inventário físico, separando itens com e sem tombo
     inventario.forEach((row, index) => {
         const tomboNorm = normalizeTombo(row[3]);
         if (tomboNorm && tomboNorm.toLowerCase() !== 's/t') {
@@ -500,7 +496,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
 
     let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [];
 
-    // 4. Lógica de cruzamento (continua a mesma, mas agora sobre os dados pré-filtrados)
     inventarioComTombo.forEach((invData, tomboNorm) => {
         if (sistemaParaAnalise.has(tomboNorm)) {
             const sysData = sistemaParaAnalise.get(tomboNorm);
@@ -561,7 +556,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
     return { 
         matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc,
         remainingSystem, remainingInventory,
-        totalSystem: sistema.length, // Total geral antes de filtrar
+        totalSystem: sistema.length,
         totalInventory: inventario.length
     };
 }
@@ -666,15 +661,42 @@ function formatDate(dateString) {
   }
 }
 
+// --- FUNÇÃO DE MOEDA CORRIGIDA ---
 function formatCurrency(value) {
   if (value === null || value === undefined || value === '') return '';
-  const sanitizedValue = String(value).replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
-  const number = parseFloat(sanitizedValue);
-  if (isNaN(number)) {
-    return value;
+
+  // Se o valor já for um número, formata diretamente.
+  if (typeof value === 'number') {
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
-  return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // Se for uma string, faz uma limpeza inteligente.
+  if (typeof value === 'string') {
+    // Remove "R$", espaços em branco no início/fim.
+    const sanitizedValue = value.replace(/R\$\s?/, '').trim();
+    
+    // Verifica se o formato é brasileiro (ex: 1.234,56) ou americano (ex: 1234.56)
+    // A presença da vírgula é um bom indicador.
+    if (sanitizedValue.includes(',')) {
+        // Remove os pontos de milhar e substitui a vírgula decimal por ponto.
+        const numberString = sanitizedValue.replace(/\./g, '').replace(',', '.');
+        const number = parseFloat(numberString);
+        if (!isNaN(number)) {
+            return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+    } else {
+        // Trata como um número no formato americano (com ponto decimal) ou inteiro.
+        const number = parseFloat(sanitizedValue);
+        if (!isNaN(number)) {
+            return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+    }
+  }
+
+  // Se nada funcionar, retorna o valor original.
+  return value;
 }
+
 
 async function popularUnidadesParaAnalise() {
   try {
