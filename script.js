@@ -576,7 +576,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
     };
 }
 
-// --- FUNÇÃO ATUALIZADA ---
 function renderAnalysisResultsV4(data, unidade) {
     const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
     const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length;
@@ -596,8 +595,7 @@ function renderAnalysisResultsV4(data, unidade) {
     const resultsContainer = document.getElementById('resultadoComparacao');
     resultsContainer.innerHTML = '';
 
-    // --- MUDANÇA AQUI: Adicionando 'Cadastro' e 'Valor NF' em todas as tabelas relevantes ---
-    const getSysData = (row) => [row[SISTEMA_COLUMNS.CADASTRO], row[SISTEMA_COLUMNS.VALOR_NF]];
+    const getSysData = (row) => [formatDate(row[SISTEMA_COLUMNS.CADASTRO]), row[SISTEMA_COLUMNS.VALOR_NF]];
 
     if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', 
         ['Tombo', 'Descrição', 'Local', 'Estado', 'Cadastro', 'Valor NF'], 
@@ -617,7 +615,7 @@ function renderAnalysisResultsV4(data, unidade) {
     );
     if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', 
         ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], m.sysRow[SISTEMA_COLUMNS.CADASTRO], m.sysRow[SISTEMA_COLUMNS.VALOR_NF]])
+        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), m.sysRow[SISTEMA_COLUMNS.VALOR_NF]])
     );
     if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', 
         ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], 
@@ -625,33 +623,28 @@ function renderAnalysisResultsV4(data, unidade) {
     );
     if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Baixa)', 'bg-light', 
         ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Cadastro', 'Valor NF'], 
-        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], i.sysRow[SISTEMA_COLUMNS.CADASTRO], i.sysRow[SISTEMA_COLUMNS.VALOR_NF]])
+        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), i.sysRow[SISTEMA_COLUMNS.VALOR_NF]])
     );
 }
 
-// --- FUNÇÃO ATUALIZADA ---
 function exportAnalysisToCsv() {
   const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory } = analysisReportData;
   if (!analysisReportData) return;
 
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
-  // Adicionada a coluna "Valor_NF_Sistema" ao cabeçalho do CSV
   let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Cadastro_Sistema;Valor_NF_Sistema;Observacao\n';
 
-  // Helper para pegar os dados do sistema de forma consistente
-  const getSysData = (row) => [row[SISTEMA_COLUMNS.NOTA_FISCAL], row[SISTEMA_COLUMNS.FORNECEDOR], row[SISTEMA_COLUMNS.CADASTRO], row[SISTEMA_COLUMNS.VALOR_NF]];
+  const getSysData = (row) => [row[SISTEMA_COLUMNS.NOTA_FISCAL], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), row[SISTEMA_COLUMNS.VALOR_NF]];
 
   matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), ''].map(escapeCsvCell).join(';') + '\n');
   matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
   matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
   divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.invRow[1], d.invRow[4], ...getSysData(d.sysRow), 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
   
-  // Adicionada a coluna "Valor NF" na exportação CSV dos pendentes
   remainingSystem.forEach(m => csvContent += ['Pendente no Sistema', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', m.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(m.sysRow), 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n');
   
   remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
   
-  // Adicionada a exportação CSV para itens de incorporação
   incorporacoes.forEach(i => csvContent += ['Incorporacao (para Baixa)', i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', i.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(i.sysRow), 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
 
   const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
@@ -667,6 +660,24 @@ function exportAnalysisToCsv() {
 // =================================================================================
 // FUNÇÕES AUXILIARES E DE UI
 // =================================================================================
+// --- NOVA FUNÇÃO HELPER PARA FORMATAR A DATA ---
+function formatDate(dateString) {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return dateString; // Retorna o valor original se não for uma data válida
+    }
+    // Usa UTC para evitar problemas de fuso horário com as datas do Google Sheets
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Meses são de 0 a 11
+    const year = date.getUTCFullYear();
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    return dateString; // Em caso de erro, retorna o valor original
+  }
+}
+
 async function popularUnidadesParaAnalise() {
   try {
     const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidades' }) });
