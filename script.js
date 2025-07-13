@@ -5,6 +5,9 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby99cTAFdCucXd1EQ7rV
 const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// **IMPORTANTE**: Ajuste este índice se a coluna "Tipo de Entrada" no seu relatório do sistema for diferente.
+// Coluna A=0, B=1, C=2, D=3, E=4, F=5...
+const SISTEMA_TIPO_ENTRADA_COL_INDEX = 5; // Assumindo que é a coluna F
 
 // Variáveis de estado global
 let accessToken = null;
@@ -14,28 +17,23 @@ let analysisReportData = {}; // Armazena os dados do último relatório gerado
 // FLUXO DE AUTENTICAÇÃO E CARREGAMENTO INICIAL
 // =================================================================================
 window.onload = () => {
-  // Inicializa o cliente do Google Identity Services para login
   google.accounts.id.initialize({
     client_id: CLIENT_ID,
     callback: handleCredentialResponse,
   });
-  // Anexa todos os event listeners da UI
   setupEventListeners();
-  // Renderiza o botão de login do Google
   google.accounts.id.renderButton(
     document.getElementById('signin-button'),
     { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' } 
   );
 };
 
-// Lida com a resposta do login do Google
 function handleCredentialResponse(response) {
   const profile = JSON.parse(atob(response.credential.split('.')[1]));
   updateUiForSignIn(profile.name);
   requestAccessToken();
 }
 
-// Solicita o token de acesso OAuth2 para o Drive
 function requestAccessToken() {
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -43,7 +41,7 @@ function requestAccessToken() {
     callback: (tokenResponse) => {
       if (tokenResponse && tokenResponse.access_token) {
         accessToken = tokenResponse.access_token;
-        initializeAppLogic(); // Inicia a lógica principal do app após obter o token
+        initializeAppLogic();
       } else {
         showToast('toastError', 'Falha na autorização para fazer upload de fotos. Tente fazer login novamente.');
       }
@@ -52,21 +50,16 @@ function requestAccessToken() {
   tokenClient.requestAccessToken();
 }
 
-// Lida com o clique no botão de logout
 function handleSignoutClick() {
   if (accessToken) {
-    google.accounts.oauth2.revoke(accessToken, () => {
-      accessToken = null;
-    });
+    google.accounts.oauth2.revoke(accessToken, () => { accessToken = null; });
   }
   google.accounts.id.disableAutoSelect();
-  // Atualiza a UI para o estado "deslogado"
   document.getElementById('auth-container').classList.add('d-none');
   document.getElementById('login-container').classList.remove('d-none');
   document.getElementById('main-content').classList.add('d-none');
 }
 
-// Atualiza a UI para o estado "logado"
 function updateUiForSignIn(userName) {
   document.getElementById('user-name').textContent = `Olá, ${userName}`;
   document.getElementById('auth-container').classList.remove('d-none');
@@ -119,9 +112,8 @@ function autoSaveDraft() {
 // MANIPULADORES DE EVENTOS (EVENT LISTENERS)
 // =================================================================================
 function setupEventListeners() {
-  // O botão de login é renderizado pelo Google, não precisa de listener de clique direto
   document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
-  setInterval(autoSaveDraft, 30000); // Salva rascunho a cada 30s
+  setInterval(autoSaveDraft, 30000);
 
   document.getElementById('salvarUnidade').addEventListener('click', () => {
     const unidade = document.getElementById('unidadeInicial').value.trim();
@@ -229,7 +221,6 @@ async function fetchConcluidos() {
     tbody.innerHTML = '';
     result.items.forEach(row => {
       const tr = document.createElement('tr');
-      // Colunas: Unidade, Local, Item, Tombo, Estado, Quantidade, Foto
       tr.innerHTML = `
         <td>${row[0] || ''}</td><td>${row[1] || ''}</td><td>${row[2] || ''}</td>
         <td>${row[3] || ''}</td><td>${row[4] || ''}</td><td>${row[5] || ''}</td>
@@ -260,10 +251,10 @@ async function handleUpload(type) {
     if (files.length > 0) {
       for (const file of files) {
         const parsed = await parseExcel(file);
-        data.push(...parsed.slice(1)); // Ignora cabeçalho
+        data.push(...parsed.slice(1));
       }
     } else if (pasteText) {
-      data.push(...parsePastedText(pasteText).slice(1)); // Ignora cabeçalho se presente
+      data.push(...parsePastedText(pasteText).slice(1));
     }
     if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
 
@@ -282,7 +273,7 @@ async function handleUpload(type) {
     showToast('toastSuccess', `Upload de '${type}' concluído com sucesso!`);
     fileInput.value = '';
     pasteArea.value = '';
-    await popularUnidadesParaAnalise(); // Atualiza a lista de unidades para análise
+    await popularUnidadesParaAnalise();
   } catch (error) {
     showToast('toastError', `Erro no upload: ${error.message}`);
   } finally {
@@ -328,7 +319,7 @@ async function fetchAndDisplayInventarios() {
 }
 
 // =================================================================================
-// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 2.0)
+// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 3.0)
 // =================================================================================
 async function handleAnalysis() {
   const unidade = document.getElementById('unidadeComparar').value;
@@ -344,18 +335,15 @@ async function handleAnalysis() {
   document.getElementById('resultadoComparacao').innerHTML = '';
 
   try {
-    // Busca os dados em paralelo para mais performance
-    const [dadosInventario, dadosSistema, todosInventarios] = await Promise.all([
+    const [dadosInventario, dadosSistema] = await Promise.all([
       fetchInventarioDaUnidade(unidade),
       carregarRelatorioSistema(),
-      fetchTodosInventarios()
     ]);
 
-    // Compara os dados com a nova lógica
-    const resultado = compararInventariosV2(dadosInventario, dadosSistema, todosInventarios, unidade);
+    const resultado = compararInventariosV3(dadosInventario, dadosSistema, unidade);
     
-    analysisReportData = resultado; // Salva para exportação
-    renderAnalysisResultsV2(analysisReportData, unidade); // Renderiza os novos resultados
+    analysisReportData = resultado;
+    renderAnalysisResultsV3(resultado, unidade);
     document.getElementById('exportCsvBtn').classList.remove('d-none');
   } catch (error) {
     showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
@@ -378,135 +366,162 @@ async function carregarRelatorioSistema() {
   throw new Error(result.message || 'Erro ao buscar dados do sistema.');
 }
 
-async function fetchTodosInventarios() {
-  const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
-  const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.message);
-  let allItems = [];
-  Object.values(result.data).forEach(group => {
-    if(group.Site) allItems.push(...group.Site);
-    if(group.Upload) allItems.push(...group.Upload);
-  });
-  return allItems;
-}
+/**
+ * Calcula a similaridade entre duas strings usando o coeficiente de Dice baseado em bigramas.
+ * @param {string} str1 Primeira string.
+ * @param {string} str2 Segunda string.
+ * @returns {number} Um valor entre 0 (nenhuma similaridade) e 1 (similaridade total).
+ */
+function stringSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    str1 = str1.toLowerCase().replace(/\s+/g, '');
+    str2 = str2.toLowerCase().replace(/\s+/g, '');
+    if (str1 === str2) return 1;
 
-function compararInventariosV2(inventario, sistema, todosInventarios, unidade) {
-  const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
-  const normalizeDesc = desc => desc ? String(desc).trim().toLowerCase() : '';
-
-  const systemMap = new Map();
-  // Filtra o relatório do sistema pela unidade selecionada antes de mapear
-  sistema.forEach(row => {
-    // Coluna 12 (M) é a unidade no relatório do sistema
-    if ((row[12] || '').trim().toLowerCase() === unidade.toLowerCase()) {
-      const tomboNorm = normalizeTombo(row[0]);
-      if (tomboNorm) systemMap.set(tomboNorm, row);
-    }
-  });
-
-  const inventoryMap = new Map();
-  inventario.forEach(row => {
-    const tomboNorm = normalizeTombo(row[3]); // Coluna 3 (D) é o tombo no inventário
-    if (tomboNorm) inventoryMap.set(tomboNorm, row);
-  });
-
-  const allInventoryMap = new Map();
-  todosInventarios.forEach(row => {
-    const tomboNorm = normalizeTombo(row[3]);
-    if (tomboNorm && !allInventoryMap.has(tomboNorm)) {
-      allInventoryMap.set(tomboNorm, row[0] || row[9]); // Unidade do item
-    }
-  });
-
-  let matches = [], missingPhysical = [], missingSystem = [], divergences = [], observations = [];
-
-  systemMap.forEach((sysRow, tomboNorm) => {
-    if (inventoryMap.has(tomboNorm)) {
-      const invRow = inventoryMap.get(tomboNorm);
-      // Compara descrição para achar divergências
-      if (normalizeDesc(invRow[2]) !== normalizeDesc(sysRow[2])) {
-        divergences.push({ tombo: sysRow[0], invRow, sysRow });
-      } else {
-        matches.push({ tombo: sysRow[0], invRow, sysRow });
-      }
-    } else {
-      missingPhysical.push({ tombo: sysRow[0], sysRow });
-      // Checa se o item faltante pode estar em outra unidade
-      if (allInventoryMap.has(tomboNorm)) {
-        const outraUnidade = allInventoryMap.get(tomboNorm);
-        if (outraUnidade && outraUnidade.toLowerCase() !== unidade.toLowerCase()) {
-          observations.push(`Item com tombo ${sysRow[0]} (Sistema: ${sysRow[2]}) foi encontrado no inventário da unidade "${outraUnidade}". Sugerir transferência.`);
+    const getBigrams = (s) => {
+        const bigrams = new Set();
+        for (let i = 0; i < s.length - 1; i++) {
+            bigrams.add(s.substring(i, i + 2));
         }
-      }
-    }
-  });
+        return bigrams;
+    };
 
-  inventoryMap.forEach((invRow, tomboNorm) => {
-    if (!systemMap.has(tomboNorm)) {
-      missingSystem.push({ tombo: invRow[3], invRow });
-    }
-  });
+    const bigrams1 = getBigrams(str1);
+    const bigrams2 = getBigrams(str2);
+    const intersection = new Set([...bigrams1].filter(x => bigrams2.has(x)));
 
-  return { matches, divergences, missingPhysical, missingSystem, observations, totalSystem: systemMap.size, totalInventory: inventoryMap.size };
+    return (2 * intersection.size) / (bigrams1.size + bigrams2.size);
 }
 
-function renderAnalysisResultsV2({ matches, divergences, missingPhysical, missingSystem, observations, totalSystem, totalInventory }, unidade) {
+function compararInventariosV3(inventario, sistema, unidade) {
+    const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
+    const normalizeDesc = desc => desc ? String(desc).trim().toLowerCase() : '';
+
+    let incorporacoes = [];
+    let sistemaParaAnalise = [];
+
+    // 1. Separar itens de "INCORPORAÇÃO" e filtrar pela unidade
+    sistema.forEach(row => {
+        const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
+        const unidadeSistema = (row[12] || '').trim().toLowerCase();
+
+        if (unidadeSistema === unidade.toLowerCase()) {
+            if (tipoEntrada.includes('incorporação')) {
+                incorporacoes.push({ sysRow: row });
+            } else {
+                sistemaParaAnalise.push(row);
+            }
+        }
+    });
+
+    const systemMap = new Map(sistemaParaAnalise.map(row => [normalizeTombo(row[0]), row]));
+    const inventoryMap = new Map(inventario.map(row => [normalizeTombo(row[3]), row]));
+    
+    let matches = [], divergences = [], matchedByDescription = [];
+    let sTItems = []; // Itens do inventário sem tombo
+
+    // 2. Separar itens do inventário com e sem tombo
+    inventoryMap.forEach((invRow, tomboNorm) => {
+        if (!tomboNorm || tomboNorm.toLowerCase() === 's/t') {
+            sTItems.push(invRow);
+        }
+    });
+
+    // 3. Conciliação por Tombo
+    systemMap.forEach((sysRow, tomboNorm) => {
+        if (inventoryMap.has(tomboNorm)) {
+            const invRow = inventoryMap.get(tomboNorm);
+            if (normalizeDesc(invRow[2]) === normalizeDesc(sysRow[2])) {
+                matches.push({ tombo: sysRow[0], invRow, sysRow });
+            } else {
+                divergences.push({ tombo: sysRow[0], invRow, sysRow });
+            }
+            inventoryMap.delete(tomboNorm); // Remove dos pendentes
+            systemMap.delete(tomboNorm); // Remove dos pendentes
+        }
+    });
+
+    // 4. Conciliação por Descrição para itens S/T
+    const systemItemsList = Array.from(systemMap.values()); // Itens do sistema que sobraram
+    sTItems.forEach(invRow => {
+        let bestMatch = { score: 0.7, sysRow: null }; // Threshold de 70%
+        for (const sysRow of systemItemsList) {
+            const score = stringSimilarity(invRow[2], sysRow[2]);
+            if (score > bestMatch.score) {
+                bestMatch = { score, sysRow };
+            }
+        }
+
+        if (bestMatch.sysRow) {
+            const tomboNorm = normalizeTombo(bestMatch.sysRow[0]);
+            matchedByDescription.push({ invRow, sysRow: bestMatch.sysRow, score: bestMatch.score });
+            systemMap.delete(tomboNorm); // Remove o item do sistema que foi combinado
+            // Remove o item s/t do mapa de inventário para não aparecer como pendente
+            const invTomboNorm = normalizeTombo(invRow[3]);
+            if(inventoryMap.has(invTomboNorm)) inventoryMap.delete(invTomboNorm);
+        }
+    });
+    
+    // 5. O que sobrou são os itens pendentes
+    const remainingSystem = Array.from(systemMap.values()).map(sysRow => ({ sysRow }));
+    const remainingInventory = Array.from(inventoryMap.values()).map(invRow => ({ invRow }));
+
+    return { 
+        matches, 
+        divergences, 
+        incorporacoes,
+        matchedByDescription,
+        remainingSystem,
+        remainingInventory,
+        totalSystem: sistemaParaAnalise.length,
+        totalInventory: inventario.length
+    };
+}
+
+function renderAnalysisResultsV3(data, unidade) {
+    const { matches, divergences, incorporacoes, matchedByDescription, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
+
     const summaryContainer = document.getElementById('analiseSummary');
     summaryContainer.innerHTML = `
         <h5 class="mb-3">Resumo da Análise para: <strong>${unidade}</strong></h5>
         <div class="row">
-            <div class="col-md-3 mb-2"><div class="card p-2 analysis-summary-card bg-light">Itens no Sistema: ${totalSystem}</div></div>
-            <div class="col-md-3 mb-2"><div class="card p-2 analysis-summary-card bg-light">Itens no Inventário: ${totalInventory}</div></div>
-        </div>
-        <hr>
-        <div class="row">
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Encontrados</h6><span class="fs-4">${matches.length}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-info"><h6><i class="bi bi-arrow-left-right me-2"></i>Divergências</h6><span class="fs-4">${divergences.length}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-search me-2"></i>Faltando no Físico</h6><span class="fs-4">${missingPhysical.length}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-danger"><h6><i class="bi bi-plus-circle-fill me-2"></i>Sobrando no Físico</h6><span class="fs-4">${missingSystem.length}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Itens no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-secondary"><h6><i class="bi bi-clipboard-check me-2"></i>Itens no Inventário</h6><span class="fs-4">${totalInventory}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${matches.length + matchedByDescription.length}</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-exclamation-triangle-fill me-2"></i>Pendentes</h6><span class="fs-4">${remainingSystem.length + remainingInventory.length}</span></div></div>
         </div>
     `;
     summaryContainer.classList.remove('d-none');
 
     const resultsContainer = document.getElementById('resultadoComparacao');
-    resultsContainer.innerHTML = ''; // Limpa resultados anteriores
+    resultsContainer.innerHTML = '';
 
-    // Renderiza as tabelas
-    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Encontrados (Matches)', 'bg-success-subtle', ['Tombo', 'Descrição', 'Local', 'Estado'], matches.map(m => [m.tombo, m.invRow[2], m.invRow[1], m.invRow[4]]));
-    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição', 'bg-info-subtle', ['Tombo', 'Descrição Inventário', 'Descrição Sistema'], divergences.map(d => [d.tombo, d.invRow[2], d.sysRow[2]]));
-    if (missingPhysical.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Faltando no Inventário Físico (Existem no Sistema)', 'bg-warning-subtle', ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor'], missingPhysical.map(m => [m.tombo, m.sysRow[2], m.sysRow[4], m.sysRow[7]]));
-    if (missingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Sobrando no Inventário Físico (Não existem no Sistema)', 'bg-danger-subtle', ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], missingSystem.map(m => [m.tombo, m.invRow[2], m.invRow[1], m.invRow[4]]));
-    
-    // Renderiza Observações
-    if (observations.length > 0) {
-        resultsContainer.innerHTML += `
-        <div class="card mb-3">
-            <div class="card-header bg-primary-subtle fw-bold">Observações e Sugestões (${observations.length})</div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul>
-            </div>
-        </div>`;
-    }
+    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', ['Tombo', 'Descrição', 'Local', 'Estado'], matches.map(m => [m.tombo, m.invRow[2], m.invRow[1], m.invRow[4]]));
+    if (matchedByDescription.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Itens S/T)', 'bg-info-subtle', ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade'], matchedByDescription.map(m => [m.sysRow[0], m.invRow[2], m.sysRow[2], `${(m.score * 100).toFixed(0)}%`]));
+    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-subtle', ['Tombo', 'Descrição Inventário', 'Descrição Sistema'], divergences.map(d => [d.tombo, d.invRow[2], d.sysRow[2]]));
+    if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Análise)', 'bg-light', ['Tombo', 'Descrição Sistema', 'Nota Fiscal'], incorporacoes.map(i => [i.sysRow[0], i.sysRow[2], i.sysRow[4]]));
+    if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor'], remainingSystem.map(m => [m.sysRow[0], m.sysRow[2], m.sysRow[4], m.sysRow[7]]));
+    if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], remainingInventory.map(m => [m.invRow[3], m.invRow[2], m.invRow[1], m.invRow[4]]));
 }
 
-
 function exportAnalysisToCsv() {
-  const { matches, divergences, missingPhysical, missingSystem, observations } = analysisReportData;
+  const { matches, divergences, incorporacoes, matchedByDescription, remainingSystem, remainingInventory } = analysisReportData;
   if (!analysisReportData) return;
 
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
   let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Observacao\n';
 
-  matches.forEach(m => csvContent += ['Match', m.tombo, m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
-  divergences.forEach(d => csvContent += ['Divergencia', d.tombo, d.invRow[2], d.sysRow[2], d.invRow[1], d.invRow[4], d.sysRow[4], d.sysRow[7], 'Descricoes diferentes'].map(escapeCsvCell).join(';') + '\n');
-  missingPhysical.forEach(m => csvContent += ['Faltando no Fisico', m.tombo, '', m.sysRow[2], '', '', m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
-  missingSystem.forEach(m => csvContent += ['Sobrando no Fisico', m.tombo, m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', 'Item nao consta no sistema'].map(escapeCsvCell).join(';') + '\n');
-  observations.forEach(o => csvContent += ['Observacao', '', '', '', '', '', '', '', o].map(escapeCsvCell).join(';') + '\n');
+  matches.forEach(m => csvContent += ['Conciliado por Tombo', m.tombo, m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
+  matchedByDescription.forEach(m => csvContent += ['Conciliado por Descricao', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
+  divergences.forEach(d => csvContent += ['Divergencia', d.tombo, d.invRow[2], d.sysRow[2], d.invRow[1], d.invRow[4], d.sysRow[4], d.sysRow[7], 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
+  incorporacoes.forEach(i => csvContent += ['Incorporacao', i.sysRow[0], '', i.sysRow[2], '', '', i.sysRow[4], i.sysRow[7], 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
+  remainingSystem.forEach(m => csvContent += ['Pendente no Sistema', m.sysRow[0], '', m.sysRow[2], '', '', m.sysRow[4], m.sysRow[7], 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n');
+  remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
 
   const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `relatorio_analise_${new Date().toISOString().split('T')[0]}.csv`;
+  link.download = `relatorio_analise_avancado_${new Date().toISOString().split('T')[0]}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -529,7 +544,7 @@ async function popularUnidadesParaAnalise() {
       const option = new Option(u, u);
       select.add(option);
     });
-    select.value = currentValue; // Mantém a unidade selecionada se ela ainda existir
+    select.value = currentValue;
   } catch (error) {
     showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
   }
@@ -565,6 +580,7 @@ function createTableHtml(title, headers, data, dataIndices) {
 }
 
 function createDetailedTable(title, headerBgClass, headers, data) {
+    if (data.length === 0) return '';
     let tableHtml = `
     <div class="card mb-3">
         <div class="card-header fw-bold ${headerBgClass}">${title} (${data.length})</div>
@@ -580,9 +596,8 @@ function createDetailedTable(title, headerBgClass, headers, data) {
     return tableHtml;
 }
 
-
 function showToast(type, message) {
-  const toastEl = document.getElementById(type);
+  const toastEl = document.getElementById(type === 'toastSuccess' ? 'toastSuccess' : 'toastError');
   if (toastEl) {
     toastEl.querySelector('.toast-body').textContent = message;
     new bootstrap.Toast(toastEl).show();
