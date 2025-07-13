@@ -1,4 +1,3 @@
-<DOCUMENT filename="index.html">
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -90,7 +89,7 @@
                             </div>
                             <div class="mb-3">
                                 <label for="quantidade" class="form-label">Quantidade</label>
-                                <input type="quantidade" class="form-control" id="quantidade" type="number" min="1" value="1">
+                                <input type="number" class="form-control" id="quantidade" min="1" value="1" required>
                             </div>
                             <div class="mb-3">
                                 <label for="foto" class="form-label">Foto do Item (Opcional)</label>
@@ -107,7 +106,7 @@
                             <thead>
                                 <tr>
                                     <th>Unidade</th><th>Local</th><th>Item</th><th>Tombo</th><th>Estado</th><th>Quantidade</th><th>Foto</th>
-</tr>
+                                </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
@@ -119,9 +118,9 @@
                 <div class="card mb-4">
                     <div class="card-header fw-bold">Upload de Relatórios do Sistema</div>
                     <div class="card-body">
-                        <div class="unidadeSistema mb-3">
+                        <div class="mb-3">
                             <label for="unidadeSistema" class="form-label">Nome da Unidade para Relatório do Sistema</label>
-                            <input type="unidadeSistema" class="form-control" id="unidadeSistema" required>
+                            <input type="text" class="form-control" id="unidadeSistema" required>
                         </div>
                         <div class="mb-3">
                             <label for="relatorioSistema" class="form-label">Upload ou Cole Relatório do Sistema</label>
@@ -220,4 +219,3 @@
 <script src="script.js"></script>
 </body>
 </html>
-</DOCUMENT>
