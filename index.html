@@ -63,6 +63,21 @@
         }
         .analysis-summary-card:hover { transform: scale(1.05); }
         .toast { border-radius: 8px; }
+        /* Cores mais fortes para seções de relatório */
+        .bg-success-subtle-strong { background-color: #28a745 !important; color: white !important; }
+        .bg-info-subtle-strong { background-color: #17a2b8 !important; color: white !important; }
+        .bg-warning-subtle-strong { background-color: #ffc107 !important; color: #333 !important; }
+        .bg-danger-subtle-strong { background-color: #dc3545 !important; color: white !important; }
+        .bg-light-strong { background-color: #f8f9fa !important; color: #333 !important; }
+        /* Otimização para mobile */
+        @media (max-width: 768px) {
+            .row { flex-direction: column; }
+            .table-responsive { overflow-x: auto; }
+            .input-group { flex-direction: column; }
+            .btn { width: 100%; margin-bottom: 10px; }
+        }
+        /* Banner */
+        .banner { width: 100%; height: auto; max-height: 200px; object-fit: cover; border-radius: 12px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -77,6 +92,9 @@
     </nav>
 
     <div class="container mt-5">
+        <!-- Banner -->
+        <img src="https://via.placeholder.com/1200x200?text=Banner+Inventario+Inteligente" alt="Banner" class="banner img-fluid">
+
         <div id="login-container">
             <div class="card mx-auto" style="max-width: 400px;">
                 <div class="card-body text-center">
@@ -295,7 +313,7 @@
     </div>
 
     <footer class="text-center mt-5 py-3" style="background-color: #e9ecef; border-top: 1px solid #dee2e6;">
-        <p class="mb-0 text-muted">&copy; 2025 Inventário Inteligente. Todos os direitos reservados.</p>
+        <p class="mb-0 text-muted">© 2025 Inventário Inteligente. Todos os direitos reservados.</p>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
