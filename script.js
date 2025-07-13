@@ -535,7 +535,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
         if (!invData) return;
         
         let exactMatchIndex = sistemaRestante.findIndex(sysData => 
-            sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.DESCRICAO])
+            sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.DESCRICAO]) && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.ESPECIE])
         );
 
         if (exactMatchIndex !== -1) {
@@ -558,8 +558,10 @@ function compararInventariosV4(inventario, sistema, unidade) {
         sistemaAindaRestante.forEach((sysData, sysIndex) => {
              if (!sysData) return;
              const score = stringSimilarity(normalizeDescription(invData.invRow[2]), normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.DESCRICAO]));
-             if (score > bestMatch.score) {
-                 bestMatch = { score, sysData, sysIndex };
+             const especieScore = stringSimilarity(normalizeDescription(invData.invRow[2]), normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.ESPECIE]));
+             const combinedScore = (score + especieScore) / 2;
+             if (combinedScore > bestMatch.score) {
+                 bestMatch = { score: combinedScore, sysData, sysIndex };
              }
         });
 
@@ -614,47 +616,47 @@ function renderAnalysisResultsV4(data, unidade) {
 
     const getSysData = (row) => [formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
 
-    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', 
+    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle-strong', 
         ['Tombo', 'Descrição', 'Local', 'Estado', 'Cadastro', 'Valor NF'], 
         matches.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow)])
     );
-    if (matchedByExactDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Match Exato)', 'bg-info-subtle', 
-        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Cadastro', 'Valor NF'], 
-        matchedByExactDesc.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], ...getSysData(m.sysRow)])
+    if (matchedByExactDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Match Exato)', 'bg-info-subtle-strong', 
+        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Espécie', 'Cadastro', 'Valor NF'], 
+        matchedByExactDesc.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], ...getSysData(m.sysRow)])
     );
-    if (matchedBySimilarDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Similaridade)', 'bg-info-subtle', 
-        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade', 'Cadastro', 'Valor NF'], 
-        matchedBySimilarDesc.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
+    if (matchedBySimilarDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Similaridade)', 'bg-info-subtle-strong', 
+        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Espécie', 'Similaridade', 'Cadastro', 'Valor NF'], 
+        matchedBySimilarDesc.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
     );
-    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-subtle', 
-        ['Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Cadastro', 'Valor NF'], 
-        divergences.map(d => [d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], ...getSysData(d.sysRow)])
+    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-subtle-strong', 
+        ['Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Espécie', 'Cadastro', 'Valor NF'], 
+        divergences.map(d => [d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.sysRow[SISTEMA_COLUMNS.ESPECIE], ...getSysData(d.sysRow)])
     );
 
     const pendingNew = remainingSystem.filter(m => m.isNew);
     const pendingOld = remainingSystem.filter(m => !m.isNew);
 
-    if (pendingNew.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Novos (Cadastro 2023-2025)', 'bg-warning-subtle', 
-        ['Tombo', 'Descrição Sistema', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        pendingNew.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
+    if (pendingNew.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Novos (Cadastro 2023-2025)', 'bg-warning-subtle-strong', 
+        ['Tombo', 'Descrição Sistema', 'Espécie', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
+        pendingNew.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
-    if (pendingOld.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Antigos (Antes de 2023)', 'bg-danger-subtle', 
-        ['Tombo', 'Descrição Sistema', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        pendingOld.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
-    );
-
-    if (needsManualReview.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes para Revisão Manual (Baixa Similaridade)', 'bg-danger-subtle', 
-        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade', 'Cadastro', 'Valor NF'], 
-        needsManualReview.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
+    if (pendingOld.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Antigos (Antes de 2023)', 'bg-danger-subtle-strong', 
+        ['Tombo', 'Descrição Sistema', 'Espécie', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
+        pendingOld.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
 
-    if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', 
+    if (needsManualReview.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes para Revisão Manual (Baixa Similaridade)', 'bg-danger-subtle-strong', 
+        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Espécie', 'Similaridade', 'Cadastro', 'Valor NF'], 
+        needsManualReview.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
+    );
+
+    if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle-strong', 
         ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], 
         remainingInventory.map(m => [m.invRow[3], m.invRow[2], m.invRow[1], m.invRow[4]])
     );
-    if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Baixa)', 'bg-light', 
-        ['Tombo', 'Descrição Sistema', 'NF', 'Cadastro', 'Valor NF'], 
-        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NF], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(i.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
+    if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Baixa)', 'bg-light-strong', 
+        ['Tombo', 'Descrição Sistema', 'Espécie', 'NF', 'Cadastro', 'Valor NF'], 
+        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.ESPECIE], i.sysRow[SISTEMA_COLUMNS.NF], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(i.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
 }
 
@@ -663,25 +665,25 @@ function exportAnalysisToCsv() {
   if (!analysisReportData) return;
 
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
-  let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Cadastro_Sistema;Valor_NF_Sistema;Observacao\n';
+  let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Especie;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Cadastro_Sistema;Valor_NF_Sistema;Observacao\n';
 
   const getSysData = (row) => [row[SISTEMA_COLUMNS.NF], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
 
-  matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), ''].map(escapeCsvCell).join(';') + '\n');
-  matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
-  matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
-  divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.invRow[1], d.invRow[4], ...getSysData(d.sysRow), 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
+  matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), ''].map(escapeCsvCell).join(';') + '\n');
+  matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
+  matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
+  divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.sysRow[SISTEMA_COLUMNS.ESPECIE], d.invRow[1], d.invRow[4], ...getSysData(d.sysRow), 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
   
   remainingSystem.forEach(m => {
     const category = m.isNew ? 'Pendente Novo no Sistema' : 'Pendente Antigo no Sistema';
-    csvContent += [category, m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', m.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(m.sysRow), 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n';
+    csvContent += [category, m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], '', '', ...getSysData(m.sysRow), 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n';
   });
   
-  remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', m.invRow[1], m.invRow[4], '', '', '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
+  remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', '', m.invRow[1], m.invRow[4], '', '', '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
   
-  incorporacoes.forEach(i => csvContent += ['Incorporacao (para Baixa)', i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', i.sysRow[SISTEMA_COLUMNS.DESCRICAO], '', '', ...getSysData(i.sysRow), 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
+  incorporacoes.forEach(i => csvContent += ['Incorporacao (para Baixa)', i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.ESPECIE], '', '', ...getSysData(i.sysRow), 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
 
-  needsManualReview.forEach(m => csvContent += ['Pendente Revisao Manual (Baixa Similaridade)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade baixa de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
+  needsManualReview.forEach(m => csvContent += ['Pendente Revisao Manual (Baixa Similaridade)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade baixa de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
 
   const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
