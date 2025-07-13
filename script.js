@@ -5,11 +5,13 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby99cTAFdCucXd1EQ7rV
 const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// **IMPORTANTE**: Ajuste do índice da coluna "Tipo de Entrada" para D.
+// Coluna A=0, B=1, C=2, D=3...
 const SISTEMA_TIPO_ENTRADA_COL_INDEX = 3; // Coluna D
 
 // Variáveis de estado global
 let accessToken = null;
-let analysisReportData = {};
+let analysisReportData = {}; // Armazena os dados do último relatório gerado
 
 // =================================================================================
 // FLUXO DE AUTENTICAÇÃO E CARREGAMENTO INICIAL
@@ -72,6 +74,7 @@ async function initializeAppLogic() {
   loadDraft();
   checkUnidadeFixada();
   await fetchConcluidos();
+  await popularUnidadesParaAnalise();
 }
 
 function checkUnidadeFixada() {
@@ -139,34 +142,10 @@ function setupEventListeners() {
   document.getElementById('uploadSistemaBtn').addEventListener('click', () => handleUpload('Sistema'));
   document.getElementById('uploadInventariosBtn').addEventListener('click', () => handleUpload('Inventario'));
   document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchAndDisplayInventarios);
+  // Listener para a nova aba de relatórios
   document.getElementById('relatorios-tab').addEventListener('shown.bs.tab', fetchAndDisplayRelatorios);
   document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
   document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
-  
-  document.getElementById('analise-tab').addEventListener('shown.bs.tab', () => {
-      popularUnidadesSistema();
-      popularUnidadesInventario();
-  });
-  document.getElementById('recarregarUnidades').addEventListener('click', () => {
-    localStorage.removeItem('cachedUnidadesSistema');
-    localStorage.removeItem('cachedUnidadesSistemaTime');
-    localStorage.removeItem('cachedUnidadesInventario');
-    localStorage.removeItem('cachedUnidadesInventarioTime');
-    showToast('toastSuccess', 'Forçando a recarga das listas de unidades...');
-    popularUnidadesSistema();
-    popularUnidadesInventario();
-  });
-  
-  document.getElementById('unidadeSistemaSelect').addEventListener('change', (e) => {
-      const sistemaUnidade = e.target.value;
-      const inventarioSelect = document.getElementById('unidadeInventarioSelect');
-      const inventarioOptions = Array.from(inventarioSelect.options);
-      const matchingOption = inventarioOptions.find(opt => opt.value === sistemaUnidade);
-      if (matchingOption) {
-          inventarioSelect.value = matchingOption.value;
-          showToast('toastSuccess', `Unidade de inventário '${matchingOption.value}' selecionada automaticamente.`);
-      }
-  });
 }
 
 // =================================================================================
@@ -296,9 +275,7 @@ async function handleUpload(type) {
     showToast('toastSuccess', `Upload de '${type}' concluído com sucesso!`);
     fileInput.value = '';
     pasteArea.value = '';
-    // Atualiza as listas na aba de análise após o upload
-    popularUnidadesSistema();
-    popularUnidadesInventario();
+    await popularUnidadesParaAnalise();
   } catch (error) {
     showToast('toastError', `Erro no upload: ${error.message}`);
   } finally {
@@ -343,6 +320,7 @@ async function fetchAndDisplayInventarios() {
   }
 }
 
+// Nova função para buscar e exibir os relatórios do sistema
 async function fetchAndDisplayRelatorios() {
     try {
         const response = await fetch(`${SCRIPT_URL}?action=buscarRelatoriosAgrupados`);
@@ -382,14 +360,12 @@ async function fetchAndDisplayRelatorios() {
 
 
 // =================================================================================
-// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 7.0)
+// LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 4.0)
 // =================================================================================
 async function handleAnalysis() {
-  const unidadeSistema = document.getElementById('unidadeSistemaSelect').value;
-  const unidadeInventario = document.getElementById('unidadeInventarioSelect').value;
-
-  if (!unidadeSistema || !unidadeInventario) {
-    showToast('toastError', 'Selecione uma unidade de cada lista para comparar!');
+  const unidade = document.getElementById('unidadeComparar').value;
+  if (!unidade) {
+    showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
     return;
   }
   
@@ -401,18 +377,18 @@ async function handleAnalysis() {
 
   try {
     const [dadosInventario, dadosSistema] = await Promise.all([
-      fetchInventarioDaUnidade(unidadeInventario),
+      fetchInventarioDaUnidade(unidade),
       carregarRelatorioSistema(),
     ]);
 
-    const resultado = compararInventariosV7(dadosInventario, dadosSistema, unidadeSistema);
+    const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidade);
     
     analysisReportData = resultado;
-    renderAnalysisResultsV7(resultado, unidadeSistema, unidadeInventario);
+    renderAnalysisResultsV4(resultado, unidade);
     document.getElementById('exportCsvBtn').classList.remove('d-none');
     
-    localStorage.setItem('lastAnalysisUnitSistema', unidadeSistema);
-    localStorage.setItem('lastAnalysisUnitInventario', unidadeInventario);
+    // Salva a última unidade selecionada no localStorage
+    localStorage.setItem('lastAnalysisUnit', unidade);
 
   } catch (error) {
     showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
@@ -438,12 +414,20 @@ async function carregarRelatorioSistema() {
 
 function normalizeDescription(str) {
     if (!str) return '';
-    return str.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s]/gi, '').replace(/\s+/g, ' '); 
+    return str
+        .toString()
+        .trim()
+        .toLowerCase()
+        .normalize("NFD") 
+        .replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^\w\s]/gi, '') 
+        .replace(/\s+/g, ' '); 
 }
 
 function stringSimilarity(str1, str2) {
     if (str1 === str2) return 1;
     if (str1.length < 2 || str2.length < 2) return 0;
+
     const getBigrams = (s) => {
         const bigrams = new Map();
         for (let i = 0; i < s.length - 1; i++) {
@@ -452,37 +436,37 @@ function stringSimilarity(str1, str2) {
         }
         return bigrams;
     };
+
     const bigrams1 = getBigrams(str1);
     const bigrams2 = getBigrams(str2);
+    
     let intersectionSize = 0;
     for (const [bigram, count1] of bigrams1.entries()) {
         if (bigrams2.has(bigram)) {
             intersectionSize += Math.min(count1, bigrams2.get(bigram));
         }
     }
+
     return (2 * intersectionSize) / (str1.length + str2.length - 2);
 }
 
-function compararInventariosV7(inventario, sistema, unidadeSistemaSelecionada) {
+function compararInventariosV4(inventario, sistema, unidade) {
     const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
 
-    let incorporacoes = [], possibleTransfers = [];
+    let incorporacoes = [];
     let sistemaParaAnalise = new Map();
     let inventarioComTombo = new Map();
     let inventarioSemTombo = [];
-    let allSistemaMap = new Map();
 
     sistema.forEach((row, index) => {
         const unidadeSistema = (row[12] || '').trim().toLowerCase();
-        const tomboNorm = normalizeTombo(row[0]);
-        if (tomboNorm) allSistemaMap.set(tomboNorm, { sysRow: row, unidade: unidadeSistema });
-        
-        if (unidadeSistema === unidadeSistemaSelecionada.toLowerCase()) {
+        if (unidadeSistema === unidade.toLowerCase()) {
             const tipoEntrada = (row[SISTEMA_TIPO_ENTRADA_COL_INDEX] || '').toLowerCase();
             if (tipoEntrada.includes('incorporação')) {
                 incorporacoes.push({ sysRow: row });
-            } else if (tomboNorm) {
-                sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
+            } else {
+                const tomboNorm = normalizeTombo(row[0]);
+                if (tomboNorm) sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
             }
         }
     });
@@ -514,13 +498,18 @@ function compararInventariosV7(inventario, sistema, unidadeSistemaSelecionada) {
     const sistemaRestante = Array.from(sistemaParaAnalise.values());
     inventarioSemTombo.forEach((invData, invIndex) => {
         if (!invData) return;
-        let exactMatchIndex = sistemaRestante.findIndex(sysData => sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[2]));
+        
+        let exactMatchIndex = sistemaRestante.findIndex(sysData => 
+            sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[2])
+        );
+
         if (exactMatchIndex !== -1) {
             const sysData = sistemaRestante[exactMatchIndex];
             matchedByExactDesc.push({ ...invData, ...sysData });
             sistemaParaAnalise.delete(normalizeTombo(sysData.sysRow[0]));
             sistemaRestante[exactMatchIndex] = null;
             inventarioSemTombo[invIndex] = null;
+            return;
         }
     });
     
@@ -529,12 +518,16 @@ function compararInventariosV7(inventario, sistema, unidadeSistemaSelecionada) {
 
     inventarioSemTomboRestante.forEach((invData, invIndex) => {
         if (!invData) return;
-        let bestMatch = { score: 0.60, sysData: null, sysIndex: -1 };
+        let bestMatch = { score: 0.75, sysData: null, sysIndex: -1 };
+        
         sistemaAindaRestante.forEach((sysData, sysIndex) => {
              if (!sysData) return;
              const score = stringSimilarity(normalizeDescription(invData.invRow[2]), normalizeDescription(sysData.sysRow[2]));
-             if (score > bestMatch.score) bestMatch = { score, sysData, sysIndex };
+             if (score > bestMatch.score) {
+                 bestMatch = { score, sysData, sysIndex };
+             }
         });
+
         if (bestMatch.sysData) {
             matchedBySimilarDesc.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
             sistemaParaAnalise.delete(normalizeTombo(bestMatch.sysData.sysRow[0]));
@@ -543,42 +536,29 @@ function compararInventariosV7(inventario, sistema, unidadeSistemaSelecionada) {
         }
     });
     
-    let remainingInventoryWithTombo = Array.from(inventarioComTombo.values());
-    remainingInventoryWithTombo.forEach((invData, index) => {
-        const tomboNorm = normalizeTombo(invData.invRow[3]);
-        if (allSistemaMap.has(tomboNorm)) {
-            const sysData = allSistemaMap.get(tomboNorm);
-            if (sysData.unidade !== unidadeSistemaSelecionada.toLowerCase()) {
-                possibleTransfers.push({ ...invData, ...sysData, suggestedUnit: sysData.unidade });
-                remainingInventoryWithTombo[index] = null;
-            }
-        }
-    });
-
     const remainingSystem = Array.from(sistemaParaAnalise.values());
-    const remainingInventory = [...remainingInventoryWithTombo.filter(Boolean), ...inventarioSemTomboRestante.filter(Boolean)];
+    const remainingInventory = [...Array.from(inventarioComTombo.values()), ...inventarioSemTomboRestante.filter(Boolean)];
 
     return { 
-        matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, possibleTransfers,
+        matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc,
         remainingSystem, remainingInventory,
-        totalSystem: sistemaParaAnalise.size + matches.length + divergences.length + matchedByExactDesc.length + matchedBySimilarDesc.length + possibleTransfers.length,
+        totalSystem: sistemaParaAnalise.size + matches.length + divergences.length + matchedByExactDesc.length + matchedBySimilarDesc.length,
         totalInventory: inventario.length
     };
 }
 
 
-function renderAnalysisResultsV7(data, unidadeSistema, unidadeInventario) {
-    const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, possibleTransfers, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
-    const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length + possibleTransfers.length;
-    const conciliadoPct = totalSystem > 0 ? ((totalConciliado / totalSystem) * 100).toFixed(0) : 0;
+function renderAnalysisResultsV4(data, unidade) {
+    const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
+    const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length;
 
     const summaryContainer = document.getElementById('analiseSummary');
     summaryContainer.innerHTML = `
-        <h5 class="mb-3">Resumo da Análise: <strong>${unidadeSistema}</strong> (Sistema) vs <strong>${unidadeInventario}</strong> (Físico)</h5>
+        <h5 class="mb-3">Resumo da Análise para: <strong>${unidade}</strong></h5>
         <div class="row">
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Itens no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-secondary"><h6><i class="bi bi-clipboard-check me-2"></i>Itens no Inventário</h6><span class="fs-4">${totalInventory}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${totalConciliado} (${conciliadoPct}%)</span></div></div>
+            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${totalConciliado}</span></div></div>
             <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-exclamation-triangle-fill me-2"></i>Pendentes</h6><span class="fs-4">${remainingSystem.length + remainingInventory.length}</span></div></div>
         </div>
     `;
@@ -590,7 +570,6 @@ function renderAnalysisResultsV7(data, unidadeSistema, unidadeInventario) {
     if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-subtle', ['Tombo', 'Descrição', 'Local', 'Estado'], matches.map(m => [m.sysRow[0], m.invRow[2], m.invRow[1], m.invRow[4]]));
     if (matchedByExactDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Match Exato)', 'bg-info-subtle', ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema'], matchedByExactDesc.map(m => [m.sysRow[0], m.invRow[2], m.sysRow[2]]));
     if (matchedBySimilarDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Similaridade)', 'bg-info-subtle', ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Similaridade'], matchedBySimilarDesc.map(m => [m.sysRow[0], m.invRow[2], m.sysRow[2], `${(m.score * 100).toFixed(0)}%`]));
-    if (possibleTransfers.length > 0) resultsContainer.innerHTML += createDetailedTable('Sugestões de Transferência (Tombo em Outra Unidade)', 'bg-primary-subtle', ['Tombo', 'Descrição Inventário', 'Unidade Sugerida', 'Descrição Sistema'], possibleTransfers.map(t => [t.sysRow[0], t.invRow[2], t.suggestedUnit, t.sysRow[2]]));
     if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-subtle', ['Tombo', 'Descrição Inventário', 'Descrição Sistema'], divergences.map(d => [d.sysRow[0], d.invRow[2], d.sysRow[2]]));
     if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Análise)', 'bg-light', ['Tombo', 'Descrição Sistema', 'Nota Fiscal'], incorporacoes.map(i => [i.sysRow[0], i.sysRow[2], i.sysRow[4]]));
     if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor'], remainingSystem.map(m => [m.sysRow[0], m.sysRow[2], m.sysRow[4], m.sysRow[7]]));
@@ -599,7 +578,7 @@ function renderAnalysisResultsV7(data, unidadeSistema, unidadeInventario) {
 
 
 function exportAnalysisToCsv() {
-  const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, possibleTransfers, remainingSystem, remainingInventory } = analysisReportData;
+  const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, remainingSystem, remainingInventory } = analysisReportData;
   if (!analysisReportData) return;
 
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
@@ -608,7 +587,6 @@ function exportAnalysisToCsv() {
   matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], ''].map(escapeCsvCell).join(';') + '\n');
   matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
   matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[0], m.invRow[2], m.sysRow[2], m.invRow[1], m.invRow[4], m.sysRow[4], m.sysRow[7], `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
-  possibleTransfers.forEach(t => csvContent += ['Sugestao Transferencia', t.sysRow[0], t.invRow[2], t.sysRow[2], t.invRow[1], t.invRow[4], t.sysRow[4], t.sysRow[7], `Possivel transferencia para ${t.suggestedUnit}`].map(escapeCsvCell).join(';') + '\n');
   divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[0], d.invRow[2], d.sysRow[2], d.invRow[1], d.invRow[4], d.sysRow[4], d.sysRow[7], 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
   incorporacoes.forEach(i => csvContent += ['Incorporacao', i.sysRow[0], '', i.sysRow[2], '', '', i.sysRow[4], i.sysRow[7], 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
   remainingSystem.forEach(m => csvContent += ['Pendente no Sistema', m.sysRow[0], '', m.sysRow[2], '', '', m.sysRow[4], m.sysRow[7], 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n');
@@ -627,50 +605,27 @@ function exportAnalysisToCsv() {
 // =================================================================================
 // FUNÇÕES AUXILIARES E DE UI
 // =================================================================================
-async function popularUnidades(tipo) {
-    const cacheKey = `cachedUnidades${tipo}`;
-    const cacheTimeKey = `${cacheKey}Time`;
-    const selectId = tipo === 'Sistema' ? 'unidadeSistemaSelect' : 'unidadeInventarioSelect';
-    const action = tipo === 'Sistema' ? 'listarUnidadesSistema' : 'listarUnidadesInventario';
+async function popularUnidadesParaAnalise() {
+  try {
+    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidades' }) });
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
 
-    const cache = localStorage.getItem(cacheKey);
-    const cacheTime = localStorage.getItem(cacheTimeKey);
+    const select = document.getElementById('unidadeComparar');
+    select.innerHTML = '<option value="">Selecione uma unidade...</option>';
+    result.unidades.sort().forEach(u => {
+      const option = new Option(u, u);
+      select.add(option);
+    });
 
-    const populate = (unidades) => {
-        const select = document.getElementById(selectId);
-        select.innerHTML = `<option value="">Selecione uma unidade de ${tipo}...</option>`;
-        unidades.sort().forEach(u => select.add(new Option(u, u)));
-        const lastUnit = localStorage.getItem(`lastAnalysisUnit${tipo}`);
-        if (lastUnit) select.value = lastUnit;
-    };
-
-    if (cache && cacheTime && Date.now() - parseInt(cacheTime) < 300000) { // 5 min cache
-        populate(JSON.parse(cache));
-        return;
+    const lastUnit = localStorage.getItem('lastAnalysisUnit');
+    if (lastUnit) {
+        select.value = lastUnit;
     }
 
-    try {
-        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action }) });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
-        
-        localStorage.setItem(cacheKey, JSON.stringify(result.unidades));
-        localStorage.setItem(cacheTimeKey, Date.now().toString());
-        populate(result.unidades);
-    } catch (error) {
-        showToast('toastError', `Erro ao carregar unidades de ${tipo}.`);
-        console.error(`Error loading ${tipo} units:`, error);
-        if(cache) populate(JSON.parse(cache));
-    }
-}
-
-function popularUnidadesSistema() {
-    popularUnidades('Sistema');
-}
-
-function popularUnidadesInventario() {
-    popularUnidades('Inventario');
+  } catch (error) {
+    showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
+  }
 }
 
 function parseExcel(file) {
@@ -710,6 +665,7 @@ function createFullWidthTable(title, headers, data) {
     });
     return table + '</tbody></table>';
 }
+
 
 function createDetailedTable(title, headerBgClass, headers, data) {
     if (data.length === 0) return '';
