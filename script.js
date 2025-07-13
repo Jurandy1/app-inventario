@@ -142,6 +142,8 @@ function setupEventListeners() {
   document.getElementById('uploadSistemaBtn').addEventListener('click', () => handleUpload('Sistema'));
   document.getElementById('uploadInventariosBtn').addEventListener('click', () => handleUpload('Inventario'));
   document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchAndDisplayInventarios);
+  // Listener para a nova aba de relatórios
+  document.getElementById('relatorios-tab').addEventListener('shown.bs.tab', fetchAndDisplayRelatorios);
   document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
   document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
 }
@@ -301,13 +303,13 @@ async function fetchAndDisplayInventarios() {
       const totalItens = (Site?.length || 0) + (Upload?.length || 0);
       const accordionItem = `
         <div class="accordion-item">
-          <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${index}">
+          <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-inv-${index}">
             ${unidade} <span class="badge bg-secondary ms-2">${totalItens} itens</span>
           </button></h2>
-          <div id="collapse-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
+          <div id="collapse-inv-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
             <div class="accordion-body">
-              ${createTableHtml('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site || [], [2, 3, 1, 4])}
-              ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload || [], [2, 3, 1, 4])}
+              ${createSimpleTable('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site || [], [2, 3, 1, 4])}
+              ${createSimpleTable('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload || [], [2, 3, 1, 4])}
             </div>
           </div>
         </div>`;
@@ -317,6 +319,45 @@ async function fetchAndDisplayInventarios() {
     showToast('toastError', `Erro ao buscar inventários: ${error.message}`);
   }
 }
+
+// Nova função para buscar e exibir os relatórios do sistema
+async function fetchAndDisplayRelatorios() {
+    try {
+        const response = await fetch(`${SCRIPT_URL}?action=buscarRelatoriosAgrupados`);
+        const result = await response.json();
+        if (result.status !== 'success') throw new Error(result.message);
+
+        const relatoriosAgrupados = result.data;
+        const accordionContainer = document.getElementById('relatoriosAccordion');
+        accordionContainer.innerHTML = '';
+
+        if (Object.keys(relatoriosAgrupados).length === 0) {
+            accordionContainer.innerHTML = '<p class="text-muted">Nenhum relatório do sistema carregado ainda.</p>';
+            return;
+        }
+
+        const allHeaders = result.headers || [];
+        
+        Object.keys(relatoriosAgrupados).sort().forEach((unidade, index) => {
+            const itens = relatoriosAgrupados[unidade];
+            const accordionItem = `
+                <div class="accordion-item">
+                    <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-rel-${index}">
+                        ${unidade} <span class="badge bg-info ms-2">${itens.length} registros</span>
+                    </button></h2>
+                    <div id="collapse-rel-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#relatoriosAccordion">
+                        <div class="accordion-body table-responsive">
+                            ${createFullWidthTable(`Relatório de ${unidade}`, allHeaders, itens)}
+                        </div>
+                    </div>
+                </div>`;
+            accordionContainer.innerHTML += accordionItem;
+        });
+    } catch (error) {
+        showToast('toastError', `Erro ao buscar relatórios: ${error.message}`);
+    }
+}
+
 
 // =================================================================================
 // LÓGICA DE ANÁLISE DE INVENTÁRIO (VERSÃO 4.0)
@@ -371,30 +412,18 @@ async function carregarRelatorioSistema() {
   throw new Error(result.message || 'Erro ao buscar dados do sistema.');
 }
 
-/**
- * Normaliza a descrição para uma comparação mais eficaz.
- * Remove acentos, caracteres especiais, e padroniza espaços.
- * @param {string} str A string a ser normalizada.
- * @returns {string} A string normalizada.
- */
 function normalizeDescription(str) {
     if (!str) return '';
     return str
         .toString()
         .trim()
         .toLowerCase()
-        .normalize("NFD") // Decompõe acentos
-        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-        .replace(/[^\w\s]/gi, '') // Remove caracteres especiais (exceto letras, números e espaços)
-        .replace(/\s+/g, ' '); // Padroniza múltiplos espaços para um só
+        .normalize("NFD") 
+        .replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^\w\s]/gi, '') 
+        .replace(/\s+/g, ' '); 
 }
 
-/**
- * Calcula a similaridade entre duas strings usando o coeficiente de Dice.
- * @param {string} str1 Primeira string (já normalizada).
- * @param {string} str2 Segunda string (já normalizada).
- * @returns {number} Um valor entre 0 (nenhuma similaridade) e 1 (similaridade total).
- */
 function stringSimilarity(str1, str2) {
     if (str1 === str2) return 1;
     if (str1.length < 2 || str2.length < 2) return 0;
@@ -429,7 +458,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
     let inventarioComTombo = new Map();
     let inventarioSemTombo = [];
 
-    // 1. Pré-processamento e separação dos dados
     sistema.forEach((row, index) => {
         const unidadeSistema = (row[12] || '').trim().toLowerCase();
         if (unidadeSistema === unidade.toLowerCase()) {
@@ -454,7 +482,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
 
     let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [];
 
-    // 2. Conciliação por Tombo
     inventarioComTombo.forEach((invData, tomboNorm) => {
         if (sistemaParaAnalise.has(tomboNorm)) {
             const sysData = sistemaParaAnalise.get(tomboNorm);
@@ -468,12 +495,10 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
 
-    // 3. Conciliação por Descrição para itens S/T
     const sistemaRestante = Array.from(sistemaParaAnalise.values());
     inventarioSemTombo.forEach((invData, invIndex) => {
-        if (!invData) return; // Item já pode ter sido combinado
+        if (!invData) return;
         
-        // 3a. Busca por match exato de descrição
         let exactMatchIndex = sistemaRestante.findIndex(sysData => 
             sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[2])
         );
@@ -482,20 +507,18 @@ function compararInventariosV4(inventario, sistema, unidade) {
             const sysData = sistemaRestante[exactMatchIndex];
             matchedByExactDesc.push({ ...invData, ...sysData });
             sistemaParaAnalise.delete(normalizeTombo(sysData.sysRow[0]));
-            sistemaRestante[exactMatchIndex] = null; // Marca como usado
-            inventarioSemTombo[invIndex] = null; // Marca como usado
-            return; // Pula para o próximo item do inventário
+            sistemaRestante[exactMatchIndex] = null;
+            inventarioSemTombo[invIndex] = null;
+            return;
         }
     });
     
-    // Filtra os que já foram combinados
     let inventarioSemTomboRestante = inventarioSemTombo.filter(Boolean);
     let sistemaAindaRestante = sistemaRestante.filter(Boolean);
 
-    // 3b. Busca por similaridade
     inventarioSemTomboRestante.forEach((invData, invIndex) => {
         if (!invData) return;
-        let bestMatch = { score: 0.75, sysData: null, sysIndex: -1 }; // Threshold de 75%
+        let bestMatch = { score: 0.75, sysData: null, sysIndex: -1 };
         
         sistemaAindaRestante.forEach((sysData, sysIndex) => {
              if (!sysData) return;
@@ -513,7 +536,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
     
-    // 4. O que sobrou são os itens pendentes
     const remainingSystem = Array.from(sistemaParaAnalise.values());
     const remainingInventory = [...Array.from(inventarioComTombo.values()), ...inventarioSemTomboRestante.filter(Boolean)];
 
@@ -596,7 +618,6 @@ async function popularUnidadesParaAnalise() {
       select.add(option);
     });
 
-    // Recupera e define a última unidade selecionada
     const lastUnit = localStorage.getItem('lastAnalysisUnit');
     if (lastUnit) {
         select.value = lastUnit;
@@ -625,7 +646,7 @@ function parsePastedText(text) {
   return text.split('\n').filter(line => line.trim()).map(line => line.split(/\t|;/).map(cell => cell.trim()));
 }
 
-function createTableHtml(title, headers, data, dataIndices) {
+function createSimpleTable(title, headers, data, dataIndices) {
   if (!data || data.length === 0) return title ? `<h5>${title}</h5><p class="text-muted">Nenhum item encontrado.</p>` : '';
   let table = `<h5>${title} (${data.length})</h5><div class="table-responsive"><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
   data.forEach(row => {
@@ -635,6 +656,16 @@ function createTableHtml(title, headers, data, dataIndices) {
   });
   return table + '</tbody></table></div>';
 }
+
+function createFullWidthTable(title, headers, data) {
+    if (!data || data.length === 0) return '';
+    let table = `<h5>${title} (${data.length})</h5><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+    data.forEach(row => {
+        table += `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`;
+    });
+    return table + '</tbody></table>';
+}
+
 
 function createDetailedTable(title, headerBgClass, headers, data) {
     if (data.length === 0) return '';
