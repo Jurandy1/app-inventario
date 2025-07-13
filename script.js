@@ -33,6 +33,7 @@ window.onload = () => {
     client_id: CLIENT_ID,
     callback: handleCredentialResponse,
   });
+  google.accounts.id.disableAutoSelect(); // CORREÇÃO: Desativa auto-seleção para evitar prompts duplicados de login
   setupEventListeners();
   google.accounts.id.renderButton(
     document.getElementById('signin-button'),
@@ -665,15 +666,27 @@ function formatDate(dateString) {
 function formatCurrency(value) {
   if (value === null || value === undefined || value === '') return '';
 
-  // Se o valor já for um número, formata diretamente.
+  // Se o valor já for um número, verifica se é um inteiro grande (centavos) e divide por 100 se necessário
   if (typeof value === 'number') {
+    if (Number.isInteger(value) && value > 10000) { // Limiar arbitrário para detectar centavos (ex: > R$100,00)
+      value /= 100;
+    }
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
   // Se for uma string, faz uma limpeza inteligente.
   if (typeof value === 'string') {
     // Remove "R$", espaços em branco no início/fim.
-    const sanitizedValue = value.replace(/R\$\s?/, '').trim();
+    let sanitizedValue = value.replace(/R\$\s?/, '').trim();
+    
+    // Se for um inteiro sem separadores (possivelmente centavos), converte e divide por 100 se for grande
+    if (/^\d+$/.test(sanitizedValue)) {
+      let number = parseInt(sanitizedValue, 10);
+      if (number > 10000) {
+        number /= 100;
+      }
+      return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
     
     // Verifica se o formato é brasileiro (ex: 1.234,56) ou americano (ex: 1234.56)
     // A presença da vírgula é um bom indicador.
