@@ -6,19 +6,18 @@ const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-// ATUALIZADO: Mapeamento da nova estrutura de colunas do Relatório do Sistema
+// ATUALIZADO: Mapeamento da nova estrutura de 9 colunas do Relatório do Sistema
 const SISTEMA_COLUMNS = {
     TOMBAMENTO: 0,
     ESPECIE: 1,
     DESCRICAO: 2,
     STATUS: 3,
-    TIPO: 4,      // Onde buscar por "INCORPORAÇÃO"
-    ENTRADA: 5,
-    CADASTRO: 6,
-    VALOR_NF: 7,
-    NF: 8,
-    FORNECEDOR: 9,
-    UNIDADE: 10   // Coluna adicionada pelo script para agrupar
+    TIPO_ENTRADA: 4, // Onde buscar por "INCORPORAÇÃO"
+    CADASTRO: 5,
+    VALOR_NF: 6,
+    NF: 7,
+    FORNECEDOR: 8,
+    UNIDADE: 9   // Coluna adicionada pelo script para agrupar
 };
 
 
@@ -478,8 +477,8 @@ function compararInventariosV4(inventario, sistema, unidade) {
 
     // 2. Processa o relatório filtrado: separa itens de "INCORPORAÇÃO" dos demais
     sistemaDisponivel.forEach((row, index) => {
-        const tipo = (row[SISTEMA_COLUMNS.TIPO] || '').toLowerCase();
-        if (tipo.includes('incorporação')) {
+        const tipoEntrada = (row[SISTEMA_COLUMNS.TIPO_ENTRADA] || '').toLowerCase();
+        if (tipoEntrada.includes('incorporação')) {
             incorporacoes.push({ sysRow: row });
         } else {
             const tomboNorm = normalizeTombo(row[SISTEMA_COLUMNS.TOMBAMENTO]);
