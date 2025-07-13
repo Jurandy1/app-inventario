@@ -6,41 +6,89 @@
     <title>Inventário Inteligente</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="script.js" defer></script>
     <style>
-        body { background-color: #f8f9fa; }
-        .analysis-summary-card { border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .analysis-summary-card h6 { font-size: 0.875rem; margin-bottom: 0.5rem; }
-        .analysis-summary-card span { font-weight: bold; }
+        body { 
+            background-color: #f0f4f8; 
+            font-family: 'Roboto', sans-serif; 
+            color: #333;
+        }
+        .navbar { 
+            background: linear-gradient(135deg, #007bff, #0056b3); 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .navbar-brand { color: #fff !important; font-weight: 700; }
+        .card { 
+            border: none; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+            transition: transform 0.2s; 
+        }
+        .card:hover { transform: translateY(-5px); }
+        .card-header { 
+            background-color: #007bff; 
+            color: #fff; 
+            border-radius: 12px 12px 0 0; 
+            font-weight: 500; 
+        }
+        .btn-primary { 
+            background-color: #007bff; 
+            border: none; 
+            transition: background-color 0.3s; 
+        }
+        .btn-primary:hover { background-color: #0056b3; }
+        .nav-tabs .nav-link { 
+            border: none; 
+            border-bottom: 2px solid transparent; 
+            color: #555; 
+            font-weight: 500; 
+        }
+        .nav-tabs .nav-link.active { 
+            border-bottom: 2px solid #007bff; 
+            color: #007bff; 
+        }
+        .table { 
+            border-radius: 8px; 
+            overflow: hidden; 
+        }
+        .table th { background-color: #e9ecef; }
+        .analysis-summary-card { 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            transition: transform 0.2s; 
+        }
+        .analysis-summary-card:hover { transform: scale(1.05); }
+        .toast { border-radius: 8px; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">Inventário Inteligente</a>
             <div id="auth-container" class="d-none">
                 <span id="user-name" class="me-2"></span>
-                <button id="signout-button" class="btn btn-outline-secondary btn-sm">Sair</button>
+                <button id="signout-button" class="btn btn-outline-light btn-sm">Sair</button>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-5">
         <div id="login-container">
-            <div class="card">
+            <div class="card mx-auto" style="max-width: 400px;">
                 <div class="card-body text-center">
-                    <h4>Bem-vindo!</h4>
+                    <h4 class="mb-3">Bem-vindo!</h4>
                     <p>Faça login com sua conta Google para gerenciar seus inventários.</p>
-                    <div id="signin-button"></div>
+                    <div id="signin-button" class="mt-3"></div>
                 </div>
             </div>
         </div>
 
         <div id="main-content" class="d-none">
-            <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+            <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
                 <li class="nav-item" role="presentation"><button class="nav-link active" id="inventario-tab" data-bs-toggle="tab" data-bs-target="#inventario" type="button" role="tab">Inventário</button></li>
                 <li class="nav-item" role="presentation"><button class="nav-link" id="uploads-tab" data-bs-toggle="tab" data-bs-target="#uploads" type="button" role="tab">Uploads</button></li>
                 <li class="nav-item" role="presentation"><button class="nav-link" id="inventarios-tab" data-bs-toggle="tab" data-bs-target="#inventarios" type="button" role="tab">Consultar Inventários</button></li>
@@ -52,7 +100,7 @@
                 <div class="tab-pane fade show active" id="inventario" role="tabpanel">
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="card mb-3">
+                            <div class="card mb-4">
                                 <div class="card-header">Entrada de Item</div>
                                 <div class="card-body">
                                     <form id="inventarioForm">
@@ -100,13 +148,13 @@
                                             <label for="foto">Foto do Item (Opcional)</label>
                                             <input type="file" class="form-control" id="foto" accept="image/*">
                                         </div>
-                                        <button type="submit" class="btn btn-primary">Salvar Item</button>
+                                        <button type="submit" class="btn btn-primary w-100">Salvar Item</button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="card mb-3">
+                            <div class="card mb-4">
                                 <div class="card-header">Itens Concluídos (Nesta Unidade)</div>
                                 <div class="card-body table-responsive">
                                     <table class="table table-sm table-striped" id="tabelaConcluidos">
@@ -122,7 +170,7 @@
                 <div class="tab-pane fade" id="uploads" role="tabpanel">
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="card mb-3">
+                            <div class="card mb-4">
                                 <div class="card-header">Upload de Relatório do Sistema</div>
                                 <div class="card-body">
                                     <div class="alert alert-info mb-3">
@@ -139,12 +187,12 @@
                                         <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv" multiple>
                                         <textarea class="form-control" id="pasteSistema" rows="5" placeholder="Ou cole os dados aqui (separados por tab ou ;)..."></textarea>
                                     </div>
-                                    <button id="uploadSistemaBtn" class="btn btn-primary">Upload Relatório</button>
+                                    <button id="uploadSistemaBtn" class="btn btn-primary w-100">Upload Relatório</button>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="card mb-3">
+                            <div class="card mb-4">
                                 <div class="card-header">Upload de Inventários Anteriores</div>
                                 <div class="card-body">
                                     <div class="mb-3">
@@ -157,7 +205,7 @@
                                         <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv" multiple>
                                         <textarea class="form-control" id="pasteInventario" rows="5" placeholder="Ou cole os dados aqui (separados por tab ou ;)..."></textarea>
                                     </div>
-                                    <button id="uploadInventariosBtn" class="btn btn-primary">Upload Inventários</button>
+                                    <button id="uploadInventariosBtn" class="btn btn-primary w-100">Upload Inventários</button>
                                 </div>
                             </div>
                         </div>
@@ -165,22 +213,22 @@
                 </div>
 
                 <div class="tab-pane fade" id="inventarios" role="tabpanel">
-                    <h4>Inventários Cadastrados por Unidade</h4>
+                    <h4 class="mb-4">Inventários Cadastrados por Unidade</h4>
                     <div class="accordion" id="inventariosAccordion">
                         <p class="text-muted">Nenhum inventário encontrado. Comece adicionando itens ou fazendo upload.</p>
                     </div>
                 </div>
 
                 <div class="tab-pane fade" id="relatorios" role="tabpanel">
-                    <h4>Relatórios do Sistema Carregados</h4>
+                    <h4 class="mb-4">Relatórios do Sistema Carregados</h4>
                     <div class="accordion" id="relatoriosAccordion">
                         <p class="text-muted">Nenhum relatório do sistema encontrado. Faça o upload na aba "Uploads".</p>
                     </div>
                 </div>
 
                 <div class="tab-pane fade" id="analise" role="tabpanel">
-                    <h4>Análise Profissional de Inventário</h4>
-                    <div class="card mb-3">
+                    <h4 class="mb-4">Análise Profissional de Inventário</h4>
+                    <div class="card mb-4">
                         <div class="card-body">
                             <div class="mb-3">
                                 <label for="unidadeComparar">Selecione a Unidade do Inventário para Analisar</label>
@@ -190,7 +238,7 @@
                             <button id="exportCsvBtn" class="btn btn-secondary d-none ms-2">Exportar para CSV</button>
                         </div>
                     </div>
-                    <div id="analiseSummary" class="d-none mb-3"></div>
+                    <div id="analiseSummary" class="d-none mb-4"></div>
                     <div id="resultadoComparacao"></div>
                 </div>
             </div>
@@ -245,6 +293,10 @@
             <div class="toast-body"></div>
         </div>
     </div>
+
+    <footer class="text-center mt-5 py-3" style="background-color: #e9ecef; border-top: 1px solid #dee2e6;">
+        <p class="mb-0 text-muted">&copy; 2025 Inventário Inteligente. Todos os direitos reservados.</p>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
