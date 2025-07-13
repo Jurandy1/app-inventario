@@ -317,19 +317,63 @@ async function fetchAndDisplayInventarios() {
     }
 }
 
+// Função para buscar os dados do Relatório do Sistema
+async function carregarRelatorioSistema() {
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "getRelatorioSistema" })
+    });
+    const result = await response.json();
+    if (result.status === "success") {
+      return result.data;
+    } else {
+      console.error("Erro ao carregar Relatório do Sistema:", result.message);
+      showToast('toastError', `Erro ao buscar dados do sistema: ${result.message}`);
+      return [];
+    }
+  } catch (error) {
+    console.error("Erro na requisição do Relatório do Sistema:", error);
+    showToast('toastError', 'Falha de comunicação ao buscar dados do sistema.');
+    return [];
+  }
+}
+
+// Função para buscar os dados de inventário de uma unidade específica
+async function fetchInventarioDaUnidade(unidade) {
+    try {
+        const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidade)}`);
+        const result = await response.json();
+        if (result.status !== 'success') throw new Error(result.message);
+        return result.items;
+    } catch (error) {
+        showToast('toastError', `Não foi possível carregar os itens da unidade: ${error.message}`);
+        return [];
+    }
+}
+
+
 async function handleAnalysis() {
     const unidade = document.getElementById('unidadeComparar').value;
-    if (!unidade) return showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
+    if (!unidade) {
+        showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
+        return;
+    }
     
     const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
     loadingModal.show();
     document.getElementById('exportCsvBtn').classList.add('d-none');
     try {
-        const response = await fetch(`${SCRIPT_URL}?action=gerarRelatorioAnalise&unidade=${encodeURIComponent(unidade)}`);
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
+        // Busca os dados do inventário e do sistema em paralelo
+        const [dadosInventario, dadosSistema] = await Promise.all([
+            fetchInventarioDaUnidade(document.getElementById('unidade').value),
+            carregarRelatorioSistema()
+        ]);
+
+        // Compara os dados
+        const resultado = compararInventarios(dadosInventario, dadosSistema, unidade);
         
-        analysisReportData = result.report;
+        analysisReportData = resultado;
         renderAnalysisResults(analysisReportData);
         document.getElementById('exportCsvBtn').classList.remove('d-none');
     } catch (error) {
@@ -338,6 +382,45 @@ async function handleAnalysis() {
         loadingModal.hide();
     }
 }
+
+function compararInventarios(inventario, sistema, unidade) {
+    const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
+
+    const systemMap = new Map();
+    sistema.forEach(row => {
+        // Assumindo que a unidade no RelatorioSistema está na coluna M (índice 12)
+        // e o tombo na coluna A (índice 0)
+        if ((row[12] || '').trim().toLowerCase() === unidade.toLowerCase()) {
+            systemMap.set(normalizeTombo(row[0]), row);
+        }
+    });
+
+    const inventoryMap = new Map();
+    inventario.forEach(row => {
+        // Assumindo que o tombo no Inventario está na coluna D (índice 3)
+        inventoryMap.set(normalizeTombo(row[3]), row);
+    });
+
+    let matches = [], missingPhysical = [], missingSystem = [];
+
+    systemMap.forEach((sysRow, tomboNorm) => {
+        if (inventoryMap.has(tomboNorm)) {
+            const invRow = inventoryMap.get(tomboNorm);
+            matches.push({ tombo: sysRow[0], descInventory: invRow[2], descSystem: sysRow[2], nf: sysRow[4], fornecedor: sysRow[7], fullSystem: sysRow });
+        } else {
+            missingPhysical.push({ tombo: sysRow[0], desc: sysRow[2], fullSystem: sysRow });
+        }
+    });
+
+    inventoryMap.forEach((invRow, tomboNorm) => {
+        if (!systemMap.has(tomboNorm)) {
+            missingSystem.push({ tombo: invRow[3], desc: invRow[2] });
+        }
+    });
+
+    return { matches, missingPhysical, missingSystem, observations: [] };
+}
+
 
 function exportAnalysisToCsv() {
     const { matches, missingPhysical, missingSystem, observations } = analysisReportData;
@@ -428,3 +511,4 @@ function showToast(id, message) {
     new bootstrap.Toast(toastEl).show();
   }
 }
+
