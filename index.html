@@ -131,11 +131,10 @@
                         <div class="card h-100">
                             <div class="card-header fw-bold">Upload de Relatório do Sistema</div>
                             <div class="card-body">
-                                <!-- AVISO ADICIONADO AQUI -->
                                 <div class="alert alert-info" role="alert">
                                     <h6 class="alert-heading"><i class="bi bi-info-circle-fill me-2"></i>Formato Esperado</h6>
-                                    <p class="mb-0 small">Certifique-se de que sua planilha tenha exatamente os seguintes cabeçalhos nesta ordem:</p>
-                                    <p class="mb-0 small fw-bold"><code>TOMBAMENTO, Espécie, Descrição, Status, Tipo, Entrada, Cadastro, Valor NF, NF, Nome Fornecedor</code></p>
+                                    <p class="mb-0 small">Certifique-se de que sua planilha (xlsx, csv, etc.) tenha exatamente os seguintes cabeçalhos na primeira linha e nesta ordem:</p>
+                                    <p class="mb-0 small fw-bold"><code>TOMBAMENTO, Espécie, Descrição, Status, Tipo Entrada, Cadastro, Valor NF, NF, Nome Fornecedor</code></p>
                                 </div>
                                 <div class="mb-3">
                                     <label for="unidadeSistema" class="form-label">Nome da Unidade para o Relatório</label>
@@ -143,7 +142,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="relatorioSistema" class="form-label">Arquivo ou Texto do Relatório</label>
-                                    <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv" multiple>
+                                    <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv,.ods" multiple>
                                     <textarea class="form-control" id="pasteSistema" rows="5" placeholder="Ou cole os dados aqui (separados por tabulação ou ponto e vírgula)"></textarea>
                                 </div>
                                 <button id="uploadSistemaBtn" class="btn btn-primary"><i class="bi bi-cloud-upload me-2"></i>Upload Relatório</button>
@@ -161,7 +160,7 @@
                                 <div class="mb-3">
                                     <label for="inventariosAntigos" class="form-label">Arquivo ou Texto do Inventário</label>
                                     <small class="form-text text-muted d-block mb-2">Formato esperado: colunas como Unidade, Item, Tombo, Local, Estado.</small>
-                                    <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv" multiple>
+                                    <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv,.ods" multiple>
                                     <textarea class="form-control" id="pasteInventario" rows="5" placeholder="Ou cole os dados aqui (separados por tabulação ou ponto e vírgula)"></textarea>
                                 </div>
                                 <button id="uploadInventariosBtn" class="btn btn-primary"><i class="bi bi-cloud-upload me-2"></i>Upload Inventários</button>
@@ -398,11 +397,10 @@
                         <div class="card h-100">
                             <div class="card-header fw-bold">Upload de Relatório do Sistema</div>
                             <div class="card-body">
-                                <!-- AVISO ADICIONADO AQUI -->
                                 <div class="alert alert-info" role="alert">
                                     <h6 class="alert-heading"><i class="bi bi-info-circle-fill me-2"></i>Formato Esperado</h6>
-                                    <p class="mb-0 small">Certifique-se de que sua planilha tenha exatamente os seguintes cabeçalhos nesta ordem:</p>
-                                    <p class="mb-0 small fw-bold"><code>TOMBAMENTO, Espécie, Descrição, Status, Tipo, Entrada, Cadastro, Valor NF, NF, Nome Fornecedor</code></p>
+                                    <p class="mb-0 small">Certifique-se de que sua planilha (xlsx, csv, etc.) tenha exatamente os seguintes cabeçalhos na primeira linha e nesta ordem:</p>
+                                    <p class="mb-0 small fw-bold"><code>TOMBAMENTO, Espécie, Descrição, Status, Tipo Entrada, Cadastro, Valor NF, NF, Nome Fornecedor</code></p>
                                 </div>
                                 <div class="mb-3">
                                     <label for="unidadeSistema" class="form-label">Nome da Unidade para o Relatório</label>
@@ -410,7 +408,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="relatorioSistema" class="form-label">Arquivo ou Texto do Relatório</label>
-                                    <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv" multiple>
+                                    <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv,.ods" multiple>
                                     <textarea class="form-control" id="pasteSistema" rows="5" placeholder="Ou cole os dados aqui (separados por tabulação ou ponto e vírgula)"></textarea>
                                 </div>
                                 <button id="uploadSistemaBtn" class="btn btn-primary"><i class="bi bi-cloud-upload me-2"></i>Upload Relatório</button>
@@ -428,7 +426,7 @@
                                 <div class="mb-3">
                                     <label for="inventariosAntigos" class="form-label">Arquivo ou Texto do Inventário</label>
                                     <small class="form-text text-muted d-block mb-2">Formato esperado: colunas como Unidade, Item, Tombo, Local, Estado.</small>
-                                    <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv" multiple>
+                                    <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv,.ods" multiple>
                                     <textarea class="form-control" id="pasteInventario" rows="5" placeholder="Ou cole os dados aqui (separados por tabulação ou ponto e vírgula)"></textarea>
                                 </div>
                                 <button id="uploadInventariosBtn" class="btn btn-primary"><i class="bi bi-cloud-upload me-2"></i>Upload Inventários</button>
