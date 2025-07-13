@@ -6,7 +6,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby99cTAFdCucXd1EQ7rV
 const SHEET_ID = '1Ye2r43tRukP6i4TMMrBQ-89AMgcweO9VEtv7ooj2cCc';
 const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 
-// Credenciais da API do Google (substitua pelos seus valores)
+// Credenciais da API do Google
 const API_KEY = 'AIzaSyCDRvL3Jm5QhgvcfExL3Z_ZJR_Xw149hFw';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const DISCOVERY_DOCS = [
@@ -15,72 +15,103 @@ const DISCOVERY_DOCS = [
 ];
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive';
 
-// Elementos da UI
-const signinButton = document.getElementById('signin-button');
-const signoutButton = document.getElementById('signout-button');
-const authContainer = document.getElementById('auth-container');
-const loginContainer = document.getElementById('login-container');
-const mainContent = document.getElementById('main-content');
-const userNameSpan = document.getElementById('user-name');
-
 // Variáveis de estado global
-let gapiInited = false;
-let gapiClientInited = false;
+let tokenClient;
 let analysisReportData = {}; // Armazena os dados da análise para exportação
 
-// Carregar a biblioteca do Google
-function handleClientLoad() {
-  gapi.load('client:auth2', initClient);
+// =================================================================================
+// FLUXO DE AUTENTICAÇÃO (Google Identity Services)
+// =================================================================================
+
+// Função chamada quando a página termina de carregar
+window.onload = () => {
+    // Carrega o cliente GAPI para APIs do Sheets/Drive
+    gapi.load('client', initializeGapiClient);
+    
+    // Inicializa o cliente do Google Identity Services para login
+    google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: handleCredentialResponse, // Função chamada após o login
+    });
+
+    // Anexa todos os event listeners da UI para evitar erros de 'null'
+    setupEventListeners();
+};
+
+// Inicializa o cliente GAPI
+function initializeGapiClient() {
+    gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs: DISCOVERY_DOCS,
+    }).catch(err => console.error('Error initializing GAPI client:', err));
 }
 
-// Inicializar o cliente da API
-function initClient() {
-  gapi.client.init({
-    apiKey: API_KEY,
-    clientId: CLIENT_ID,
-    discoveryDocs: DISCOVERY_DOCS,
-    scope: SCOPES
-  }).then(() => {
-    gapiClientInited = true;
-    // Escuta por mudanças no status de login
-    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
-    // Lida com o status de login inicial
-    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-  }).catch(err => console.error('Error initializing GAPI client:', err));
+// Lida com a resposta do login do Google
+async function handleCredentialResponse(response) {
+    // Decodifica o token JWT para obter informações do usuário
+    const profile = JSON.parse(atob(response.credential.split('.')[1]));
+    updateUiForSignIn(profile.name);
+    
+    // Solicita o token de acesso para usar as APIs (Sheets, Drive)
+    requestAccessToken();
 }
 
-// Atualiza a UI com base no status de login
-function updateSigninStatus(isSignedIn) {
-  if (isSignedIn) {
-    authContainer.style.display = 'block';
-    loginContainer.style.display = 'none';
-    mainContent.style.display = 'block';
-    const profile = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
-    userNameSpan.textContent = `Olá, ${profile.getName()}`;
-    initializeApp(); // Inicia as funções principais do app
-  } else {
-    authContainer.style.display = 'none';
-    loginContainer.style.display = 'block';
-    mainContent.style.display = 'none';
-    userNameSpan.textContent = '';
-  }
+// Atualiza a UI para o estado "logado"
+function updateUiForSignIn(userName) {
+    document.getElementById('user-name').textContent = `Olá, ${userName}`;
+    document.getElementById('auth-container').style.display = 'block';
+    document.getElementById('login-container').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
 }
 
-// Funções de login/logout
-function handleAuthClick() {
-  gapi.auth2.getAuthInstance().signIn();
+// Solicita o token de acesso OAuth2
+function requestAccessToken() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+                // Define o token para o cliente GAPI, autorizando chamadas de API
+                gapi.client.setToken(tokenResponse);
+                // Agora que estamos totalmente autenticados, inicializa o app
+                initializeAppLogic();
+            } else {
+                console.error("Não foi possível obter o token de acesso.");
+                showToast('toastError', 'Falha na autorização para acessar os dados.');
+            }
+        },
+    });
+    // Pede o token ao usuário
+    tokenClient.requestAccessToken();
 }
 
+// Lida com o clique no botão de logout
 function handleSignoutClick() {
-  gapi.auth2.getAuthInstance().signOut();
+    const token = gapi.client.getToken();
+    if (token) {
+        // Revoga o token para deslogar o usuário do app
+        google.accounts.oauth2.revoke(token.access_token, () => {
+            console.log('Token de acesso revogado.');
+        });
+        gapi.client.setToken(null);
+    }
+    
+    // Atualiza a UI para o estado "deslogado"
+    document.getElementById('auth-container').style.display = 'none';
+    document.getElementById('login-container').style.display = 'block';
+    document.getElementById('main-content').style.display = 'none';
+    document.getElementById('user-name').textContent = '';
+    
+    // Impede o login automático na próxima visita
+    google.accounts.id.disableAutoSelect();
 }
 
 // =================================================================================
-// FUNÇÕES PRINCIPAIS DO APLICATIVO
+// LÓGICA PRINCIPAL DO APLICATIVO
 // =================================================================================
 
-// Função chamada após o login bem-sucedido
-async function initializeApp() {
+// Função chamada após a autenticação bem-sucedida
+async function initializeAppLogic() {
   loadDraft();
   checkUnidadeFixada();
   await fetchConcluidos();
@@ -97,7 +128,7 @@ function checkUnidadeFixada() {
     }
 }
 
-// Carrega o rascunho salvo
+// Carrega o rascunho salvo do formulário
 function loadDraft() {
     const draft = JSON.parse(localStorage.getItem('draft'));
     if (draft) {
@@ -127,41 +158,48 @@ function autoSaveDraft() {
 // MANIPULADORES DE EVENTOS (EVENT LISTENERS)
 // =================================================================================
 
-window.onload = handleClientLoad;
-signinButton.addEventListener('click', handleAuthClick);
-signoutButton.addEventListener('click', handleSignoutClick);
-setInterval(autoSaveDraft, 30000); // Salva rascunho a cada 30s
+// Anexa todos os event listeners da UI
+function setupEventListeners() {
+    document.getElementById('signin-button').addEventListener('click', () => google.accounts.id.prompt());
+    document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
+    
+    setInterval(autoSaveDraft, 30000);
 
-// Salvar unidade inicial
-document.getElementById('salvarUnidade').addEventListener('click', () => {
-  const unidade = document.getElementById('unidadeInicial').value.trim();
-  if (unidade) {
-    localStorage.setItem('unidadeFixada', unidade);
-    document.getElementById('unidade').value = unidade;
-    bootstrap.Modal.getInstance(document.getElementById('unidadeModal')).hide();
-    fetchConcluidos(); // Recarrega itens para a nova unidade
-  }
-});
+    document.getElementById('salvarUnidade').addEventListener('click', () => {
+      const unidade = document.getElementById('unidadeInicial').value.trim();
+      if (unidade) {
+        localStorage.setItem('unidadeFixada', unidade);
+        document.getElementById('unidade').value = unidade;
+        bootstrap.Modal.getInstance(document.getElementById('unidadeModal')).hide();
+        fetchConcluidos();
+      }
+    });
 
-// Resetar unidade
-document.getElementById('resetUnidade').addEventListener('click', () => {
-  localStorage.removeItem('unidadeFixada');
-  document.getElementById('unidade').value = '';
-  new bootstrap.Modal(document.getElementById('unidadeModal')).show();
-});
+    document.getElementById('resetUnidade').addEventListener('click', () => {
+      localStorage.removeItem('unidadeFixada');
+      document.getElementById('unidade').value = '';
+      new bootstrap.Modal(document.getElementById('unidadeModal')).show();
+    });
 
-// Permitir edição do campo 'local'
-document.getElementById('editLocal').addEventListener('click', () => {
-  const localInput = document.getElementById('local');
-  localInput.readOnly = false;
-  localInput.focus();
-  localInput.addEventListener('blur', () => {
-    localInput.readOnly = true;
-  }, { once: true });
-});
+    document.getElementById('editLocal').addEventListener('click', () => {
+      const localInput = document.getElementById('local');
+      localInput.readOnly = false;
+      localInput.focus();
+      localInput.addEventListener('blur', () => {
+        localInput.readOnly = true;
+      }, { once: true });
+    });
 
-// Envio do formulário de inventário
-document.getElementById('inventarioForm').addEventListener('submit', async (e) => {
+    document.getElementById('inventarioForm').addEventListener('submit', handleInventoryFormSubmit);
+    document.getElementById('uploadSistemaBtn').addEventListener('click', () => handleUpload('Sistema'));
+    document.getElementById('uploadInventariosBtn').addEventListener('click', () => handleUpload('Inventario'));
+    document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchAndDisplayInventarios);
+    document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
+    document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
+}
+
+// Lida com o envio do formulário de inventário
+async function handleInventoryFormSubmit(e) {
   e.preventDefault();
   const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
   loadingModal.show();
@@ -194,7 +232,7 @@ document.getElementById('inventarioForm').addEventListener('submit', async (e) =
 
     localStorage.removeItem('draft');
     e.target.reset();
-    document.getElementById('unidade').value = localStorage.getItem('unidadeFixada'); // Restaura a unidade fixada
+    document.getElementById('unidade').value = localStorage.getItem('unidadeFixada');
     await fetchConcluidos();
     showToast('toastSuccess', 'Item salvo com sucesso!');
   } catch (error) {
@@ -203,22 +241,7 @@ document.getElementById('inventarioForm').addEventListener('submit', async (e) =
   } finally {
     loadingModal.hide();
   }
-});
-
-
-// Uploads de relatórios (Sistema e Inventários Antigos)
-document.getElementById('uploadSistemaBtn').addEventListener('click', () => handleUpload('Sistema'));
-document.getElementById('uploadInventariosBtn').addEventListener('click', () => handleUpload('Inventario'));
-
-// Aba de Inventários (Acordeão)
-document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchAndDisplayInventarios);
-
-// Análise de Inventário
-document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
-
-// Exportar para CSV
-document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
-
+}
 
 // =================================================================================
 // FUNÇÕES DE LÓGICA E COMUNICAÇÃO COM APIS
@@ -235,10 +258,9 @@ async function uploadFileToDrive(file) {
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', file);
 
-    const accessToken = gapi.auth.getToken().access_token;
     const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}` },
+        headers: { 'Authorization': `Bearer ${gapi.client.getToken().access_token}` },
         body: form
     });
 
@@ -259,23 +281,19 @@ async function fetchConcluidos() {
   try {
     const response = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'Inventario!A:G' // Unidade, Local, Item, Tombo, Estado, Quantidade, Foto
+      range: 'Inventario!A:G'
     });
     const rows = response.result.values || [];
     const tbody = document.querySelector('#tabelaConcluidos tbody');
     tbody.innerHTML = '';
     
-    rows.slice(1) // Pula o cabeçalho
-        .filter(row => row[0] === unidadeAtual) // Filtra pela unidade atual
+    rows.slice(1)
+        .filter(row => row[0] === unidadeAtual)
         .forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${row[0] || ''}</td>
-                <td>${row[1] || ''}</td>
-                <td>${row[2] || ''}</td>
-                <td>${row[3] || ''}</td>
-                <td>${row[4] || ''}</td>
-                <td>${row[5] || ''}</td>
+                <td>${row[0] || ''}</td><td>${row[1] || ''}</td><td>${row[2] || ''}</td>
+                <td>${row[3] || ''}</td><td>${row[4] || ''}</td><td>${row[5] || ''}</td>
                 <td>${row[6] ? `<a href="${row[6]}" target="_blank" class="btn btn-sm btn-outline-primary">Ver</a>` : 'N/A'}</td>
             `;
             tbody.appendChild(tr);
@@ -293,7 +311,6 @@ async function handleUpload(type) {
 
     const fileInput = document.getElementById(type === 'Sistema' ? 'relatorioSistema' : 'inventariosAntigos');
     const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
-    
     const files = fileInput.files;
     const pasteText = pasteArea.value.trim();
 
@@ -302,22 +319,21 @@ async function handleUpload(type) {
     const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
     loadingModal.show();
     
-    // Timeout para evitar que o modal fique aberto indefinidamente
     const timeoutId = setTimeout(() => {
         loadingModal.hide();
-        showToast('toastError', 'Tempo esgotado. A operação demorou demais. Verifique sua conexão ou o tamanho do arquivo.');
-    }, 60000); // 60 segundos
+        showToast('toastError', 'Tempo esgotado. Verifique sua conexão ou o tamanho do arquivo.');
+    }, 60000);
 
     try {
         let data = [];
         if (files.length > 0) {
             for (const file of files) {
                 const parsed = await parseExcel(file);
-                data.push(...parsed.slice(1)); // Adiciona dados, ignorando cabeçalho
+                data.push(...parsed.slice(1));
             }
         } else if (pasteText) {
             const parsed = parsePastedText(pasteText);
-            data.push(...parsed.slice(1)); // Adiciona dados, ignorando cabeçalho
+            data.push(...parsed.slice(1));
         }
 
         if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
@@ -333,9 +349,9 @@ async function handleUpload(type) {
         });
 
         showToast('toastSuccess', `Upload de '${type}' concluído com sucesso!`);
-        fileInput.value = ''; // Limpa o input de arquivo
-        pasteArea.value = ''; // Limpa a área de texto
-        await popularUnidadesParaAnalise(); // Atualiza a lista de unidades para análise
+        fileInput.value = '';
+        pasteArea.value = '';
+        await popularUnidadesParaAnalise();
 
     } catch (error) {
         console.error(`Erro no upload de ${type}:`, error);
@@ -351,13 +367,13 @@ async function fetchAndDisplayInventarios() {
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: SHEET_ID,
-            range: 'Inventario!A:J' // Unidade, Local, Item, Tombo, Estado, Qtd, Foto, Timestamp, Fonte, UnidadeUpload
+            range: 'Inventario!A:J'
         });
         const rows = response.result.values ? response.result.values.slice(1) : [];
         
         const inventariosAgrupados = rows.reduce((acc, row) => {
-            const unidade = (row[0] || row[9] || 'Sem Unidade').trim(); // Usa Unidade ou UnidadeUpload
-            const fonte = row[8] || 'N/A'; // Site ou Upload
+            const unidade = (row[0] || row[9] || 'Sem Unidade').trim();
+            const fonte = row[8] || 'N/A';
             
             if (!acc[unidade]) {
                 acc[unidade] = { Site: [], Upload: [] };
@@ -409,7 +425,7 @@ async function handleAnalysis() {
     
     const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
     loadingModal.show();
-    document.getElementById('exportCsvBtn').classList.add('d-none'); // Esconde o botão de exportar
+    document.getElementById('exportCsvBtn').classList.add('d-none');
 
     try {
         const systemResponse = gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: 'RelatorioSistema!A:M' });
@@ -428,10 +444,7 @@ async function handleAnalysis() {
         const systemMap = new Map(systemFilteredByUnidade.map(row => [normalizeTombo(row[0]), row]));
         const inventoryMap = new Map(inventoryFilteredByUnidade.map(row => [normalizeTombo(row[3]), row]));
 
-        let matches = [];
-        let missingPhysical = [];
-        let missingSystem = [];
-        let observations = [];
+        let matches = [], missingPhysical = [], missingSystem = [], observations = [];
 
         systemMap.forEach((sysRow, tomboNorm) => {
             if (inventoryMap.has(tomboNorm)) {
@@ -448,12 +461,8 @@ async function handleAnalysis() {
             }
         });
         
-        // Salva os dados para exportação
         analysisReportData = { matches, missingPhysical, missingSystem, observations };
-
-        // Renderiza o resultado na tela
         renderAnalysisResults(analysisReportData);
-        
         document.getElementById('exportCsvBtn').classList.remove('d-none');
 
     } catch (error) {
@@ -463,7 +472,6 @@ async function handleAnalysis() {
         loadingModal.hide();
     }
 }
-
 
 // Exporta os dados da análise para um arquivo CSV
 function exportAnalysisToCsv() {
@@ -495,14 +503,13 @@ function exportAnalysisToCsv() {
         csvContent += row.map(escapeCsvCell).join(';') + '\n';
     });
 
-    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel compatibility
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `relatorio_analise_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
 }
-
 
 // =================================================================================
 // FUNÇÕES AUXILIARES E DE UI
@@ -513,7 +520,7 @@ async function popularUnidadesParaAnalise() {
     try {
         const response = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: SHEET_ID,
-            range: 'Inventario!J:J' // Coluna UnidadeUpload
+            range: 'Inventario!J:J'
         });
         const rows = response.result.values || [];
         const unidades = [...new Set(rows.slice(1).flat().map(u => u.trim()).filter(Boolean))];
@@ -554,7 +561,7 @@ function parseExcel(file) {
 // Parseia texto copiado e colado
 function parsePastedText(text) {
   const lines = text.split('\n').filter(line => line.trim());
-  return lines.map(line => line.split('\t').map(cell => cell.trim())); // Assume tab-separated
+  return lines.map(line => line.split('\t').map(cell => cell.trim()));
 }
 
 // Cria uma tabela HTML a partir de dados
@@ -565,7 +572,11 @@ function createTableHtml(title, headers, data, dataIndices) {
     table += '</tr></thead><tbody>';
     data.forEach(row => {
         table += '<tr>';
-        dataIndices.forEach(index => table += `<td>${row[index] || ''}</td>`);
+        dataIndices.forEach(index => {
+            const key = index;
+            const value = row[key] || (typeof key === 'number' ? row[key] : '');
+            table += `<td>${value}</td>`;
+        });
         table += '</tr>';
     });
     table += '</tbody></table></div>';
@@ -576,23 +587,14 @@ function createTableHtml(title, headers, data, dataIndices) {
 function renderAnalysisResults({ matches, missingPhysical, missingSystem, observations }) {
     const resultadoDiv = document.getElementById('resultadoComparacao');
     resultadoDiv.innerHTML = `
-      <div class="card mb-3">
-        <div class="card-header bg-success text-white fw-bold">Itens Encontrados (Matches) - ${matches.length}</div>
-        <div class="card-body">${createTableHtml('', ['Tombo', 'Descrição', 'Nota Fiscal'], matches, ['tombo', 'descInventory', 'nf'])}</div>
-      </div>
-      <div class="card mb-3">
-        <div class="card-header bg-warning text-dark fw-bold">Itens Faltando no Inventário Físico - ${missingPhysical.length}</div>
-        <div class="card-body">${createTableHtml('', ['Tombo', 'Descrição'], missingPhysical, ['tombo', 'desc'])}</div>
-      </div>
-      <div class="card mb-3">
-        <div class="card-header bg-danger text-white fw-bold">Itens Sobrando (Não Constam no Sistema) - ${missingSystem.length}</div>
-        <div class="card-body">${createTableHtml('', ['Tombo', 'Descrição'], missingSystem, ['tombo', 'desc'])}</div>
-      </div>
-      ${observations.length > 0 ? `
-      <div class="card">
-        <div class="card-header bg-info text-white fw-bold">Observações - ${observations.length}</div>
-        <div class="card-body"><ul class="list-group list-group-flush">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul></div>
-      </div>` : ''}
+      <div class="card mb-3"><div class="card-header bg-success text-white fw-bold">Itens Encontrados (Matches) - ${matches.length}</div>
+        <div class="card-body">${createTableHtml('', ['Tombo', 'Descrição', 'Nota Fiscal'], matches, ['tombo', 'descInventory', 'nf'])}</div></div>
+      <div class="card mb-3"><div class="card-header bg-warning text-dark fw-bold">Itens Faltando no Inventário Físico - ${missingPhysical.length}</div>
+        <div class="card-body">${createTableHtml('', ['Tombo', 'Descrição'], missingPhysical, ['tombo', 'desc'])}</div></div>
+      <div class="card mb-3"><div class="card-header bg-danger text-white fw-bold">Itens Sobrando (Não Constam no Sistema) - ${missingSystem.length}</div>
+        <div class="card-body">${createTableHtml('', ['Tombo', 'Descrição'], missingSystem, ['tombo', 'desc'])}</div></div>
+      ${observations.length > 0 ? `<div class="card"><div class="card-header bg-info text-white fw-bold">Observações - ${observations.length}</div>
+        <div class="card-body"><ul class="list-group list-group-flush">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul></div></div>` : ''}
     `;
 }
 
