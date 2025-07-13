@@ -256,80 +256,37 @@ function parsePaste(text) {
   return lines.map(line => line.split(/\t|,/).map(cell => cell.trim()));
 }
 
-// Fetch inventários diferenciados (atualizado para accordion com + por unidade)
+// Fetch inventários diferenciados
 async function fetchInventarios() {
   const response = await gapi.client.sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: 'Inventario!A:J'
   });
   const rows = response.result.values || [];
-  const siteData = {};
-  const uploadData = {};
+  const siteTable = document.getElementById('tabelaSite');
+  const uploadTable = document.getElementById('tabelaUpload');
+  siteTable.innerHTML = '<thead><tr><th>Unidade</th><th>Item</th><th>Tombo</th><th>Estado</th></tr></thead><tbody>';
+  uploadTable.innerHTML = '<thead><tr><th>Unidade</th><th>Item</th><th>Tombo</th><th>Estado</th></tr></thead><tbody>';
   rows.slice(1).forEach(row => {
-    const unidade = row[0] || row[9];
-    const itemHtml = `<tr><td>${unidade}</td><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`;
+    const html = `<tr><td>${row[0] || row[9]}</td><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`;
     if (row[8] === 'Site') {
-      if (!siteData[unidade]) siteData[unidade] = [];
-      siteData[unidade].push(itemHtml);
+      siteTable.innerHTML += html;
     } else if (row[8] === 'Upload') {
-      if (!uploadData[unidade]) uploadData[unidade] = [];
-      uploadData[unidade].push(itemHtml);
+      uploadTable.innerHTML += html;
     }
   });
-
-  const siteContainer = document.getElementById('tabelaSite');
-  siteContainer.innerHTML = '<h3>Feitos no Site</h3><div class="accordion" id="siteAccordion"></div>';
-  Object.keys(siteData).forEach((unidade, index) => {
-    const accordionItem = `
-      <div class="accordion-item">
-        <h2 class="accordion-header" id="siteHeading${index}">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#siteCollapse${index}">
-            ${unidade}
-          </button>
-        </h2>
-        <div id="siteCollapse${index}" class="accordion-collapse collapse" data-bs-parent="#siteAccordion">
-          <div class="accordion-body">
-            <table class="table table-striped"><thead><tr><th>Unidade</th><th>Item</th><th>Tombo</th><th>Estado</th></tr></thead><tbody>${siteData[unidade].join('')}</tbody></table>
-          </div>
-        </div>
-      </div>
-    `;
-    siteContainer.querySelector('#siteAccordion').innerHTML += accordionItem;
-  });
-
-  const uploadContainer = document.getElementById('tabelaUpload');
-  uploadContainer.innerHTML = '<h3>Carregados por Upload</h3><div class="accordion" id="uploadAccordion"></div>';
-  Object.keys(uploadData).forEach((unidade, index) => {
-    const accordionItem = `
-      <div class="accordion-item">
-        <h2 class="accordion-header" id="uploadHeading${index}">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCollapse${index}">
-            ${unidade}
-          </button>
-        </h2>
-        <div id="uploadCollapse${index}" class="accordion-collapse collapse" data-bs-parent="#uploadAccordion">
-          <div class="accordion-body">
-            <table class="table table-striped"><thead><tr><th>Unidade</th><th>Item</th><th>Tombo</th><th>Estado</th></tr></thead><tbody>${uploadData[unidade].join('')}</tbody></table>
-          </div>
-        </div>
-      </div>
-    `;
-    uploadContainer.querySelector('#uploadAccordion').innerHTML += accordionItem;
-  });
+  siteTable.innerHTML += '</tbody>';
+  uploadTable.innerHTML += '</tbody>';
 }
 
 document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchInventarios);
 
-// Lógica de análise (atualizada para mais profissional, com colunas separadas)
+// Lógica de análise
 document.getElementById('compararBtn').addEventListener('click', async () => {
   const unidade = document.getElementById('unidadeComparar').value;
   if (!unidade) return showToast('toastError', 'Selecione uma unidade!');
   const loading = new bootstrap.Modal(document.getElementById('loadingModal'));
   loading.show();
-  const timeoutId = setTimeout(() => {
-    loading.hide();
-    showToast('toastError', 'Tempo esgotado na análise: Tente novamente.');
-  }, 60000); // Timeout de 60 segundos para análise
   try {
     const systemResponse = await gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -356,9 +313,9 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
     systemMap.forEach((sysRow, tomboNorm) => {
       if (inventoryMap.has(tomboNorm)) {
         const invRow = inventoryMap.get(tomboNorm);
-        matches.push({ tombo: tomboNorm, descInventory: invRow[2], descSystem: sysRow[2], cadastro: sysRow[1], tipoEntrada: sysRow[3], nf: sysRow[4], ativo: sysRow[5], subStatus: sysRow[6], fornecedor: sysRow[7], dataMovimento: sysRow[8], valorNF: sysRow[9], status: sysRow[10] });
+        matches.push({ tombo: tomboNorm, descSystem: sysRow[2], descInventory: invRow[2], nf: sysRow[4], fornecedor: sysRow[7], fullSystem: sysRow.join(', ') });
       } else {
-        missingPhysical.push({ tombo: tomboNorm, desc: sysRow[2], cadastro: sysRow[1], tipoEntrada: sysRow[3], nf: sysRow[4], ativo: sysRow[5], subStatus: sysRow[6], fornecedor: sysRow[7], dataMovimento: sysRow[8], valorNF: sysRow[9], status: sysRow[10] });
+        missingPhysical.push({ tombo: tomboNorm, desc: sysRow[2], fullSystem: sysRow.join(', ') });
         const other = systemData.slice(1).find(r => normalizeTombo(r[0]) === tomboNorm && (r[0] || r[12])?.toLowerCase() !== unidade);
         if (other) {
           observations.push(`Tombo ${tomboNorm} encontrado em outra unidade: ${other[0] || other[12]}. Sugestão: Transferir para ${unidade}.`);
@@ -382,11 +339,9 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
         <div class="card-header bg-primary text-white">Tombamentos Iguais (Matches)</div>
         <div class="card-body">
           <div class="table-responsive">
-            <table class="table table-striped table-hover">
-              <thead class="table-dark">
-                <tr><th>Tombo</th><th>Desc. Inventário</th><th>Desc. Sistema</th><th>Cadastro</th><th>Tipo Entrada</th><th>NF</th><th>Ativo</th><th>SubStatus</th><th>Fornecedor</th><th>Data Movimento</th><th>Valor NF</th><th>Status</th></tr>
-              </thead>
-              <tbody>${matches.map(m => `<tr><td>${m.tombo}</td><td>${m.descInventory}</td><td>${m.descSystem}</td><td>${m.cadastro}</td><td>${m.tipoEntrada}</td><td>${m.nf}</td><td>${m.ativo}</td><td>${m.subStatus}</td><td>${m.fornecedor}</td><td>${m.dataMovimento}</td><td>${m.valorNF}</td><td>${m.status}</td></tr>`).join('')}</tbody>
+            <table class="table table-striped">
+              <thead><tr><th>Tombo</th><th>Desc. Inventário</th><th>Desc. Sistema</th><th>NF</th><th>Fornecedor</th><th>Info Completa Sistema</th></tr></thead>
+            <tbody>${matches.map(m => `<tr><td>${m.tombo}</td><td>${m.descInventory}</td><td>${m.descSystem}</td><td>${m.nf}</td><td>${m.fornecedor}</td><td>${m.fullSystem}</td></tr>`).join('')}</tbody>
             </table>
           </div>
         </div>
@@ -394,33 +349,19 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
       <div class="card mb-3">
         <div class="card-header bg-warning text-dark">Faltando no Físico</div>
         <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-striped table-hover">
-              <thead class="table-dark">
-                <tr><th>Tombo</th><th>Desc. Sistema</th><th>Cadastro</th><th>Tipo Entrada</th><th>NF</th><th>Ativo</th><th>SubStatus</th><th>Fornecedor</th><th>Data Movimento</th><th>Valor NF</th><th>Status</th></tr>
-              </thead>
-              <tbody>${missingPhysical.map(mp => `<tr><td>${mp.tombo}</td><td>${mp.desc}</td><td>${mp.cadastro}</td><td>${mp.tipoEntrada}</td><td>${mp.nf}</td><td>${mp.ativo}</td><td>${mp.subStatus}</td><td>${mp.fornecedor}</td><td>${mp.dataMovimento}</td><td>${mp.valorNF}</td><td>${mp.status}</td></tr>`).join('')}</tbody>
-            </table>
-          </div>
+          <ul class="list-group">${missingPhysical.map(mp => `<li class="list-group-item">Tombo: ${mp.tombo}, Desc: ${mp.desc}, Info Sistema: ${mp.fullSystem}</li>`).join('')}</ul>
         </div>
       </div>
       <div class="card mb-3">
         <div class="card-header bg-danger text-white">Faltando no Sistema</div>
         <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-striped table-hover">
-              <thead class="table-dark">
-                <tr><th>Tombo</th><th>Desc. Inventário</th></tr>
-              </thead>
-              <tbody>${missingSystem.map(ms => `<tr><td>${ms.tombo}</td><td>${ms.desc}</td></tr>`).join('')}</tbody>
-            </table>
-          </div>
+          <ul class="list-group">${missingSystem.map(ms => `<li class="list-group-item">Tombo: ${ms.tombo}, Desc: ${ms.desc}</li>`).join('')}</ul>
         </div>
       </div>
       <div class="card">
         <div class="card-header bg-info text-white">Observações (Tombos em Outras Unidades)</div>
         <div class="card-body">
-          <ul class="list-group list-group-flush">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul>
+          <ul class="list-group">${observations.map(o => `<li class="list-group-item">${o}</li>`).join('')}</ul>
         </div>
       </div>
     `;
@@ -428,18 +369,17 @@ document.getElementById('compararBtn').addEventListener('click', async () => {
   } catch (error) {
     showToast('toastError', 'Erro na análise: ' + error.message);
   } finally {
-    clearTimeout(timeoutId);
     loading.hide();
   }
 });
 
-// Exportar CSV (atualizado para incluir colunas separadas)
+// Exportar CSV
 document.getElementById('exportCsv').addEventListener('click', () => {
-  let csv = 'Tipo;Tombo;Desc Inventario;Desc Sistema;Cadastro;Tipo Entrada;NF;Ativo;SubStatus;Fornecedor;Data Movimento;Valor NF;Status;Observacao\n';
-  matches.forEach(m => csv += `Match;${m.tombo};${m.descInventory};${m.descSystem};${m.cadastro};${m.tipoEntrada};${m.nf};${m.ativo};${m.subStatus};${m.fornecedor};${m.dataMovimento};${m.valorNF};${m.status};\n`);
-  missingPhysical.forEach(mp => csv += `MissingPhysical;${mp.tombo};;${mp.desc};${mp.cadastro};${mp.tipoEntrada};${mp.nf};${mp.ativo};${mp.subStatus};${mp.fornecedor};${mp.dataMovimento};${mp.valorNF};${mp.status};\n`);
-  missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;;;;;;;;;\n`);
-  observations.forEach(o => csv += `Observation;;;;;;;;;;;;;${o}\n`);
+  let csv = 'Tipo;Tombo;Desc Inventario;Desc Sistema;NF;Fornecedor;Info Sistema;Observacao\n';
+  matches.forEach(m => csv += `Match;${m.tombo};${m.descInventory};${m.descSystem};${m.nf};${m.fornecedor};${m.fullSystem};\n`);
+  missingPhysical.forEach(mp => csv += `MissingPhysical;${mp.tombo};;${mp.desc};;${mp.fullSystem};\n`);
+  missingSystem.forEach(ms => csv += `MissingSystem;${ms.tombo};${ms.desc};;;\n`);
+  observations.forEach(o => csv += `Observation;;;;;;${o}\n`);
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -448,7 +388,7 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   a.click();
 });
 
-// Parsear Excel (atualizado para pular cabeçalho no RelatorioSistema)
+// Parsear Excel
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -458,13 +398,7 @@ function parseExcel(file) {
         const workbook = XLSX.read(data, { type: 'binary' });
         const sheetName = workbook.SheetNames[0];
         const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-        // Pula cabeçalho se presente para RelatorioSistema
-        const headers = sheet[0];
-        if (Array.isArray(headers) && headers.includes('Tombamento')) {
-          resolve(sheet.slice(1));
-        } else {
-          resolve(sheet);
-        }
+        resolve(sheet);
       } catch (error) {
         reject(error);
       }
@@ -477,6 +411,6 @@ function parseExcel(file) {
 function showToast(id, message) {
   const toastEl = document.getElementById(id);
   toastEl.querySelector('.toast-body').textContent = message;
-  const toast = new bootstrap.Toast(toastEl, { delay: 5000 });
+  const toast = new bootstrap.Toast(toastEl);
   toast.show();
 }
