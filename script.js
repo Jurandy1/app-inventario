@@ -1,4 +1,3 @@
-<DOCUMENT filename="script.js">
 // =================================================================================
 // CONFIGURAÇÃO E INICIALIZAÇÃO
 // =================================================================================
@@ -747,4 +746,3 @@ function showToast(type, message) {
     new bootstrap.Toast(toastEl).show();
   }
 }
-</DOCUMENT>
