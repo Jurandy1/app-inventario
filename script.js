@@ -1,4 +1,3 @@
-<DOCUMENT filename="script.js">
 // =================================================================================
 // CONFIGURAÇÃO E INICIALIZAÇÃO
 // =================================================================================
@@ -116,7 +115,7 @@ function autoSaveDraft() {
 // =================================================================================
 function setupEventListeners() {
   document.getElementById('signin-button').addEventListener('click', () => google.accounts.id.prompt());
-  document.getElementById('signout-button').addEventListener('click', handleSignoutClick());
+  document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
   setInterval(autoSaveDraft, 30000);
 
   document.getElementById('salvarUnidade').addEventListener('click', () => {
@@ -165,7 +164,7 @@ async function handleInventoryFormSubmit(e) {
       photoUrl = await uploadFileToDrive(file);
     }
 
-    const data = await {
+    const data = {
       action: 'saveItem',
       unidade: document.getElementById('unidade').value,
       local: document.getElementById('local').value,
@@ -307,7 +306,7 @@ async function fetchAndDisplayInventarios() {
           <div id="collapse-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
             <div class="accordion-body">
               ${createTableHtml('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site, [2, 3, 1, 4])}
-              ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload, [2', '3', '1', '4'])}
+              ${createTableHtml('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload, [2, 3, 1, 4])}
             </div>
           </div>
         </div>`;
@@ -567,4 +566,3 @@ function showToast(id, message) {
     new bootstrap.Toast(toastEl).show();
   }
 }
-</DOCUMENT>
