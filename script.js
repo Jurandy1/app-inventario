@@ -6,16 +6,19 @@ const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
 const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-// Mapeamento de colunas do Relatório do Sistema (baseado em índice 0)
+// ATUALIZADO: Mapeamento da nova estrutura de colunas do Relatório do Sistema
 const SISTEMA_COLUMNS = {
     TOMBAMENTO: 0,
-    CADASTRO: 1,
+    ESPECIE: 1,
     DESCRICAO: 2,
-    TIPO_ENTRADA: 3,
-    NOTA_FISCAL: 4,
-    VALOR_NF: 9, // CORRIGIDO: Apontando para a coluna J (índice 9).
-    FORNECEDOR: 7,
-    UNIDADE: 12
+    STATUS: 3,
+    TIPO: 4,      // Onde buscar por "INCORPORAÇÃO"
+    ENTRADA: 5,
+    CADASTRO: 6,
+    VALOR_NF: 7,
+    NF: 8,
+    FORNECEDOR: 9,
+    UNIDADE: 10   // Coluna adicionada pelo script para agrupar
 };
 
 
@@ -27,28 +30,23 @@ let analysisReportData = {}; // Armazena os dados do último relatório gerado
 // FLUXO DE AUTENTICAÇÃO E CARREGAMENTO INICIAL
 // =================================================================================
 window.onload = () => {
-  // Inicializa o serviço de identidade do Google
   google.accounts.id.initialize({
     client_id: CLIENT_ID,
     callback: handleCredentialResponse,
   });
-  // Configura todos os event listeners da página
   setupEventListeners();
-  // Renderiza o botão de login do Google
   google.accounts.id.renderButton(
     document.getElementById('signin-button'),
     { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' } 
   );
 };
 
-// Função chamada após o login bem-sucedido
 function handleCredentialResponse(response) {
   const profile = JSON.parse(atob(response.credential.split('.')[1]));
   updateUiForSignIn(profile.name);
-  requestAccessToken(); // Solicita o token de acesso para o Drive
+  requestAccessToken();
 }
 
-// Solicita o token de acesso para APIs como o Google Drive
 function requestAccessToken() {
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -56,7 +54,7 @@ function requestAccessToken() {
     callback: (tokenResponse) => {
       if (tokenResponse && tokenResponse.access_token) {
         accessToken = tokenResponse.access_token;
-        initializeAppLogic(); // Inicia a lógica principal do app após obter o token
+        initializeAppLogic();
       } else {
         showToast('toastError', 'Falha na autorização para fazer upload de fotos. Tente fazer login novamente.');
       }
@@ -65,7 +63,6 @@ function requestAccessToken() {
   tokenClient.requestAccessToken();
 }
 
-// Lida com o clique no botão de sair
 function handleSignoutClick() {
   if (accessToken) {
     google.accounts.oauth2.revoke(accessToken, () => { accessToken = null; });
@@ -74,7 +71,6 @@ function handleSignoutClick() {
   updateUiForSignOut();
 }
 
-// Atualiza a interface para o estado "logado"
 function updateUiForSignIn(userName) {
   document.getElementById('user-name').textContent = `Olá, ${userName}`;
   document.getElementById('auth-container').classList.remove('d-none');
@@ -82,7 +78,6 @@ function updateUiForSignIn(userName) {
   document.getElementById('main-content').classList.remove('d-none');
 }
 
-// Atualiza a interface para o estado "deslogado"
 function updateUiForSignOut() {
     document.getElementById('auth-container').classList.add('d-none');
     document.getElementById('login-container').classList.remove('d-none');
@@ -93,13 +88,12 @@ function updateUiForSignOut() {
 // LÓGICA PRINCIPAL DO APLICATIVO
 // =================================================================================
 async function initializeAppLogic() {
-  loadDraft(); // Carrega rascunho salvo
-  checkUnidadeFixada(); // Verifica se uma unidade de trabalho já foi definida
-  await fetchConcluidos(); // Busca itens já inventariados para a unidade atual
-  await popularUnidadesParaAnalise(); // Popula o dropdown de análise
+  loadDraft();
+  checkUnidadeFixada();
+  await fetchConcluidos();
+  await popularUnidadesParaAnalise();
 }
 
-// Verifica se a unidade está no localStorage, senão, abre o modal para definição
 function checkUnidadeFixada() {
   const unidadeFixada = localStorage.getItem('unidadeFixada');
   if (!unidadeFixada) {
@@ -109,7 +103,6 @@ function checkUnidadeFixada() {
   }
 }
 
-// Carrega o rascunho do formulário do localStorage
 function loadDraft() {
   const draft = JSON.parse(localStorage.getItem('draft'));
   if (draft) {
@@ -120,7 +113,6 @@ function loadDraft() {
   }
 }
 
-// Salva o estado atual do formulário como rascunho
 function autoSaveDraft() {
   const formData = {
     unidade: document.getElementById('unidade').value,
@@ -138,9 +130,8 @@ function autoSaveDraft() {
 // =================================================================================
 function setupEventListeners() {
   document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
-  setInterval(autoSaveDraft, 30000); // Salva rascunho a cada 30 segundos
+  setInterval(autoSaveDraft, 30000);
 
-  // Salva a unidade de trabalho definida no modal
   document.getElementById('salvarUnidade').addEventListener('click', () => {
     const unidade = document.getElementById('unidadeInicial').value.trim();
     if (unidade) {
@@ -151,14 +142,12 @@ function setupEventListeners() {
     }
   });
 
-  // Reseta a unidade fixada
   document.getElementById('resetUnidade').addEventListener('click', () => {
     localStorage.removeItem('unidadeFixada');
     document.getElementById('unidade').value = '';
     new bootstrap.Modal(document.getElementById('unidadeModal')).show();
   });
 
-  // Permite editar o campo "local"
   document.getElementById('editLocal').addEventListener('click', () => {
     const localInput = document.getElementById('local');
     localInput.readOnly = false;
@@ -386,7 +375,7 @@ async function fetchAndDisplayRelatorios() {
 
 
 // =================================================================================
-// LÓGICA DE ANÁLISE DE INVENTÁRIO (CORRIGIDA)
+// LÓGICA DE ANÁLISE DE INVENTÁRIO
 // =================================================================================
 async function handleAnalysis() {
   const unidade = document.getElementById('unidadeComparar').value;
@@ -475,6 +464,7 @@ function stringSimilarity(str1, str2) {
     return (2 * intersectionSize) / (str1.length + str2.length - 2);
 }
 
+// --- FUNÇÃO DE COMPARAÇÃO ATUALIZADA ---
 function compararInventariosV4(inventario, sistema, unidade) {
     const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
 
@@ -483,10 +473,13 @@ function compararInventariosV4(inventario, sistema, unidade) {
     let inventarioComTombo = new Map();
     let inventarioSemTombo = [];
 
-    // Processa o relatório do sistema: separa itens de "incorporação" dos demais
-    sistema.forEach((row, index) => {
-        const tipoEntrada = (row[SISTEMA_COLUMNS.TIPO_ENTRADA] || '').toLowerCase();
-        if (tipoEntrada.includes('incorporação')) {
+    // 1. Filtra o relatório do sistema para conter apenas itens "DISPONÍVEL"
+    const sistemaDisponivel = sistema.filter(row => (row[SISTEMA_COLUMNS.STATUS] || '').trim().toUpperCase() === 'DISPONÍVEL');
+
+    // 2. Processa o relatório filtrado: separa itens de "INCORPORAÇÃO" dos demais
+    sistemaDisponivel.forEach((row, index) => {
+        const tipo = (row[SISTEMA_COLUMNS.TIPO] || '').toLowerCase();
+        if (tipo.includes('incorporação')) {
             incorporacoes.push({ sysRow: row });
         } else {
             const tomboNorm = normalizeTombo(row[SISTEMA_COLUMNS.TOMBAMENTO]);
@@ -496,7 +489,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
 
-    // Processa o inventário físico, separando itens com e sem tombo
+    // 3. Processa o inventário físico, separando itens com e sem tombo
     inventario.forEach((row, index) => {
         const tomboNorm = normalizeTombo(row[3]);
         if (tomboNorm && tomboNorm.toLowerCase() !== 's/t') {
@@ -508,7 +501,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
 
     let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [];
 
-    // 1. Cruzamento por Tombo
+    // 4. Lógica de cruzamento (continua a mesma, mas agora sobre os dados pré-filtrados)
     inventarioComTombo.forEach((invData, tomboNorm) => {
         if (sistemaParaAnalise.has(tomboNorm)) {
             const sysData = sistemaParaAnalise.get(tomboNorm);
@@ -522,7 +515,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
 
-    // 2. Cruzamento por Descrição Exata (para itens sem tombo)
     const sistemaRestante = Array.from(sistemaParaAnalise.values());
     inventarioSemTombo.forEach((invData, invIndex) => {
         if (!invData) return;
@@ -541,7 +533,6 @@ function compararInventariosV4(inventario, sistema, unidade) {
         }
     });
     
-    // 3. Cruzamento por Descrição Similar
     let inventarioSemTomboRestante = inventarioSemTombo.filter(Boolean);
     let sistemaAindaRestante = sistemaRestante.filter(Boolean);
 
@@ -571,7 +562,7 @@ function compararInventariosV4(inventario, sistema, unidade) {
     return { 
         matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc,
         remainingSystem, remainingInventory,
-        totalSystem: sistema.length,
+        totalSystem: sistema.length, // Total geral antes de filtrar
         totalInventory: inventario.length
     };
 }
@@ -614,16 +605,16 @@ function renderAnalysisResultsV4(data, unidade) {
         divergences.map(d => [d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], ...getSysData(d.sysRow)])
     );
     if (remainingSystem.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Sistema)', 'bg-danger-subtle', 
-        ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
+        ['Tombo', 'Descrição Sistema', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
+        remainingSystem.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
     if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-subtle', 
         ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], 
         remainingInventory.map(m => [m.invRow[3], m.invRow[2], m.invRow[1], m.invRow[4]])
     );
     if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Baixa)', 'bg-light', 
-        ['Tombo', 'Descrição Sistema', 'Nota Fiscal', 'Cadastro', 'Valor NF'], 
-        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NOTA_FISCAL], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(i.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
+        ['Tombo', 'Descrição Sistema', 'NF', 'Cadastro', 'Valor NF'], 
+        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.NF], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(i.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
     );
 }
 
@@ -634,7 +625,7 @@ function exportAnalysisToCsv() {
   const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
   let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Cadastro_Sistema;Valor_NF_Sistema;Observacao\n';
 
-  const getSysData = (row) => [row[SISTEMA_COLUMNS.NOTA_FISCAL], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
+  const getSysData = (row) => [row[SISTEMA_COLUMNS.NF], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
 
   matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), ''].map(escapeCsvCell).join(';') + '\n');
   matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
@@ -665,26 +656,23 @@ function formatDate(dateString) {
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      return dateString; // Retorna o valor original se não for uma data válida
+      return dateString;
     }
-    // Usa UTC para evitar problemas de fuso horário com as datas do Google Sheets
     const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Meses são de 0 a 11
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const year = date.getUTCFullYear();
     return `${day}/${month}/${year}`;
   } catch (error) {
-    return dateString; // Em caso de erro, retorna o valor original
+    return dateString;
   }
 }
 
-// --- NOVA FUNÇÃO HELPER PARA FORMATAR VALOR MONETÁRIO ---
 function formatCurrency(value) {
   if (value === null || value === undefined || value === '') return '';
-  // Remove R$, pontos de milhar e substitui vírgula por ponto para conversão
   const sanitizedValue = String(value).replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
   const number = parseFloat(sanitizedValue);
   if (isNaN(number)) {
-    return value; // Retorna o valor original se não for um número
+    return value;
   }
   return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
