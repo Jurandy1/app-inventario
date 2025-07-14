@@ -86,6 +86,7 @@ async function initializeAppLogic() {
   checkUnidadeFixada();
   await fetchConcluidos();
   await popularUnidadesParaAnalise();
+  await popularUnidadesSistemaParaAnalise(); // Nova função para dropdown de unidades do sistema
 }
 
 function checkUnidadeFixada() {
@@ -154,6 +155,24 @@ function setupEventListeners() {
   document.getElementById('relatorios-tab').addEventListener('shown.bs.tab', fetchAndDisplayRelatorios);
   document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
   document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
+}
+
+// Nova função para popular dropdown de unidades do sistema
+async function popularUnidadesSistemaParaAnalise() {
+  try {
+    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidadesSistema' }) });
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message);
+
+    const select = document.getElementById('unidadeSistemaComparar');
+    select.innerHTML = '<option value="">Selecione uma unidade...</option>';
+    result.unidadesSistema.forEach(u => {
+      const option = new Option(u, u);
+      select.add(option);
+    });
+  } catch (error) {
+    showToast('toastError', `Erro ao carregar unidades do sistema: ${error.message}`);
+  }
 }
 
 // FUNÇÕES DE LÓGICA E COMUNICAÇÃO COM APPS SCRIPT
@@ -379,9 +398,10 @@ async function fetchAndDisplayRelatorios() {
 
 // LÓGICA DE ANÁLISE DE INVENTÁRIO
 async function handleAnalysis() {
-  const unidade = document.getElementById('unidadeComparar').value;
-  if (!unidade) {
-    showToast('toastError', 'Selecione uma unidade para gerar o relatório!');
+  const unidadeInventario = document.getElementById('unidadeComparar').value;
+  const unidadeSistema = document.getElementById('unidadeSistemaComparar').value;
+  if (!unidadeInventario || !unidadeSistema) {
+    showToast('toastError', 'Selecione as unidades para comparar!');
     return;
   }
   
@@ -393,17 +413,17 @@ async function handleAnalysis() {
 
   try {
     const [dadosInventario, dadosSistema] = await Promise.all([
-      fetchInventarioDaUnidade(unidade),
-      carregarRelatorioSistema(),
+      fetchInventarioDaUnidade(unidadeInventario),
+      carregarRelatorioSistema(unidadeSistema), // Atualizado para filtrar por unidadeSistema
     ]);
 
-    const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidade);
+    const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidadeInventario);
     
     analysisReportData = resultado;
-    renderAnalysisResultsV4(resultado, unidade);
+    renderAnalysisResultsV4(resultado, unidadeInventario);
     document.getElementById('exportCsvBtn').classList.remove('d-none');
     
-    localStorage.setItem('lastAnalysisUnit', unidade);
+    localStorage.setItem('lastAnalysisUnit', unidadeInventario);
 
   } catch (error) {
     showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
@@ -420,8 +440,8 @@ async function fetchInventarioDaUnidade(unidade) {
   return result.items;
 }
 
-async function carregarRelatorioSistema() {
-  const response = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "getRelatorioSistema" }) });
+async function carregarRelatorioSistema(unidadeSistema) {
+  const response = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "getRelatorioSistema", unidade: unidadeSistema }) });
   const result = await response.json();
   if (result.status === "success") return result.data;
   throw new Error(result.message || 'Erro ao buscar dados do sistema.');
