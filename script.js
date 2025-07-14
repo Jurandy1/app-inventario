@@ -246,7 +246,7 @@ async function handleUpload(type) {
   const fileInput = document.getElementById(type === 'Sistema' ? 'relatorioSistema' : 'inventariosAntigos');
   const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
   const files = fileInput.files;
-  const pasteText = pasteArea.value.trim();
+  let pasteText = pasteArea.value.trim();
 
   if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
 
@@ -260,14 +260,17 @@ async function handleUpload(type) {
         data.push(...parsed.slice(1));
       }
     } else if (pasteText) {
-      data.push(...parsePastedText(pasteText).slice(1));
+      // Ajuste para colagem direta sem tabulação necessária, assumindo , ou espaço
+      pasteText = pasteText.replace(/[\r\n]+/g, '\n').trim(); // Normaliza linhas
+      data = pasteText.split('\n').map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()));
     }
     if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
 
     if (type === 'Inventario') {
       data = data.map(row => {
-        if (row.length < 6) throw new Error("Formato inválido: precisa de Unidade, Local, Item, Tombo, Estado, Quantidade.");
-        return row; // Envia como está para backend processar
+        if (row.length < 5) throw new Error("Formato inválido: precisa de UNIDADE, ITEM, TOMBO, LOCAL, ESTADO DE CONSERVAÇÃO.");
+        const unidadeRow = row[0] || unidade; // Usa coluna UNIDADE se presente
+        return [unidadeRow, row[1], row[2], row[3], row[4], '1']; // Quantidade default 1
       });
     } else if (type === 'Sistema') {
       data.forEach(row => {
@@ -350,7 +353,7 @@ async function fetchAndDisplayRelatorios() {
       return;
     }
 
-    const allHeaders = ['TOMBAMENTO', 'Espécie', 'Descrição', 'Status', 'Tipo Entrada', 'Cadastro', 'Valor NF', 'NF', 'Nome Fornecedor', 'Unidade']; // Headers fixos
+    const allHeaders = ['TOMBAMENTO', 'Espécie', 'Descrição', 'Status', 'Tipo Entrada', 'Cadastro', 'Valor NF', 'NF', 'Nome Fornecedor', 'Unidade']; 
     
     Object.keys(relatoriosAgrupados).sort().forEach((unidade, index) => {
       const itens = relatoriosAgrupados[unidade];
@@ -785,7 +788,7 @@ function parseExcel(file) {
 }
 
 function parsePastedText(text) {
-  return text.split('\n').filter(line => line.trim()).map(line => line.split(/\t|;/).map(cell => cell.trim()));
+  return text.split('\n').filter(line => line.trim()).map(line => line.split(/[\t;, ]+/).map(cell => cell.trim()));
 }
 
 function createSimpleTable(title, headers, data, dataIndices) {
