@@ -6,6 +6,7 @@
     <title>Inventário Inteligente</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
@@ -53,7 +54,7 @@
 
 <div class="container my-4">
     <!-- Banner -->
-    <img src="https://placehold.co/1200x200/343a40/ffffff?text=Banner+da+Empresa" class="img-fluid w-100 rounded mb-4" alt="Banner Inventário" style="max-height: 200px; object-fit: cover;">
+    <img src="https://placehold.co/1200x200/343a40/ffffff?text=Inventário+Inteligente" class="img-fluid w-100 rounded mb-4" alt="Banner Inventário" style="max-height: 200px; object-fit: cover;">
 
     <div id="login-container">
         <div class="card mx-auto" style="max-width: 450px;">
@@ -76,7 +77,73 @@
 
         <div class="tab-content" id="mainTabContent">
             <div class="tab-pane fade show active" id="inventario" role="tabpanel">
-                <!-- Conteúdo da aba Inventário (sem alterações estruturais) -->
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header fw-bold">Entrada de Item</div>
+                            <div class="card-body">
+                                <form id="inventarioForm">
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="unidade" class="form-label">Unidade (Fixada)</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="unidade" readonly>
+                                                <button class="btn btn-outline-secondary" type="button" id="resetUnidade"><i class="bi bi-pencil"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <label for="local" class="form-label">Local (Fixado)</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="local" readonly>
+                                                <button class="btn btn-outline-secondary" type="button" id="editLocal"><i class="bi bi-pencil"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="item" class="form-label">Descrição do Item</label>
+                                        <input type="text" class="form-control" id="item" required>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col">
+                                            <label for="tombo" class="form-label">Tombo / Patrimônio</label>
+                                            <input type="text" class="form-control" id="tombo">
+                                        </div>
+                                        <div class="col">
+                                            <label for="estado" class="form-label">Estado de Conservação</label>
+                                            <select class="form-select" id="estado" required>
+                                                <option value="">Selecione...</option>
+                                                <option value="Excelente">Excelente</option>
+                                                <option value="Bom">Bom</option>
+                                                <option value="Regular">Regular</option>
+                                                <option value="Ruim">Ruim</option>
+                                            </select>
+                                        </div>
+                                        <div class="col">
+                                            <label for="quantidade" class="form-label">Quantidade</label>
+                                            <input type="number" class="form-control" id="quantidade" min="1" value="1" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="foto" class="form-label">Foto do Item (Opcional)</label>
+                                        <input type="file" class="form-control" id="foto" accept="image/*">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Salvar Item</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header fw-bold">Itens Concluídos (Nesta Unidade)</div>
+                            <div class="card-body table-responsive">
+                                <table class="table table-sm table-striped" id="tabelaConcluidos">
+                                    <thead><tr><th>Unidade</th><th>Local</th><th>Item</th><th>Tombo</th><th>Estado</th><th>Qtd.</th><th>Foto</th></tr></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="tab-pane fade" id="uploads" role="tabpanel">
@@ -122,22 +189,56 @@
 
             <div class="tab-pane fade" id="consultar-inventarios" role="tabpanel">
                  <h4 class="mb-4">Inventários Cadastrados por Unidade</h4>
-                 <div class="accordion" id="inventariosAccordion"></div>
+                 <div class="accordion" id="inventariosAccordion">
+                    <p class="text-muted">Nenhum inventário encontrado. Vá para a aba 'Inventário' para adicionar itens ou para 'Uploads' para carregar em massa.</p>
+                 </div>
             </div>
 
             <div class="tab-pane fade" id="relatorios-sistema" role="tabpanel">
                 <h4 class="mb-4">Relatórios do Sistema Carregados</h4>
-                <div class="accordion" id="relatoriosAccordion"></div>
+                <div class="accordion" id="relatoriosAccordion">
+                    <p class="text-muted">Nenhum relatório do sistema encontrado. Vá para a aba 'Uploads' para carregar.</p>
+                </div>
             </div>
             
             <div class="tab-pane fade" id="analise" role="tabpanel">
-                <!-- Conteúdo da aba Análise (sem alterações estruturais) -->
+                 <h4 class="mb-4">Análise Profissional de Inventário</h4>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="unidadeComparar" class="form-label">Selecione a Unidade do Inventário para Analisar</label>
+                                <select class="form-select" id="unidadeComparar"></select>
+                            </div>
+                            <button id="compararBtn" class="btn btn-primary">Gerar Relatório de Análise</button>
+                            <button id="exportCsvBtn" class="btn btn-secondary d-none ms-2">Exportar para CSV</button>
+                        </div>
+                    </div>
+                    <div id="analiseSummary" class="d-none mb-4"></div>
+                    <div id="resultadoComparacao"></div>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Modals e Toasts -->
+<div class="modal fade" id="unidadeModal" tabindex="-1" aria-labelledby="unidadeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="unidadeModalLabel">Defina a Unidade de Trabalho</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Digite o nome da unidade ou setor onde você está. Este nome será fixado para facilitar o preenchimento.</p>
+                <input type="text" class="form-control" id="unidadeInicial" placeholder="Ex: Setor Administrativo" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="salvarUnidade">Salvar e Continuar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content"><div class="modal-body text-center p-4">
