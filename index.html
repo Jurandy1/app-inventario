@@ -145,8 +145,12 @@
                     <div class="card-header fw-bold">Upload de Inventários Anteriores</div>
                     <div class="card-body">
                         <p class="alert alert-info">Formato esperado: colunas como UNIDADE, ITEM, TOMBO, LOCAL, ESTADO DE CONSERVAÇÃO. Para carregar unidades em massa, inclua a coluna 'UNIDADE' na planilha ou texto colado.</p>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="massUpload">
+                            <label class="form-check-label" for="massUpload">Carregamento em Massa (Unidades da Planilha)</label>
+                        </div>
                         <div class="mb-3">
-                            <label for="unidadeInventario" class="form-label">Nome da Unidade do Inventário</label>
+                            <label for="unidadeInventario" class="form-label">Nome da Unidade do Inventário (se não na planilha)</label>
                             <input type="text" class="form-control" id="unidadeInventario">
                         </div>
                         <div class="mb-3">
