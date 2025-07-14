@@ -86,7 +86,7 @@ async function initializeAppLogic() {
   checkUnidadeFixada();
   await fetchConcluidos();
   await popularUnidadesParaAnalise();
-  await popularUnidadesSistemaParaAnalise(); // Nova função para dropdown de unidades do sistema
+  await popularUnidadesSistemaParaAnalise();
 }
 
 function checkUnidadeFixada() {
@@ -414,7 +414,7 @@ async function handleAnalysis() {
   try {
     const [dadosInventario, dadosSistema] = await Promise.all([
       fetchInventarioDaUnidade(unidadeInventario),
-      carregarRelatorioSistema(unidadeSistema), // Atualizado para filtrar por unidadeSistema
+      carregarRelatorioSistema(unidadeSistema),
     ]);
 
     const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidadeInventario);
