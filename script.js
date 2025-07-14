@@ -247,6 +247,7 @@ async function handleUpload(type) {
   const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
   const files = fileInput.files;
   let pasteText = pasteArea.value.trim();
+  const massUpload = document.getElementById('massUpload').checked;
 
   if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
 
@@ -269,7 +270,8 @@ async function handleUpload(type) {
     if (type === 'Inventario') {
       data = data.map(row => {
         if (row.length < 5) throw new Error("Formato inválido: precisa de UNIDADE, ITEM, TOMBO, LOCAL, ESTADO DE CONSERVAÇÃO.");
-        const unidadeRow = row[0] || unidade; // Usa coluna UNIDADE se presente
+        const unidadeRow = massUpload ? (row[0] || '') : unidade; // Se mass, usa row[0]; else input
+        if (massUpload && !row[0]) throw new Error("Para carregamento em massa, inclua UNIDADE na coluna A.");
         return [unidadeRow, row[1], row[2], row[3], row[4], '1']; // Quantidade default 1
       });
     } else if (type === 'Sistema') {
