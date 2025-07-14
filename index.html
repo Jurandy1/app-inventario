@@ -6,231 +6,206 @@
     <title>Inventário Inteligente</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
-    <script src="script.js" defer></script>
     <style>
-        body { 
-            padding-top: 56px; /* Ajuste para a navbar fixa */
-            background-color: #f0f4f8; 
-            font-family: 'Roboto', sans-serif; 
-        }
+        body { padding-top: 56px; }
         .navbar-brand { font-weight: bold; }
-        .form-control[readonly] { background-color: #e9ecef; }
-        .card { 
-            border: none; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
-            transition: transform 0.2s;
-            height: 100%;
-        }
-        .card:hover { transform: translateY(-5px); }
-        .toast-container { position: fixed; top: 80px; right: 20px; z-index: 1055; }
-        /* Classes de cores fortes para os relatórios */
+        .form-control[readonly] { background-color: #e9ecef; cursor: pointer; }
+        .accordion-button { font-weight: bold; }
+        .table-sm th, .table-sm td { font-size: 0.875rem; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1050; }
         .bg-success-strong { background-color: #198754 !important; color: white; }
         .bg-warning-strong { background-color: #ffc107 !important; color: black; }
         .bg-danger-strong { background-color: #dc3545 !important; color: white; }
         .bg-info-strong { background-color: #0dcaf0 !important; color: black; }
         .bg-light-strong { background-color: #f8f9fa !important; color: black; }
         .analysis-summary-card { border: none; border-radius: 8px; }
-        @media (max-width: 576px) { 
-            .btn { width: 100%; margin-bottom: 10px; } 
-        }
+        @media (max-width: 576px) { .btn { width: 100%; margin-bottom: 10px; } }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
     <div class="container-fluid">
-        <a class="navbar-brand" href="#"><i class="bi bi-box-seam-fill me-2"></i>Inventário Inteligente</a>
+        <a class="navbar-brand" href="#">Inventário Inteligente</a>
         <div id="auth-container" class="d-none">
-            <span id="user-name" class="navbar-text me-3"></span>
-            <button id="signout-button" class="btn btn-outline-light btn-sm">Sair</button>
+            <span id="user-name" class="navbar-text me-2"></span>
+            <button id="signout-button" class="btn btn-outline-light">Sair</button>
         </div>
     </div>
 </nav>
 
-<div class="container my-4">
-    <!-- Banner -->
-    <img src="https://placehold.co/1200x200/343a40/ffffff?text=Inventário+Inteligente" class="img-fluid w-100 rounded mb-4" alt="Banner Inventário" style="max-height: 200px; object-fit: cover;">
+<img src="banner.jpg" class="img-fluid w-100" alt="Banner Inventário" style="max-height: 200px; object-fit: cover;">
 
+<div class="container my-4">
     <div id="login-container">
-        <div class="card mx-auto" style="max-width: 450px;">
-            <div class="card-body text-center p-5">
-                <h3 class="card-title">Bem-vindo!</h3>
-                <p class="card-text text-muted">Faça login com sua conta Google para começar a gerenciar seus inventários.</p>
-                <div id="signin-button" class="mt-4 d-flex justify-content-center"></div>
+        <div class="card">
+            <div class="card-body text-center">
+                <h3>Bem-vindo!</h3>
+                <p>Faça login com sua conta Google para gerenciar seus inventários.</p>
+                <div id="signin-button"></div>
             </div>
         </div>
     </div>
 
     <div id="main-content" class="d-none">
-        <ul class="nav nav-tabs mb-4" id="mainTab" role="tablist">
-            <li class="nav-item" role="presentation"><a class="nav-link active" data-bs-toggle="tab" href="#inventario" role="tab">Inventário</a></li>
-            <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#uploads" role="tab">Uploads</a></li>
-            <li class="nav-item" role="presentation"><a class="nav-link" id="inventarios-tab" data-bs-toggle="tab" href="#consultar-inventarios" role="tab">Consultar Inventários</a></li>
-            <li class="nav-item" role="presentation"><a class="nav-link" id="relatorios-tab" data-bs-toggle="tab" href="#relatorios-sistema" role="tab">Relatórios do Sistema</a></li>
-            <li class="nav-item" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#analise" role="tab">Análise</a></li>
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#inventario" role="tab">Inventário</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#uploads" role="tab">Uploads</a></li>
+            <li class="nav-item"><a class="nav-link" id="inventarios-tab" data-bs-toggle="tab" href="#consultar-inventarios" role="tab">Consultar Inventários</a></li>
+            <li class="nav-item"><a class="nav-link" id="relatorios-tab" data-bs-toggle="tab" href="#relatorios-sistema" role="tab">Relatórios do Sistema</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#analise" role="tab">Análise</a></li>
         </ul>
 
-        <div class="tab-content" id="mainTabContent">
+        <div class="tab-content">
             <div class="tab-pane fade show active" id="inventario" role="tabpanel">
-                <div class="row">
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header fw-bold">Entrada de Item</div>
-                            <div class="card-body">
-                                <form id="inventarioForm">
-                                    <div class="row mb-3">
-                                        <div class="col">
-                                            <label for="unidade" class="form-label">Unidade (Fixada)</label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="unidade" readonly>
-                                                <button class="btn btn-outline-secondary" type="button" id="resetUnidade"><i class="bi bi-pencil"></i></button>
-                                            </div>
-                                        </div>
-                                        <div class="col">
-                                            <label for="local" class="form-label">Local (Fixado)</label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="local" readonly>
-                                                <button class="btn btn-outline-secondary" type="button" id="editLocal"><i class="bi bi-pencil"></i></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="item" class="form-label">Descrição do Item</label>
-                                        <input type="text" class="form-control" id="item" required>
-                                    </div>
-                                    <div class="row mb-3">
-                                        <div class="col">
-                                            <label for="tombo" class="form-label">Tombo / Patrimônio</label>
-                                            <input type="text" class="form-control" id="tombo">
-                                        </div>
-                                        <div class="col">
-                                            <label for="estado" class="form-label">Estado de Conservação</label>
-                                            <select class="form-select" id="estado" required>
-                                                <option value="">Selecione...</option>
-                                                <option value="Excelente">Excelente</option>
-                                                <option value="Bom">Bom</option>
-                                                <option value="Regular">Regular</option>
-                                                <option value="Ruim">Ruim</option>
-                                            </select>
-                                        </div>
-                                        <div class="col">
-                                            <label for="quantidade" class="form-label">Quantidade</label>
-                                            <input type="number" class="form-control" id="quantidade" min="1" value="1" required>
-                                        </div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="foto" class="form-label">Foto do Item (Opcional)</label>
-                                        <input type="file" class="form-control" id="foto" accept="image/*">
-                                    </div>
-                                    <button type="submit" class="btn btn-primary w-100">Salvar Item</button>
-                                </form>
+                <div class="card mb-4">
+                    <div class="card-header fw-bold">Entrada de Item</div>
+                    <div class="card-body">
+                        <form id="inventarioForm">
+                            <div class="mb-3">
+                                <label for="unidade" class="form-label">Unidade (Fixada)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="unidade" readonly required>
+                                    <button class="btn btn-outline-secondary" type="button" id="resetUnidade">Resetar</button>
+                                </div>
                             </div>
-                        </div>
+                            <div class="mb-3">
+                                <label for="local" class="form-label">Local (Fixado)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="local" readonly required>
+                                    <button class="btn btn-outline-secondary" type="button" id="editLocal"><i class="bi bi-pencil"></i></button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="item" class="form-label">Descrição do Item</label>
+                                <input type="text" class="form-control" id="item" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tombo" class="form-label">Tombo / Patrimônio</label>
+                                <input type="text" class="form-control" id="tombo">
+                            </div>
+                            <div class="mb-3">
+                                <label for="estado" class="form-label">Estado de Conservação</label>
+                                <select class="form-select" id="estado" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Excelente">Excelente</option>
+                                    <option value="Bom">Bom</option>
+                                    <option value="Regular">Regular</option>
+                                    <option value="Ruim">Ruim</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="quantidade" class="form-label">Quantidade</label>
+                                <input type="number" class="form-control" id="quantidade" min="1" value="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="foto" class="form-label">Foto do Item (Opcional)</label>
+                                <input type="file" class="form-control" id="foto" accept="image/*">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Salvar Item</button>
+                        </form>
                     </div>
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header fw-bold">Itens Concluídos (Nesta Unidade)</div>
-                            <div class="card-body table-responsive">
-                                <table class="table table-sm table-striped" id="tabelaConcluidos">
-                                    <thead><tr><th>Unidade</th><th>Local</th><th>Item</th><th>Tombo</th><th>Estado</th><th>Qtd.</th><th>Foto</th></tr></thead>
-                                    <tbody></tbody>
-                                </table>
-                            </div>
-                        </div>
+                </div>
+                <div class="card">
+                    <div class="card-header fw-bold">Itens Concluídos (Nesta Unidade)</div>
+                    <div class="card-body">
+                        <table class="table table-sm table-striped" id="tabelaConcluidos">
+                            <thead>
+                                <tr>
+                                    <th>Unidade</th><th>Local</th><th>Item</th><th>Tombo</th><th>Estado</th><th>Qtd.</th><th>Foto</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
             <div class="tab-pane fade" id="uploads" role="tabpanel">
-                <div class="row">
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header fw-bold">Upload de Relatório do Sistema</div>
-                            <div class="card-body">
-                                <p class="small text-muted">Formato esperado: TOMBAMENTO, Espécie, Descrição, Status, Tipo Entrada, Cadastro, Valor NF, NF, Nome Fornecedor</p>
-                                <div class="mb-3">
-                                    <label for="unidadeSistema" class="form-label">Nome da Unidade para o Relatório</label>
-                                    <input type="text" class="form-control" id="unidadeSistema" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="relatorioSistema" class="form-label">Arquivo ou Texto do Relatório</label>
-                                    <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv" multiple>
-                                    <textarea class="form-control" id="pasteSistema" rows="5" placeholder="Ou cole os dados aqui (separados por tab ou ;)"></textarea>
-                                </div>
-                                <button id="uploadSistemaBtn" class="btn btn-primary w-100">Upload Relatório</button>
-                            </div>
+                <div class="card mb-4">
+                    <div class="card-header fw-bold">Upload de Relatório do Sistema</div>
+                    <div class="card-body">
+                        <p class="alert alert-info">Formato Esperado: Certifique-se de que sua planilha (xlsx, csv, etc.) tenha exatamente os seguintes cabeçalhos na primeira linha e nesta ordem: TOMBAMENTO, Espécie, Descrição, Status, Tipo Entrada, Cadastro, Valor NF, NF, Nome Fornecedor</p>
+                        <div class="mb-3">
+                            <label for="unidadeSistema" class="form-label">Nome da Unidade para o Relatório</label>
+                            <input type="text" class="form-control" id="unidadeSistema" required>
                         </div>
+                        <div class="mb-3">
+                            <label for="relatorioSistema" class="form-label">Arquivo ou Texto do Relatório</label>
+                            <input type="file" class="form-control mb-2" id="relatorioSistema" accept=".xlsx,.xls,.csv" multiple>
+                            <textarea class="form-control" id="pasteSistema" rows="5" placeholder="Cole os dados aqui (separados por tabulação ou ;)"></textarea>
+                        </div>
+                        <button id="uploadSistemaBtn" class="btn btn-primary">Upload Relatório</button>
                     </div>
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header fw-bold">Upload de Inventários Anteriores (Múltiplas Unidades)</div>
-                            <div class="card-body">
-                                <p class="small text-muted">Formato: <strong>Unidade, Local, Item, Tombo, Estado, Quantidade</strong>. Se a coluna 'Unidade' existir no arquivo, ela será usada. Senão, o campo abaixo servirá como padrão.</p>
-                                <div class="mb-3">
-                                    <label for="unidadeInventario" class="form-label">Unidade Padrão (se não estiver no arquivo)</label>
-                                    <input type="text" class="form-control" id="unidadeInventario">
-                                </div>
-                                <div class="mb-3">
-                                    <label for="inventariosAntigos" class="form-label">Arquivo ou Texto do Inventário</label>
-                                    <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv" multiple>
-                                    <textarea class="form-control" id="pasteInventario" rows="5" placeholder="Ou cole os dados aqui (separados por tab ou ;)"></textarea>
-                                </div>
-                                <button id="uploadInventariosBtn" class="btn btn-primary w-100">Upload Inventários</button>
-                            </div>
+                </div>
+                <div class="card">
+                    <div class="card-header fw-bold">Upload de Inventários Anteriores</div>
+                    <div class="card-body">
+                        <p class="alert alert-info">Formato esperado: colunas como Unidade, Local, Item, Tombo, Estado, Quantidade. Para carregar unidades em massa, inclua a coluna 'Unidade' na planilha ou texto colado.</p>
+                        <div class="mb-3">
+                            <label for="unidadeInventario" class="form-label">Nome da Unidade do Inventário</label>
+                            <input type="text" class="form-control" id="unidadeInventario">
                         </div>
+                        <div class="mb-3">
+                            <label for="inventariosAntigos" class="form-label">Arquivo ou Texto do Inventário</label>
+                            <input type="file" class="form-control mb-2" id="inventariosAntigos" accept=".xlsx,.xls,.csv" multiple>
+                            <textarea class="form-control" id="pasteInventario" rows="5" placeholder="Cole os dados aqui (separados por tabulação ou ;)"></textarea>
+                        </div>
+                        <button id="uploadInventariosBtn" class="btn btn-primary">Upload Inventários</button>
                     </div>
                 </div>
             </div>
 
             <div class="tab-pane fade" id="consultar-inventarios" role="tabpanel">
-                 <h4 class="mb-4">Inventários Cadastrados por Unidade</h4>
-                 <div class="accordion" id="inventariosAccordion">
-                    <p class="text-muted">Nenhum inventário encontrado. Vá para a aba 'Inventário' para adicionar itens ou para 'Uploads' para carregar em massa.</p>
-                 </div>
+                <div class="card">
+                    <div class="card-header fw-bold">Inventários Cadastrados por Unidade</div>
+                    <div class="card-body">
+                        <div id="inventariosAccordion" class="accordion"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="tab-pane fade" id="relatorios-sistema" role="tabpanel">
-                <h4 class="mb-4">Relatórios do Sistema Carregados</h4>
-                <div class="accordion" id="relatoriosAccordion">
-                    <p class="text-muted">Nenhum relatório do sistema encontrado. Vá para a aba 'Uploads' para carregar.</p>
+                <div class="card">
+                    <div class="card-header fw-bold">Relatórios do Sistema Carregados</div>
+                    <div class="card-body">
+                        <div id="relatoriosAccordion" class="accordion"></div>
+                    </div>
                 </div>
             </div>
-            
+
             <div class="tab-pane fade" id="analise" role="tabpanel">
-                 <h4 class="mb-4">Análise Profissional de Inventário</h4>
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label for="unidadeComparar" class="form-label">Selecione a Unidade do Inventário para Analisar</label>
-                                <select class="form-select" id="unidadeComparar"></select>
-                            </div>
-                            <button id="compararBtn" class="btn btn-primary">Gerar Relatório de Análise</button>
-                            <button id="exportCsvBtn" class="btn btn-secondary d-none ms-2">Exportar para CSV</button>
+                <div class="card">
+                    <div class="card-header fw-bold">Análise Profissional de Inventário</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="unidadeComparar" class="form-label">Selecione a Unidade do Inventário para Analisar</label>
+                            <select class="form-select" id="unidadeComparar"></select>
                         </div>
+                        <button id="compararBtn" class="btn btn-primary me-2">Gerar Relatório</button>
+                        <button id="exportCsvBtn" class="btn btn-secondary d-none">Exportar para CSV</button>
                     </div>
-                    <div id="analiseSummary" class="d-none mb-4"></div>
-                    <div id="resultadoComparacao"></div>
+                    <div id="analiseSummary" class="card-body d-none"></div>
+                    <div id="resultadoComparacao" class="card-body"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modals e Toasts -->
-<div class="modal fade" id="unidadeModal" tabindex="-1" aria-labelledby="unidadeModalLabel" aria-hidden="true">
+<div class="modal fade" id="unidadeModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="unidadeModalLabel">Defina a Unidade de Trabalho</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Defina a Unidade de Trabalho</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Digite o nome da unidade ou setor onde você está. Este nome será fixado para facilitar o preenchimento.</p>
-                <input type="text" class="form-control" id="unidadeInicial" placeholder="Ex: Setor Administrativo" required>
+                <p>Digite o nome da unidade ou setor onde você está fazendo o inventário. Este nome será fixado para facilitar o preenchimento.</p>
+                <input type="text" class="form-control" id="unidadeInicial" required>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" id="salvarUnidade">Salvar e Continuar</button>
@@ -239,26 +214,39 @@
     </div>
 </div>
 
-<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content"><div class="modal-body text-center p-4">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-3" id="loadingText">Processando...</p>
-        </div></div>
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border" role="status"></div>
+                <p class="mt-2">Processando... Por favor, aguarde.</p>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="toast-container">
-    <div id="toastSuccess" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header bg-success-strong"><strong class="me-auto">Sucesso</strong><button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button></div>
+    <div id="toastSuccess" class="toast bg-success text-white" role="alert">
+        <div class="toast-header">
+            <strong class="me-auto">Sucesso</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
         <div class="toast-body"></div>
     </div>
-    <div id="toastError" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header bg-danger-strong"><strong class="me-auto">Erro</strong><button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button></div>
+    <div id="toastError" class="toast bg-danger text-white" role="alert">
+        <div class="toast-header">
+            <strong class="me-auto">Erro</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
         <div class="toast-body"></div>
     </div>
 </div>
 
+<footer class="bg-light text-center py-3">
+    <p>© 2025 Inventário Inteligente. Todos os direitos reservados.</p>
+</footer>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
