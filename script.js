@@ -266,7 +266,7 @@ async function handleUpload(type) {
   const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
   const files = fileInput.files;
   let pasteText = pasteArea.value.trim();
-  const massUpload = document.getElementById('massUpload').checked;
+  const massUpload = document.getElementById(type === 'Sistema' ? 'massUploadSistema' : 'massUpload').checked;
 
   if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
 
@@ -280,7 +280,6 @@ async function handleUpload(type) {
         data.push(...parsed.slice(1));
       }
     } else if (pasteText) {
-      // Ajuste para colagem direta sem tabulação necessária, assumindo , ou espaço
       pasteText = pasteText.replace(/[\r\n]+/g, '\n').trim(); // Normaliza linhas
       data = pasteText.split('\n').map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()));
     }
@@ -294,9 +293,15 @@ async function handleUpload(type) {
         return [unidadeRow, row[1], row[2], row[3], row[4], '1']; // Quantidade default 1
       });
     } else if (type === 'Sistema') {
-      data.forEach(row => {
-        if (row.length < 9) throw new Error("Formato inválido para Relatório do Sistema.");
-      });
+      if (massUpload) {
+        data.forEach(row => {
+          if (row.length < 10) throw new Error("Formato inválido para Relatório do Sistema em massa: precisa de 10 colunas incluindo UNIDADE na J.");
+        });
+      } else {
+        data.forEach(row => {
+          if (row.length < 9) throw new Error("Formato inválido para Relatório do Sistema: precisa de 9 colunas.");
+        });
+      }
     }
 
     const response = await fetch(SCRIPT_URL, {
@@ -305,7 +310,8 @@ async function handleUpload(type) {
         action: 'appendReport',
         sheetName: type === 'Sistema' ? 'RelatorioSistema' : 'Inventario',
         data: data,
-        unidadeUpload: unidade
+        unidadeUpload: massUpload ? '' : unidade, // Envia vazio se mass, backend usa per-row
+        massUpload: massUpload
       })
     });
     const result = await response.json();
@@ -807,10 +813,6 @@ function parseExcel(file) {
     reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
     reader.readAsBinaryString(file);
   });
-}
-
-function parsePastedText(text) {
-  return text.split('\n').filter(line => line.trim()).map(line => line.split(/[\t;, ]+/).map(cell => cell.trim()));
 }
 
 function createSimpleTable(title, headers, data, dataIndices) {
