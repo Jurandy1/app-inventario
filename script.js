@@ -285,11 +285,12 @@ async function handleUpload(type) {
       for (const file of files) {
         const parsed = await parseExcel(file);
         inputRows += parsed.slice(1).length;
-        data.push(...parsed.slice(1));
+        data.push(...parsed.slice(1).filter(row => row.length > 0));  // Filter empty rows []
       }
     } else if (pasteText) {
       pasteText = pasteText.replace(/[\r\n]+/g, '\n').trim(); // Normaliza linhas
-      data = pasteText.split('\n').map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()));
+      const lines = pasteText.split('\n').filter(line => line.trim()); // Filter empty lines
+      data = lines.map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()).filter(cell => cell)); // Filter empty cells
       inputRows = data.length;
     }
     if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
@@ -330,7 +331,7 @@ async function handleUpload(type) {
     const result = await response.json();
     if (result.status !== 'success') throw new Error(result.message);
 
-    showToast('toastSuccess', `Upload de '${type}' concluído com sucesso! ${result.rowsAppended} linhas carregadas de ${inputRows} fornecidas.`);
+    showToast('toastSuccess', `Upload de '${type}' concluído com sucesso! ${result.rowsAppended} linhas carregadas de ${inputRows} fornecidas (${result.invalidRows} inválidas).`);
     fileInput.value = '';
     pasteArea.value = '';
     await popularUnidadesParaAnalise();
