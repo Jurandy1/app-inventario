@@ -266,7 +266,6 @@ async function handleUpload(type) {
   const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
   const files = fileInput.files;
   let pasteText = pasteArea.value.trim();
-  // Linha 269: Adicione isso pra debug - se null, loga erro
   const massUploadElement = document.getElementById(type === 'Sistema' ? 'massUploadSistema' : 'massUpload');
   if (!massUploadElement) {
     console.error(`Elemento checkbox '${type === 'Sistema' ? 'massUploadSistema' : 'massUpload'}' não encontrado! Adicione no HTML.`);
@@ -281,14 +280,17 @@ async function handleUpload(type) {
   loadingModal.show();
   try {
     let data = [];
+    let inputRows = 0;
     if (files.length > 0) {
       for (const file of files) {
         const parsed = await parseExcel(file);
+        inputRows += parsed.slice(1).length;
         data.push(...parsed.slice(1));
       }
     } else if (pasteText) {
       pasteText = pasteText.replace(/[\r\n]+/g, '\n').trim(); // Normaliza linhas
       data = pasteText.split('\n').map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()));
+      inputRows = data.length;
     }
     if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
 
@@ -328,7 +330,7 @@ async function handleUpload(type) {
     const result = await response.json();
     if (result.status !== 'success') throw new Error(result.message);
 
-    showToast('toastSuccess', `Upload de '${type}' concluído com sucesso!`);
+    showToast('toastSuccess', `Upload de '${type}' concluído com sucesso! ${result.rowsAppended} linhas carregadas de ${inputRows} fornecidas.`);
     fileInput.value = '';
     pasteArea.value = '';
     await popularUnidadesParaAnalise();
