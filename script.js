@@ -266,7 +266,14 @@ async function handleUpload(type) {
   const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
   const files = fileInput.files;
   let pasteText = pasteArea.value.trim();
-  const massUpload = document.getElementById(type === 'Sistema' ? 'massUploadSistema' : 'massUpload').checked;
+  // Linha 269: Adicione isso pra debug - se null, loga erro
+  const massUploadElement = document.getElementById(type === 'Sistema' ? 'massUploadSistema' : 'massUpload');
+  if (!massUploadElement) {
+    console.error(`Elemento checkbox '${type === 'Sistema' ? 'massUploadSistema' : 'massUpload'}' não encontrado! Adicione no HTML.`);
+    showToast('toastError', 'Erro: Checkbox de carregamento em massa não encontrado. Adicione no HTML e recarregue.');
+    return;
+  }
+  const massUpload = massUploadElement.checked;
 
   if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
 
@@ -284,6 +291,10 @@ async function handleUpload(type) {
       data = pasteText.split('\n').map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()));
     }
     if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
+
+    if (type === 'Sistema' && !massUpload && data.some(row => row.length >= 10 && row[9] && row[9].trim() !== unidade)) {
+      showToast('toastWarning', 'Aviso: Dados parecem ter múltiplas unidades na coluna J. Marque "Carregamento em Massa" para evitar mistura.');
+    }
 
     if (type === 'Inventario') {
       data = data.map(row => {
@@ -321,6 +332,7 @@ async function handleUpload(type) {
     fileInput.value = '';
     pasteArea.value = '';
     await popularUnidadesParaAnalise();
+    await popularUnidadesSistemaParaAnalise(); // Atualiza dropdowns após upload
   } catch (error) {
     showToast('toastError', `Erro no upload: ${error.message}`);
   } finally {
