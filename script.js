@@ -1,877 +1,510 @@
-// CONFIGURAÇÃO E INICIALIZAÇÃO
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby99cTAFdCucXd1EQ7rVqL6qMVkXFLaYUShD9c2iy6eqv36PP_y9t6Lz6sRm41GT3wGjg/exec';
-const DRIVE_FOLDER_ID = '1DGuZWpe9kakSpRUvy7qqizll0bqJB62o';
-const CLIENT_ID = '431216787156-vfivrga4ueekuabmrqk0du5tgbsdrvma.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
-// Mapeamento da estrutura de 9 colunas do Relatório do Sistema
-const SISTEMA_COLUMNS = {
-    TOMBAMENTO: 0,
-    ESPECIE: 1,
-    DESCRICAO: 2,
-    STATUS: 3,
-    TIPO_ENTRADA: 4,
-    CADASTRO: 5,
-    VALOR_NF: 6,
-    NF: 7,
-    FORNECEDOR: 8,
-    UNIDADE: 9
-};
-
-
-// Variáveis de estado global
-let accessToken = null;
-let analysisReportData = {};
-
-// FLUXO DE AUTENTICAÇÃO E CARREGAMENTO INICIAL
-window.onload = () => {
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID,
-    callback: handleCredentialResponse,
-  });
-  google.accounts.id.disableAutoSelect();
-  setupEventListeners();
-  google.accounts.id.renderButton(
-    document.getElementById('signin-button'),
-    { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' } 
-  );
-};
-
-function handleCredentialResponse(response) {
-  const profile = JSON.parse(atob(response.credential.split('.')[1]));
-  updateUiForSignIn(profile.name);
-  requestAccessToken();
-}
-
-function requestAccessToken() {
-  const tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: (tokenResponse) => {
-      if (tokenResponse && tokenResponse.access_token) {
-        accessToken = tokenResponse.access_token;
-        initializeAppLogic();
-      } else {
-        showToast('toastError', 'Falha na autorização para fazer upload de fotos. Tente fazer login novamente.');
-      }
-    },
-  });
-  tokenClient.requestAccessToken();
-}
-
-function handleSignoutClick() {
-  if (accessToken) {
-    google.accounts.oauth2.revoke(accessToken, () => { accessToken = null; });
-  }
-  google.accounts.id.disableAutoSelect();
-  updateUiForSignOut();
-}
-
-function updateUiForSignIn(userName) {
-  document.getElementById('user-name').textContent = `Olá, ${userName}`;
-  document.getElementById('auth-container').classList.remove('d-none');
-  document.getElementById('login-container').classList.add('d-none');
-  document.getElementById('main-content').classList.remove('d-none');
-}
-
-function updateUiForSignOut() {
-  document.getElementById('auth-container').classList.add('d-none');
-  document.getElementById('login-container').classList.remove('d-none');
-  document.getElementById('main-content').classList.add('d-none');
-}
-
-// LÓGICA PRINCIPAL DO APLICATIVO
-async function initializeAppLogic() {
-  loadDraft();
-  checkUnidadeFixada();
-  await fetchConcluidos();
-  await popularUnidadesParaAnalise();
-  await popularUnidadesSistemaParaAnalise();
-}
-
-function checkUnidadeFixada() {
-  const unidadeFixada = localStorage.getItem('unidadeFixada');
-  if (!unidadeFixada) {
-    new bootstrap.Modal(document.getElementById('unidadeModal')).show();
-  } else {
-    document.getElementById('unidade').value = unidadeFixada;
-  }
-}
-
-function loadDraft() {
-  const draft = JSON.parse(localStorage.getItem('draft'));
-  if (draft) {
-    Object.keys(draft).forEach(key => {
-      const element = document.getElementById(key);
-      if (element) element.value = draft[key];
-    });
-  }
-}
-
-function autoSaveDraft() {
-  const formData = {
-    unidade: document.getElementById('unidade').value,
-    local: document.getElementById('local').value,
-    item: document.getElementById('item').value,
-    tombo: document.getElementById('tombo').value,
-    estado: document.getElementById('estado').value,
-    quantidade: document.getElementById('quantidade').value
-  };
-  localStorage.setItem('draft', JSON.stringify(formData));
-}
-
-// MANIPULADORES DE EVENTOS
-function setupEventListeners() {
-  document.getElementById('signout-button').addEventListener('click', handleSignoutClick);
-  setInterval(autoSaveDraft, 30000);
-
-  document.getElementById('salvarUnidade').addEventListener('click', () => {
-    const unidade = document.getElementById('unidadeInicial').value.trim();
-    if (unidade) {
-      localStorage.setItem('unidadeFixada', unidade);
-      document.getElementById('unidade').value = unidade;
-      bootstrap.Modal.getInstance(document.getElementById('unidadeModal')).hide();
-      fetchConcluidos();
-    }
-  });
-
-  document.getElementById('resetUnidade').addEventListener('click', () => {
-    localStorage.removeItem('unidadeFixada');
-    document.getElementById('unidade').value = '';
-    new bootstrap.Modal(document.getElementById('unidadeModal')).show();
-  });
-
-  document.getElementById('editLocal').addEventListener('click', () => {
-    const localInput = document.getElementById('local');
-    localInput.readOnly = false;
-    localInput.focus();
-    localInput.addEventListener('blur', () => { localInput.readOnly = true; }, { once: true });
-  });
-
-  document.getElementById('inventarioForm').addEventListener('submit', handleInventoryFormSubmit);
-  document.getElementById('uploadSistemaBtn').addEventListener('click', () => handleUpload('Sistema'));
-  document.getElementById('uploadInventariosBtn').addEventListener('click', () => handleUpload('Inventario'));
-  document.getElementById('inventarios-tab').addEventListener('shown.bs.tab', fetchAndDisplayInventarios);
-  document.getElementById('relatorios-tab').addEventListener('shown.bs.tab', fetchAndDisplayRelatorios);
-  document.getElementById('compararBtn').addEventListener('click', handleAnalysis);
-  document.getElementById('exportCsvBtn').addEventListener('click', exportAnalysisToCsv);
-}
-
-// Nova função para popular dropdown de unidades do sistema
-async function popularUnidadesSistemaParaAnalise() {
-  try {
-    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidadesSistema' }) });
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    const select = document.getElementById('unidadeSistemaComparar');
-    select.innerHTML = '<option value="">Selecione uma unidade...</option>';
-    result.unidadesSistema.forEach(u => {
-      const option = new Option(u, u);
-      select.add(option);
-    });
-  } catch (error) {
-    showToast('toastError', `Erro ao carregar unidades do sistema: ${error.message}`);
-  }
-}
-
-// FUNÇÕES DE LÓGICA E COMUNICAÇÃO COM APPS SCRIPT
-async function handleInventoryFormSubmit(e) {
-  e.preventDefault();
-  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-  loadingModal.show();
-  try {
-    let photoUrl = '';
-    const file = document.getElementById('foto').files[0];
-    if (file) {
-      if (!accessToken) throw new Error("Autorização para upload de fotos expirou. Faça login novamente.");
-      photoUrl = await uploadFileToDrive(file);
-    }
-
-    const data = {
-      action: 'saveItem',
-      unidade: document.getElementById('unidade').value,
-      local: document.getElementById('local').value,
-      item: document.getElementById('item').value,
-      tombo: document.getElementById('tombo').value,
-      estado: document.getElementById('estado').value,
-      quantidade: document.getElementById('quantidade').value,
-      photoUrl
-    };
-
-    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) });
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    localStorage.removeItem('draft');
-    e.target.reset();
-    document.getElementById('unidade').value = localStorage.getItem('unidadeFixada');
-    await fetchConcluidos();
-    showToast('toastSuccess', 'Item salvo com sucesso!');
-  } catch (error) {
-    showToast('toastError', `Erro ao salvar: ${error.message}`);
-  } finally {
-    loadingModal.hide();
-  }
-}
-
-async function uploadFileToDrive(file) {
-  const metadata = { name: `${new Date().toISOString()}-${file.name}`, parents: [DRIVE_FOLDER_ID] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', file);
-
-  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}` },
-    body: form
-  });
-
-  if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Falha no upload para o Drive: ${errorData.error.message}`);
-  }
-  const result = await response.json();
-  return `https://drive.google.com/uc?id=${result.id}`;
-}
-
-async function fetchConcluidos() {
-  const unidadeAtual = localStorage.getItem('unidadeFixada');
-  if (!unidadeAtual) return;
-
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidadeAtual)}`);
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    const tbody = document.querySelector('#tabelaConcluidos tbody');
-    tbody.innerHTML = '';
-    result.items.forEach(row => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${row[0] || ''}</td><td>${row[1] || ''}</td><td>${row[2] || ''}</td>
-        <td>${row[3] || ''}</td><td>${row[4] || ''}</td><td>${row[5] || ''}</td>
-        <td>${row[6] ? `<a href="${row[6]}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-camera"></i> Ver</a>` : 'N/A'}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  } catch (error) {
-    showToast('toastError', `Não foi possível carregar os itens: ${error.message}`);
-  }
-}
-
-async function handleUpload(type) {
-  const unidade = document.getElementById(type === 'Sistema' ? 'unidadeSistema' : 'unidadeInventario').value.trim();
-  const fileInput = document.getElementById(type === 'Sistema' ? 'relatorioSistema' : 'inventariosAntigos');
-  const pasteArea = document.getElementById(type === 'Sistema' ? 'pasteSistema' : 'pasteInventario');
-  const files = fileInput.files;
-  let pasteText = pasteArea.value.trim();
-  const massUploadElement = document.getElementById(type === 'Sistema' ? 'massUploadSistema' : 'massUpload');
-  if (!massUploadElement) {
-    console.error(`Elemento checkbox '${type === 'Sistema' ? 'massUploadSistema' : 'massUpload'}' não encontrado! Adicione no HTML.`);
-    showToast('toastError', 'Erro: Checkbox de carregamento em massa não encontrado. Adicione no HTML e recarregue.');
-    return;
-  }
-  const massUpload = massUploadElement.checked;
-
-  if (files.length === 0 && !pasteText) return showToast('toastError', 'Selecione um arquivo ou cole os dados.');
-
-  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-  loadingModal.show();
-  try {
-    let data = [];
-    let inputRows = 0;
-    if (files.length > 0) {
-      for (const file of files) {
-        const parsed = await parseExcel(file);
-        inputRows += parsed.slice(1).length;
-        data.push(...parsed.slice(1).filter(row => row.length > 0));  // Filter empty rows []
-      }
-    } else if (pasteText) {
-      pasteText = pasteText.replace(/[\r\n]+/g, '\n').trim(); // Normaliza linhas
-      const lines = pasteText.split('\n').filter(line => line.trim()); // Filter empty lines
-      data = lines.map(line => line.split(/[\t,; ]+/).map(cell => cell.trim()).filter(cell => cell)); // Filter empty cells
-      inputRows = data.length;
-    }
-    if (data.length === 0) throw new Error("Nenhum dado válido para enviar.");
-
-    if (type === 'Sistema' && !massUpload && data.some(row => row.length >= 10 && row[9] && row[9].trim() !== unidade)) {
-      showToast('toastWarning', 'Aviso: Dados parecem ter múltiplas unidades na coluna J. Marque "Carregamento em Massa" para evitar mistura.');
-    }
-
-    if (type === 'Inventario') {
-      data = data.map(row => {
-        if (row.length < 5) throw new Error("Formato inválido: precisa de UNIDADE, ITEM, TOMBO, LOCAL, ESTADO DE CONSERVAÇÃO.");
-        const unidadeRow = massUpload ? (row[0] || '') : unidade; // Se mass, usa row[0]; else input
-        if (massUpload && !row[0]) throw new Error("Para carregamento em massa, inclua UNIDADE na coluna A.");
-        return [unidadeRow, row[1], row[2], row[3], row[4], '1']; // Quantidade default 1
-      });
-    } else if (type === 'Sistema') {
-      if (massUpload) {
-        data.forEach(row => {
-          if (row.length < 10) throw new Error("Formato inválido para Relatório do Sistema em massa: precisa de 10 colunas incluindo UNIDADE na J.");
-        });
-      } else {
-        data.forEach(row => {
-          if (row.length < 9) throw new Error("Formato inválido para Relatório do Sistema: precisa de 9 colunas.");
-        });
-      }
-    }
-
-    const response = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'appendReport',
-        sheetName: type === 'Sistema' ? 'RelatorioSistema' : 'Inventario',
-        data: data,
-        unidadeUpload: massUpload ? '' : unidade, // Envia vazio se mass, backend usa per-row
-        massUpload: massUpload
-      })
-    });
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    showToast('toastSuccess', `Upload de '${type}' concluído com sucesso! ${result.rowsAppended} linhas carregadas de ${inputRows} fornecidas (${result.invalidRows} inválidas).`);
-    fileInput.value = '';
-    pasteArea.value = '';
-    await popularUnidadesParaAnalise();
-    await popularUnidadesSistemaParaAnalise(); // Atualiza dropdowns após upload
-  } catch (error) {
-    showToast('toastError', `Erro no upload: ${error.message}`);
-  } finally {
-    loadingModal.hide();
-  }
-}
-
-async function fetchAndDisplayInventarios() {
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=buscarInventariosAgrupados`);
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    const inventariosAgrupados = result.data;
-    const accordionContainer = document.getElementById('inventariosAccordion');
-    accordionContainer.innerHTML = '';
-
-    if (Object.keys(inventariosAgrupados).length === 0) {
-      accordionContainer.innerHTML = '<p class="text-muted">Nenhum inventário cadastrado ainda.</p>';
-      return;
-    }
-
-    Object.keys(inventariosAgrupados).sort().forEach((unidade, index) => {
-      const { Site, Upload } = inventariosAgrupados[unidade];
-      const totalItens = (Site?.length || 0) + (Upload?.length || 0);
-      const accordionItem = `
-        <div class="accordion-item">
-          <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-inv-${index}">
-            ${unidade} <span class="badge bg-secondary ms-2">${totalItens} itens</span>
-          </button></h2>
-          <div id="collapse-inv-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#inventariosAccordion">
-            <div class="accordion-body">
-              ${createSimpleTable('Feitos no Site', ['Item', 'Tombo', 'Local', 'Estado'], Site || [], [2, 3, 1, 4])}
-              ${createSimpleTable('Carregados por Upload', ['Item', 'Tombo', 'Local', 'Estado'], Upload || [], [2, 3, 1, 4])}
-            </div>
-          </div>
-        </div>`;
-      accordionContainer.innerHTML += accordionItem;
-    });
-  } catch (error) {
-    showToast('toastError', `Erro ao buscar inventários: ${error.message}`);
-  }
-}
-
-async function fetchAndDisplayRelatorios() {
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=buscarRelatoriosAgrupados`);
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
-
-    const relatoriosAgrupados = result.data;
-    const accordionContainer = document.getElementById('relatoriosAccordion');
-    accordionContainer.innerHTML = '';
-
-    if (Object.keys(relatoriosAgrupados).length === 0) {
-      accordionContainer.innerHTML = '<p class="text-muted">Nenhum relatório do sistema carregado ainda.</p>';
-      return;
-    }
-
-    const allHeaders = ['TOMBAMENTO', 'Espécie', 'Descrição', 'Status', 'Tipo Entrada', 'Cadastro', 'Valor NF', 'NF', 'Nome Fornecedor', 'Unidade']; 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIRETORIA TÉCNICA DE ALMOXARIFADO E PATRIMÔNIO - SEMCAS</title>
     
-    Object.keys(relatoriosAgrupados).sort().forEach((unidade, index) => {
-      const itens = relatoriosAgrupados[unidade];
-      const accordionItem = `
-        <div class="accordion-item">
-          <h2 class="accordion-header"><button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-rel-${index}">
-            ${unidade} <span class="badge bg-info ms-2">${itens.length} registros</span>
-          </button></h2>
-          <div id="collapse-rel-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#relatoriosAccordion">
-            <div class="accordion-body table-responsive">
-              ${createFullWidthTable(`Relatório de ${unidade}`, allHeaders, itens)}
-            </div>
-          </div>
-        </div>`;
-      accordionContainer.innerHTML += accordionItem;
-    });
-  } catch (error) {
-    showToast('toastError', `Erro ao buscar relatórios: ${error.message}`);
-  }
-}
-
-// LÓGICA DE ANÁLISE DE INVENTÁRIO
-async function handleAnalysis() {
-  const unidadeInventario = document.getElementById('unidadeComparar').value;
-  const unidadeSistema = document.getElementById('unidadeSistemaComparar').value;
-  if (!unidadeInventario || !unidadeSistema) {
-    showToast('toastError', 'Selecione as unidades para comparar!');
-    return;
-  }
-  
-  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-  loadingModal.show();
-  document.getElementById('exportCsvBtn').classList.add('d-none');
-  document.getElementById('analiseSummary').classList.add('d-none');
-  document.getElementById('resultadoComparacao').innerHTML = '';
-
-  try {
-    const [dadosInventario, dadosSistema] = await Promise.all([
-      fetchInventarioDaUnidade(unidadeInventario),
-      carregarRelatorioSistema(unidadeSistema),
-    ]);
-
-    const resultado = compararInventariosV4(dadosInventario, dadosSistema, unidadeInventario);
+    <!-- Scripts e Links -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    analysisReportData = resultado;
-    renderAnalysisResultsV4(resultado, unidadeInventario);
-    document.getElementById('exportCsvBtn').classList.remove('d-none');
-    
-    localStorage.setItem('lastAnalysisUnit', unidadeInventario);
-
-  } catch (error) {
-    showToast('toastError', `Erro ao gerar relatório: ${error.message}`);
-    console.error(error);
-  } finally {
-    loadingModal.hide();
-  }
-}
-
-async function fetchInventarioDaUnidade(unidade) {
-  const response = await fetch(`${SCRIPT_URL}?action=buscarItensPorUnidade&unidade=${encodeURIComponent(unidade)}`);
-  const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.message);
-  return result.items;
-}
-
-async function carregarRelatorioSistema(unidadeSistema) {
-  const response = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "getRelatorioSistema", unidade: unidadeSistema }) });
-  const result = await response.json();
-  if (result.status === "success") return result.data;
-  throw new Error(result.message || 'Erro ao buscar dados do sistema.');
-}
-
-function normalizeDescription(str) {
-    if (!str) return '';
-    return str
-        .toString()
-        .trim()
-        .toLowerCase()
-        .normalize("NFD") 
-        .replace(/[\u0300-\u036f]/g, "") 
-        .replace(/[^\w\s]/gi, '') 
-        .replace(/\s+/g, ' '); 
-}
-
-function levenshteinDistance(s1, s2) {
-  const matrix = Array.from({ length: s1.length + 1 }, () => Array(s2.length + 1).fill(0));
-  for (let i = 0; i <= s1.length; i++) matrix[i][0] = i;
-  for (let j = 0; j <= s2.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= s1.length; i++) {
-    for (let j = 1; j <= s2.length; j++) {
-      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return matrix[s1.length][s2.length];
-}
-
-function stringSimilarity(str1, str2) {
-    if (str1 === str2) return 1;
-    if (str1.length < 2 || str2.length < 2) return 0;
-
-    const getBigrams = (s) => {
-        const bigrams = new Map();
-        for (let i = 0; i < s.length - 1; i++) {
-            const bigram = s.substring(i, i + 2);
-            bigrams.set(bigram, (bigrams.get(bigram) || 0) + 1);
+    <!-- Estilos -->
+    <style>
+        :root {
+            --primary-blue: #1e40af;
+            --secondary-blue: #3b82f6;
+            --light-blue: #60a5fa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
         }
-        return bigrams;
-    };
 
-    const bigrams1 = getBigrams(str1);
-    const bigrams2 = getBigrams(str2);
-    
-    let intersectionSize = 0;
-    for (const [bigram, count1] of bigrams1.entries()) {
-        if (bigrams2.has(bigram)) {
-            intersectionSize += Math.min(count1, bigrams2.get(bigram));
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
         }
-    }
 
-    const bigramScore = (2 * intersectionSize) / (str1.length + str2.length - 2);
-    const levDist = levenshteinDistance(str1, str2);
-    const levScore = 1 - (levDist / Math.max(str1.length, str2.length));
-    return (bigramScore + levScore) / 2;
-}
-
-function compararInventariosV4(inventario, sistema, unidade) {
-    const normalizeTombo = tombo => tombo ? String(tombo).trim().replace(/^0+/, '') : '';
-
-    let incorporacoes = [];
-    let sistemaParaAnalise = new Map();
-    let inventarioComTombo = new Map();
-    let inventarioSemTombo = [];
-
-    const sistemaDisponivel = sistema.filter(row => (row[SISTEMA_COLUMNS.STATUS] || '').trim().toUpperCase() === 'DISPONÍVEL');
-
-    sistemaDisponivel.forEach((row, index) => {
-        const tipoEntrada = (row[SISTEMA_COLUMNS.TIPO_ENTRADA] || '').toLowerCase();
-        if (tipoEntrada.includes('incorporação')) {
-            incorporacoes.push({ sysRow: row });
-        } else {
-            const tomboNorm = normalizeTombo(row[SISTEMA_COLUMNS.TOMBAMENTO]);
-            if (tomboNorm) {
-                sistemaParaAnalise.set(tomboNorm, { sysRow: row, originalIndex: index });
-            }
+        .card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            transition: all 0.3s ease;
         }
-    });
-
-    inventario.forEach((row, index) => {
-        const tomboNorm = normalizeTombo(row[3]);
-        if (tomboNorm && tomboNorm.toLowerCase() !== 's/t') {
-            inventarioComTombo.set(tomboNorm, { invRow: row, originalIndex: index });
-        } else {
-            inventarioSemTombo.push({ invRow: row, originalIndex: index });
+        .table button {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
         }
-    });
-
-    let matches = [], divergences = [], matchedByExactDesc = [], matchedBySimilarDesc = [], needsManualReview = [];
-
-    inventarioComTombo.forEach((invData, tomboNorm) => {
-        if (sistemaParaAnalise.has(tomboNorm)) {
-            const sysData = sistemaParaAnalise.get(tomboNorm);
-            if (normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.DESCRICAO])) {
-                matches.push({ ...invData, ...sysData });
-            } else {
-                divergences.push({ ...invData, ...sysData });
-            }
-            inventarioComTombo.delete(tomboNorm);
-            sistemaParaAnalise.delete(tomboNorm);
+        .table tr:hover button {
+            opacity: 1;
         }
-    });
+        .alert { padding: 1rem; border-radius: 0.5rem; border: 1px solid; }
+        .alert-error { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background: #d1fae5; color: #059669; }
+        .badge-blue { background: #dbeafe; color: #2563eb; }
+        .badge-yellow { background: #fef3c7; color: #d97706; }
+        .badge-red { background: #fee2e2; color: #dc2626; }
 
-    const sistemaRestante = Array.from(sistemaParaAnalise.values());
-    inventarioSemTombo.forEach((invData, invIndex) => {
-        if (!invData) return;
+        .header-banner {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-btn {
+            padding: 0.75rem 1rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            color: #475569;
+            white-space: nowrap;
+        }
+        .nav-btn:hover { background-color: #f8fafc; }
+        .nav-btn.active { color: var(--secondary-blue); border-bottom-color: var(--secondary-blue); }
+
+        .loading-spinner {
+            border: 5px solid #e5e7eb;
+            border-top: 5px solid var(--secondary-blue);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        let exactMatchIndex = sistemaRestante.findIndex(sysData => 
-            sysData && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.DESCRICAO]) && normalizeDescription(invData.invRow[2]) === normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.ESPECIE])
-        );
+        .modal-overlay { transition: opacity 0.3s ease; }
+        .modal-container { transition: all 0.3s ease; max-height: 90vh; }
+        .chart-container { position: relative; width: 100%; height: 350px; }
+    </style>
+</head>
+<body class="text-slate-700 antialiased">
 
-        if (exactMatchIndex !== -1) {
-            const sysData = sistemaRestante[exactMatchIndex];
-            matchedByExactDesc.push({ ...invData, ...sysData });
-            sistemaParaAnalise.delete(normalizeTombo(sysData.sysRow[SISTEMA_COLUMNS.TOMBAMENTO]));
-            sistemaRestante[exactMatchIndex] = null;
-            inventarioSemTombo[invIndex] = null;
-            return;
-        }
-    });
-    
-    let inventarioSemTomboRestante = inventarioSemTombo.filter(Boolean);
-    let sistemaAindaRestante = sistemaRestante.filter(Boolean);
-
-    inventarioSemTomboRestante.forEach((invData, invIndex) => {
-        if (!invData) return;
-        let bestMatch = { score: 0.7, sysData: null, sysIndex: -1 }; // Threshold 0.7
-        
-        sistemaAindaRestante.forEach((sysData, sysIndex) => {
-             if (!sysData) return;
-             const score = stringSimilarity(normalizeDescription(invData.invRow[2]), normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.DESCRICAO]));
-             const especieScore = stringSimilarity(normalizeDescription(invData.invRow[2]), normalizeDescription(sysData.sysRow[SISTEMA_COLUMNS.ESPECIE]));
-             const combinedScore = (score + especieScore) / 2;
-             if (combinedScore > bestMatch.score) {
-                 bestMatch = { score: combinedScore, sysData, sysIndex };
-             }
-        });
-
-        if (bestMatch.sysData) {
-            if (bestMatch.score >= 0.7) {
-                matchedBySimilarDesc.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
-            } else {
-                needsManualReview.push({ ...invData, ...bestMatch.sysData, score: bestMatch.score });
-            }
-            sistemaParaAnalise.delete(normalizeTombo(bestMatch.sysData.sysRow[SISTEMA_COLUMNS.TOMBAMENTO]));
-            sistemaAindaRestante[bestMatch.sysIndex] = null;
-            inventarioSemTomboRestante[invIndex] = null;
-        }
-    });
-    
-    let remainingSystem = Array.from(sistemaParaAnalise.values());
-    const remainingInventory = [...Array.from(inventarioComTombo.values()), ...inventarioSemTomboRestante.filter(Boolean)];
-
-    const currentYear = new Date().getFullYear();
-    remainingSystem = remainingSystem.map(item => {
-      const cadastroDate = new Date(item.sysRow[SISTEMA_COLUMNS.CADASTRO]);
-      item.isNew = !isNaN(cadastroDate.getTime()) && cadastroDate.getFullYear() >= 2023 && cadastroDate.getFullYear() <= currentYear;
-      return item;
-    });
-
-    return { 
-        matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, needsManualReview,
-        remainingSystem, remainingInventory,
-        totalSystem: sistema.length,
-        totalInventory: inventario.length
-    };
-}
-
-function renderAnalysisResultsV4(data, unidade) {
-    const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, needsManualReview, remainingSystem, remainingInventory, totalSystem, totalInventory } = data;
-    const totalConciliado = matches.length + matchedByExactDesc.length + matchedBySimilarDesc.length;
-
-    const summaryContainer = document.getElementById('analiseSummary');
-    summaryContainer.innerHTML = `
-        <h5 class="mb-3">Resumo da Análise para o Inventário de: <strong>${unidade}</strong></h5>
-        <div class="row">
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-primary"><h6><i class="bi bi-building me-2"></i>Total no Sistema</h6><span class="fs-4">${totalSystem}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-secondary"><h6><i class="bi bi-clipboard-check me-2"></i>Itens no Inventário</h6><span class="fs-4">${totalInventory}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-white bg-success"><h6><i class="bi bi-check-circle-fill me-2"></i>Conciliados</h6><span class="fs-4">${totalConciliado}</span></div></div>
-            <div class="col-lg-3 col-md-6 mb-3"><div class="card p-3 analysis-summary-card text-dark bg-warning"><h6><i class="bi bi-exclamation-triangle-fill me-2"></i>Pendentes</h6><span class="fs-4">${remainingSystem.length + remainingInventory.length}</span></div></div>
+    <!-- Header -->
+    <header class="header-banner sticky top-0 z-50 text-white p-4">
+        <div class="container mx-auto flex items-center gap-4">
+            <img src="https://www.saoluis.ma.gov.br/img/logo_mobile.png" alt="Logo Prefeitura" class="h-14 bg-white p-1 rounded-md shadow-md">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold leading-tight">Diretoria de Almoxarifado e Patrimônio</h1>
+                <p class="text-sm opacity-90">SEMCAS - São Luís</p>
+            </div>
         </div>
-    `;
-    summaryContainer.classList.remove('d-none');
+    </header>
 
-    const resultsContainer = document.getElementById('resultadoComparacao');
-    resultsContainer.innerHTML = '';
+    <!-- Sub-Header de Status -->
+    <div class="bg-white shadow-sm border-b border-slate-200">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.4.0 (Firebase)</span></h2>
+            <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
+        </div>
+    </div>
 
-    const getSysData = (row) => [formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
+    <!-- Navegação por Abas -->
+    <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[92px] md:top-[88px]">
+        <div class="container mx-auto px-4">
+            <div class="flex space-x-1 overflow-x-auto">
+                <button class="nav-btn" data-tab="patrimonio">💼 Patrimônio</button>
+                <button class="nav-btn" data-tab="dashboard">📊 Dashboard</button>
+            </div>
+        </div>
+    </nav>
 
-    if (matches.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Tombo', 'bg-success-strong', 
-        ['Tombo', 'Descrição', 'Local', 'Estado', 'Cadastro', 'Valor NF'], 
-        matches.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow)])
-    );
-    if (matchedByExactDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Match Exato)', 'bg-info-strong', 
-        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Espécie', 'Cadastro', 'Valor NF'], 
-        matchedByExactDesc.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], ...getSysData(m.sysRow)])
-    );
-    if (matchedBySimilarDesc.length > 0) resultsContainer.innerHTML += createDetailedTable('Conciliados por Descrição (Similaridade)', 'bg-info-strong', 
-        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Espécie', 'Similaridade', 'Cadastro', 'Valor NF'], 
-        matchedBySimilarDesc.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
-    );
-    if (divergences.length > 0) resultsContainer.innerHTML += createDetailedTable('Divergências de Descrição (Mesmo Tombo)', 'bg-warning-strong', 
-        ['Tombo', 'Descrição Inventário', 'Descrição Sistema', 'Espécie', 'Cadastro', 'Valor NF'], 
-        divergences.map(d => [d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.sysRow[SISTEMA_COLUMNS.ESPECIE], ...getSysData(d.sysRow)])
-    );
+    <!-- Conteúdo Principal -->
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Dashboard -->
+        <div id="content-dashboard" class="hidden fade-in">
+            <div id="dashboard-content-area">
+                <div class="card text-center"><div class="loading-spinner"></div><p class="mt-4">Carregando dashboard...</p></div>
+            </div>
+        </div>
 
-    const pendingNew = remainingSystem.filter(m => m.isNew);
-    const pendingOld = remainingSystem.filter(m => !m.isNew);
+        <!-- Patrimônio -->
+        <div id="content-patrimonio" class="hidden fade-in">
+             <div class="card mb-8">
+                <!-- Filtros e Busca -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                    <div><label for="filtro-servico" class="block text-sm font-medium mb-1">Tipo</label><select id="filtro-servico" class="w-full p-2 border rounded-lg"><option value="">TODOS</option><option value="CONSELHO">CONSELHO</option><option value="CRAS">CRAS</option><option value="CREAS">CREAS</option><option value="UNIDADE EXTERNA">UNIDADE EXTERNA</option><option value="CENTRO POP">CENTRO POP</option><option value="ABRIGO">ABRIGO</option><option value="SEDE">SEDE</option></select></div>
+                    <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg"><option value="">TODAS</option></select></div>
+                    <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg"><option value="">TODOS</option><option value="Novo">NOVO</option><option value="Bom">BOM</option><option value="Regular">REGULAR</option><option value="Avariado">AVARIADO</option></select></div>
+                    <div><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Geral</label><input type="text" id="filtro-busca" placeholder="Buscar..." class="w-full p-2 border rounded-lg"></div>
+                </div>
+            </div>
+            <!-- Botões de Ação -->
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Inventário</h2>
+                <button id="open-add-modal-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+                    Adicionar Item
+                </button>
+            </div>
+            <main id="main-content-area" class="mt-2"></main>
+        </div>
+    </main>
 
-    if (pendingNew.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Novos (Cadastro 2023-2025)', 'bg-warning-strong', 
-        ['Tombo', 'Descrição Sistema', 'Espécie', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        pendingNew.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
-    );
-    if (pendingOld.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes Antigos (Antes de 2023)', 'bg-danger-strong', 
-        ['Tombo', 'Descrição Sistema', 'Espécie', 'NF', 'Fornecedor', 'Cadastro', 'Valor NF'], 
-        pendingOld.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.sysRow[SISTEMA_COLUMNS.NF], m.sysRow[SISTEMA_COLUMNS.FORNECEDOR], formatDate(m.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(m.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
-    );
-
-    if (needsManualReview.length > 0) resultsContainer.innerHTML += createDetailedTable('Pendentes para Revisão Manual (Baixa Similaridade)', 'bg-danger-strong', 
-        ['Tombo Sugerido', 'Descrição Inventário (S/T)', 'Descrição Sistema', 'Espécie', 'Similaridade', 'Cadastro', 'Valor NF'], 
-        needsManualReview.map(m => [m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], `${(m.score * 100).toFixed(0)}%`, ...getSysData(m.sysRow)])
-    );
-
-    if (remainingInventory.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens Pendentes (Apenas no Inventário Físico)', 'bg-danger-strong', 
-        ['Tombo', 'Descrição Inventário', 'Local', 'Estado'], 
-        remainingInventory.map(m => [m.invRow[3], m.invRow[2], m.invRow[1], m.invRow[4]])
-    );
-    if (incorporacoes.length > 0) resultsContainer.innerHTML += createDetailedTable('Itens de Incorporação (Separados para Baixa)', 'bg-light-strong', 
-        ['Tombo', 'Descrição Sistema', 'Espécie', 'NF', 'Cadastro', 'Valor NF'], 
-        incorporacoes.map(i => [i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.ESPECIE], i.sysRow[SISTEMA_COLUMNS.NF], formatDate(i.sysRow[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(i.sysRow[SISTEMA_COLUMNS.VALOR_NF])])
-    );
-}
-
-function exportAnalysisToCsv() {
-  const { matches, divergences, incorporacoes, matchedByExactDesc, matchedBySimilarDesc, needsManualReview, remainingSystem, remainingInventory } = analysisReportData;
-  if (!analysisReportData) return;
-
-  const escapeCsvCell = (cell) => `"${String(cell || '').replace(/"/g, '""')}"`;
-  let csvContent = 'Categoria;Tombo;Descricao_Inventario;Descricao_Sistema;Especie;Local_Inventario;Estado_Inventario;NF_Sistema;Fornecedor_Sistema;Cadastro_Sistema;Valor_NF_Sistema;Observacao\n';
-
-  const getSysData = (row) => [row[SISTEMA_COLUMNS.NF], row[SISTEMA_COLUMNS.FORNECEDOR], formatDate(row[SISTEMA_COLUMNS.CADASTRO]), formatCurrency(row[SISTEMA_COLUMNS.VALOR_NF])];
-
-  matches.forEach(m => csvContent += ['Conciliado por Tombo', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), ''].map(escapeCsvCell).join(';') + '\n');
-  matchedByExactDesc.forEach(m => csvContent += ['Conciliado por Descricao (Exato)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), 'Match exato de descrição normalizada'].map(escapeCsvCell).join(';') + '\n');
-  matchedBySimilarDesc.forEach(m => csvContent += ['Conciliado por Descricao (Similar)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
-  divergences.forEach(d => csvContent += ['Divergencia', d.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], d.invRow[2], d.sysRow[SISTEMA_COLUMNS.DESCRICAO], d.sysRow[SISTEMA_COLUMNS.ESPECIE], d.invRow[1], d.invRow[4], ...getSysData(d.sysRow), 'Descricoes diferentes para o mesmo tombo'].map(escapeCsvCell).join(';') + '\n');
-  
-  remainingSystem.forEach(m => {
-    const category = m.isNew ? 'Pendente Novo no Sistema' : 'Pendente Antigo no Sistema';
-    csvContent += [category, m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], '', '', ...getSysData(m.sysRow), 'Item nao encontrado no inventario fisico'].map(escapeCsvCell).join(';') + '\n';
-  });
-  
-  remainingInventory.forEach(m => csvContent += ['Pendente no Inventario', m.invRow[3], m.invRow[2], '', '', m.invRow[1], m.invRow[4], '', '', '', '', 'Item nao encontrado no relatorio do sistema'].map(escapeCsvCell).join(';') + '\n');
-  
-  incorporacoes.forEach(i => csvContent += ['Incorporacao (para Baixa)', i.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], '', i.sysRow[SISTEMA_COLUMNS.DESCRICAO], i.sysRow[SISTEMA_COLUMNS.ESPECIE], '', '', ...getSysData(i.sysRow), 'Item de incorporacao, separado para analise'].map(escapeCsvCell).join(';') + '\n');
-
-  needsManualReview.forEach(m => csvContent += ['Pendente Revisao Manual (Baixa Similaridade)', m.sysRow[SISTEMA_COLUMNS.TOMBAMENTO], m.invRow[2], m.sysRow[SISTEMA_COLUMNS.DESCRICAO], m.sysRow[SISTEMA_COLUMNS.ESPECIE], m.invRow[1], m.invRow[4], ...getSysData(m.sysRow), `Similaridade baixa de ${(m.score * 100).toFixed(0)}%`].map(escapeCsvCell).join(';') + '\n');
-
-  const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `relatorio_analise_avancado_${new Date().toISOString().split('T')[0]}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
-}
-
-// FUNÇÕES AUXILIARES E DE UI
-function formatDate(dateString) {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return dateString;
-    }
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    return `${day}/${month}/${year}`;
-  } catch (error) {
-    return dateString;
-  }
-}
-
-function formatCurrency(value) {
-  if (value === null || value === undefined || value === '') return '';
-
-  if (typeof value === 'number') {
-    if (Number.isInteger(value) && value > 10000) {
-      value /= 100;
-    }
-    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
-
-  if (typeof value === 'string') {
-    let sanitizedValue = value.replace(/R\$\s?/, '').trim();
-    
-    if (/^\d+$/.test(sanitizedValue)) {
-      let number = parseInt(sanitizedValue, 10);
-      if (number > 10000) {
-        number /= 100;
-      }
-      return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
-    
-    if (sanitizedValue.includes(',')) {
-        const numberString = sanitizedValue.replace(/\./g, '').replace(',', '.');
-        const number = parseFloat(numberString);
-        if (!isNaN(number)) {
-            return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        }
-    } else {
-        const number = parseFloat(sanitizedValue);
-        if (!isNaN(number)) {
-            return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        }
-    }
-  }
-
-  return value;
-}
+    <!-- Modal para Adicionar/Editar Item -->
+    <div id="item-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div id="modal-overlay" class="absolute inset-0 bg-black/60 opacity-0"></div>
+        <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <form id="item-form">
+                <input type="hidden" id="itemId">
+                <div class="flex items-center justify-between p-4 border-b">
+                    <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3>
+                    <button type="button" id="close-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+                </div>
+                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
+                    <div><label for="tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="tombamento" class="w-full p-2 border rounded-lg" placeholder="S/T para sem tombo"></div>
+                    <div><label for="tipo" class="block text-sm font-medium mb-1">Tipo</label><select id="tipo" class="w-full p-2 border rounded-lg"><option value="CONSELHO">CONSELHO</option><option value="CRAS">CRAS</option><option value="CREAS">CREAS</option><option value="UNIDADE EXTERNA">UNIDADE EXTERNA</option><option value="CENTRO POP">CENTRO POP</option><option value="ABRIGO">ABRIGO</option><option value="SEDE">SEDE</option><option value="OUTRO">OUTRO</option></select></div>
+                    <div class="md:col-span-2"><label for="descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="descricao" class="w-full p-2 border rounded-lg" required></div>
+                    <div><label for="unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="unidade" class="w-full p-2 border rounded-lg" required></div>
+                    <div><label for="localizacao" class="block text-sm font-medium mb-1">Localização na Unidade</label><input type="text" id="localizacao" class="w-full p-2 border rounded-lg"></div>
+                    <div><label for="estado" class="block text-sm font-medium mb-1">Estado</label><select id="estado" class="w-full p-2 border rounded-lg"><option value="Novo">Novo</option><option value="Bom">Bom</option><option value="Regular">Regular</option><option value="Avariado">Avariado</option></select></div>
+                    <div><label for="fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="fornecedor" class="w-full p-2 border rounded-lg"></div>
+                    <div class="md:col-span-2"><label for="observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="observacao" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
+                </div>
+                <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
+                    <button type="button" id="cancel-btn" class="px-4 py-2 bg-slate-200 font-semibold rounded-lg hover:bg-slate-300">Cancelar</button>
+                    <button type="submit" id="save-btn" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
 
-async function popularUnidadesParaAnalise() {
-  try {
-    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'listarUnidades' }) });
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message);
+    <script type="module">
+        // Importações do Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const select = document.getElementById('unidadeComparar');
-    select.innerHTML = '<option value="">Selecione uma unidade...</option>';
-    result.unidades.forEach(u => {
-      const option = new Option(u, u);
-      select.add(option);
-    });
+        // =================================================================
+        // CONFIGURAÇÃO DO FIREBASE
+        // =================================================================
+        // ATENÇÃO: Substitua o objeto abaixo pela configuração do seu projeto Firebase
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_AUTH_DOMAIN",
+            projectId: "SEU_PROJECT_ID",
+            storageBucket: "SEU_STORAGE_BUCKET",
+            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
 
-    const lastUnit = localStorage.getItem('lastAnalysisUnit');
-    if (lastUnit) {
-        select.value = lastUnit;
-    }
+        // Inicializa Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        setLogLevel('debug'); // Use 'debug' para ver logs detalhados no console
 
-  } catch (error) {
-    showToast('toastError', `Erro ao carregar unidades: ${error.message}`);
-  }
-}
+        // =================================================================
+        // LÓGICA PRINCIPAL DA APLICAÇÃO
+        // =================================================================
+        document.addEventListener('DOMContentLoaded', () => {
 
-function parseExcel(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
-        resolve(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" }));
-      } catch (error) { reject(error); }
-    };
-    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
-    reader.readAsBinaryString(file);
-  });
-}
+            let allItems = []; // Armazena todos os itens do Firestore
+            let currentPage = 1;
+            const itemsPerPage = 25;
+            let dashboardChartInstance;
 
-function createSimpleTable(title, headers, data, dataIndices) {
-  if (!data || data.length === 0) return title ? `<h5>${title}</h5><p class="text-muted">Nenhum item encontrado.</p>` : '';
-  let table = `<h5>${title} (${data.length})</h5><div class="table-responsive"><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
-  data.forEach(row => {
-    table += '<tr>';
-    dataIndices.forEach(index => table += `<td>${row[index] || ''}</td>`);
-    table += '</tr>';
-  });
-  return table + '</tbody></table></div>';
-}
+            // --- Seletores de Elementos DOM ---
+            const navButtons = document.querySelectorAll('.nav-btn');
+            const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
+            const connectionStatusEl = document.getElementById('connectionStatus');
+            const mainContentAreaEl = document.getElementById('main-content-area');
+            
+            // Filtros
+            const filtroServicoEl = document.getElementById('filtro-servico');
+            const filtroUnidadeEl = document.getElementById('filtro-unidade');
+            const filtroEstadoEl = document.getElementById('filtro-estado');
+            const filtroBuscaEl = document.getElementById('filtro-busca');
 
-function createFullWidthTable(title, headers, data) {
-    if (!data || data.length === 0) return '';
-    let table = `<h5>${title} (${data.length})</h5><table class="table table-sm table-striped table-hover"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
-    data.forEach(row => {
-        table += `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`;
-    });
-    return table + '</tbody></table>';
-}
+            // Modal
+            const itemModal = document.getElementById('item-modal');
+            const modalOverlay = document.getElementById('modal-overlay');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const openAddModalBtn = document.getElementById('open-add-modal-btn');
+            const cancelBtn = document.getElementById('cancel-btn');
+            const itemForm = document.getElementById('item-form');
+            const modalTitle = document.getElementById('modal-title');
+            
+            const stateColors = { 'Novo': '#16a34a', 'Bom': '#2563eb', 'Regular': '#facc15', 'Avariado': '#dc2626' };
+
+            // --- FUNÇÕES AUXILIARES ---
+            const debounce = (func, delay) => { let t; return function(...a) { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); }; };
+
+            // --- LÓGICA DE NAVEGAÇÃO E RENDERIZAÇÃO ---
+            function switchTab(tabName) {
+                navButtons.forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`.nav-btn[data-tab="${tabName}"]`).classList.add('active');
+                contentPanes.forEach(pane => pane.classList.add('hidden'));
+                document.getElementById(`content-${tabName}`).classList.remove('hidden');
+
+                if (tabName === 'dashboard') renderDashboard();
+                if (tabName === 'patrimonio') renderFilteredItems();
+            }
+
+            function getFilteredItems() {
+                const tipo = filtroServicoEl.value;
+                const unidade = filtroUnidadeEl.value;
+                const estado = filtroEstadoEl.value;
+                const busca = filtroBuscaEl.value.toLowerCase();
+
+                return allItems.filter(item => 
+                    (!tipo || item.tipo === tipo) &&
+                    (!unidade || item.unidade === unidade) &&
+                    (!estado || item.estado === estado) &&
+                    (!busca || Object.values(item).some(val => String(val).toLowerCase().includes(busca)))
+                );
+            }
+
+            function renderFilteredItems() {
+                currentPage = 1;
+                renderApp();
+            }
+
+            function renderApp() {
+                const currentFilteredData = getFilteredItems();
+                renderTable(currentFilteredData);
+            }
+
+            function renderTable(itemsToDisplay) {
+                const totalItems = itemsToDisplay.length;
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
+                const paginatedItems = itemsToDisplay.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+                if (totalItems === 0) {
+                     mainContentAreaEl.innerHTML = `<div class="card text-center p-10"><p class="text-slate-500">Nenhum item encontrado para os filtros selecionados.</p></div>`;
+                     return;
+                }
+
+                mainContentAreaEl.innerHTML = `
+                    <div class="card p-0 overflow-x-auto">
+                        <table class="table w-full text-sm">
+                            <thead>
+                                <tr class="bg-slate-50">
+                                    <th class="p-4 text-left">Tomb.</th>
+                                    <th class="p-4 text-left">Descrição</th>
+                                    <th class="p-4 text-left">Unidade</th>
+                                    <th class="p-4 text-left">Local</th>
+                                    <th class="p-4 text-left">Estado</th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                                ${paginatedItems.map(item => `
+                                    <tr class="border-b border-slate-200 hover:bg-slate-50">
+                                        <td class="p-4 font-mono text-xs">${item.tombamento || 'S/T'}</td>
+                                        <td class="p-4 font-medium text-slate-900">${item.descricao}</td>
+                                        <td class="p-4">${item.unidade}</td>
+                                        <td class="p-4">${item.localizacao || 'N/A'}</td>
+                                        <td class="p-4"><span class="badge" style="background-color: ${stateColors[item.estado]}20; color: ${stateColors[item.estado]}">${item.estado}</span></td>
+                                        <td class="p-4 text-center">
+                                             <button data-action="edit" data-id="${item.id}" class="p-1 text-blue-600 hover:text-blue-800" title="Editar">✏️</button>
+                                             <button data-action="delete" data-id="${item.id}" class="p-1 text-red-600 hover:text-red-800" title="Excluir">🗑️</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination-controls" class="flex items-center justify-between mt-6">
+                        <span class="text-sm text-slate-600">Mostrando ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} a ${Math.min(currentPage * itemsPerPage, totalItems)} de ${totalItems}</span>
+                        <div class="inline-flex">
+                            <button data-page="${currentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
+                            <button data-page="${currentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderDashboard() {
+                const dashboardContentArea = document.getElementById('dashboard-content-area');
+                if (allItems.length === 0) {
+                     dashboardContentArea.innerHTML = `<div class="card text-center"><p>Nenhum dado para exibir.</p></div>`;
+                     return;
+                }
+
+                const totalItens = allItems.length;
+                const totalUnidades = new Set(allItems.map(i => i.unidade)).size;
+                const totalAvariados = allItems.filter(i => i.state === 'Avariado').length;
+
+                dashboardContentArea.innerHTML = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                        <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Total de Itens</p><p class="text-4xl font-bold text-blue-600 mt-2">${totalItens}</p></div>
+                        <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Unidades Mapeadas</p><p class="text-4xl font-bold text-blue-600 mt-2">${totalUnidades}</p></div>
+                        <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Itens Avariados</p><p class="text-4xl font-bold text-red-600 mt-2">${totalAvariados}</p></div>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4">Distribuição por Estado</h3>
+                        <div class="chart-container" style="height: 400px;"><canvas id="dashboardEstadoChart"></canvas></div>
+                    </div>
+                `;
+                
+                if(dashboardChartInstance) dashboardChartInstance.destroy();
+                const chartData = ['Novo', 'Bom', 'Regular', 'Avariado'].map(state => allItems.filter(i => i.estado === state).length);
+                dashboardChartInstance = new Chart(document.getElementById('dashboardEstadoChart'), { 
+                    type: 'doughnut', 
+                    data: { 
+                        labels: ['Novo', 'Bom', 'Regular', 'Avariado'], 
+                        datasets: [{ 
+                            data: chartData, 
+                            backgroundColor: Object.values(stateColors)
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: false } 
+                });
+            }
 
 
-function createDetailedTable(title, headerBgClass, headers, data) {
-    if (data.length === 0) return '';
-    let tableHtml = `
-    <div class="card mb-3">
-        <div class="card-header fw-bold ${headerBgClass}">${title} (${data.length})</div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover table-sm mb-0">
-                    <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-                    <tbody>`;
-    data.forEach(row => {
-        tableHtml += `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`;
-    });
-    tableHtml += `</tbody></table></div></div></div>`;
-    return tableHtml;
-}
+            // --- LÓGICA DO MODAL (ADICIONAR/EDITAR) ---
+            const openModal = (item = null) => {
+                itemForm.reset();
+                if (item) {
+                    modalTitle.textContent = 'Editar Item';
+                    document.getElementById('itemId').value = item.id;
+                    document.getElementById('tombamento').value = item.tombamento || '';
+                    document.getElementById('tipo').value = item.tipo || 'OUTRO';
+                    document.getElementById('descricao').value = item.descricao || '';
+                    document.getElementById('unidade').value = item.unidade || '';
+                    document.getElementById('localizacao').value = item.localizacao || '';
+                    document.getElementById('estado').value = item.estado || 'Regular';
+                    document.getElementById('fornecedor').value = item.fornecedor || '';
+                    document.getElementById('observacao').value = item.observacao || '';
+                } else {
+                    modalTitle.textContent = 'Adicionar Novo Item';
+                    document.getElementById('itemId').value = '';
+                }
+                itemModal.classList.remove('hidden');
+                setTimeout(() => {
+                    modalOverlay.classList.remove('opacity-0');
+                    itemModal.querySelector('.modal-container').classList.remove('scale-95', 'opacity-0');
+                }, 10);
+            };
 
-function showToast(type, message) {
-  const toastEl = document.getElementById(type);
-  if (toastEl) {
-    toastEl.querySelector('.toast-body').textContent = message;
-    new bootstrap.Toast(toastEl).show();
-  }
-}
+            const closeModal = () => {
+                itemModal.querySelector('.modal-container').classList.add('scale-95', 'opacity-0');
+                modalOverlay.classList.add('opacity-0');
+                setTimeout(() => itemModal.classList.add('hidden'), 300);
+            };
+            
+            async function handleFormSubmit(e) {
+                e.preventDefault();
+                const id = document.getElementById('itemId').value;
+                const itemData = {
+                    tombamento: document.getElementById('tombamento').value || 'S/T',
+                    tipo: document.getElementById('tipo').value,
+                    descricao: document.getElementById('descricao').value,
+                    unidade: document.getElementById('unidade').value,
+                    localizacao: document.getElementById('localizacao').value,
+                    estado: document.getElementById('estado').value,
+                    fornecedor: document.getElementById('fornecedor').value,
+                    observacao: document.getElementById('observacao').value,
+                };
+                
+                try {
+                    if (id) {
+                        await updateDoc(doc(db, "patrimonio", id), itemData);
+                    } else {
+                        await addDoc(collection(db, "patrimonio"), itemData);
+                    }
+                    closeModal();
+                } catch (error) {
+                    console.error("Erro ao salvar item: ", error);
+                    alert("Ocorreu um erro ao salvar. Verifique o console.");
+                }
+            }
+            
+            async function handleDeleteItem(id) {
+                if (confirm('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.')) {
+                    try {
+                        await deleteDoc(doc(db, "patrimonio", id));
+                    } catch (error) {
+                         console.error("Erro ao excluir item: ", error);
+                        alert("Ocorreu um erro ao excluir. Verifique o console.");
+                    }
+                }
+            }
+
+
+            // --- EVENT LISTENERS ---
+            navButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
+            [filtroServicoEl, filtroUnidadeEl, filtroEstadoEl].forEach(el => el.addEventListener('change', renderFilteredItems));
+            filtroBuscaEl.addEventListener('input', debounce(renderFilteredItems, 400));
+            
+            // Listeners para paginação e ações na tabela
+            mainContentAreaEl.addEventListener('click', (e) => {
+                // Paginação
+                const pageButton = e.target.closest('[data-page]');
+                if (pageButton) {
+                    currentPage = parseInt(pageButton.dataset.page);
+                    renderApp();
+                    return;
+                }
+                
+                // Ações de Editar/Excluir
+                const actionButton = e.target.closest('[data-action]');
+                if (actionButton) {
+                    const { action, id } = actionButton.dataset;
+                    if (action === 'edit') {
+                        const itemToEdit = allItems.find(item => item.id === id);
+                        openModal(itemToEdit);
+                    } else if (action === 'delete') {
+                        handleDeleteItem(id);
+                    }
+                }
+            });
+
+
+            // Listeners do Modal
+            openAddModalBtn.addEventListener('click', () => openModal());
+            closeModalBtn.addEventListener('click', closeModal);
+            modalOverlay.addEventListener('click', closeModal);
+            cancelBtn.addEventListener('click', closeModal);
+            itemForm.addEventListener('submit', handleFormSubmit);
+
+            // --- INICIALIZAÇÃO E CONEXÃO COM FIREBASE ---
+            connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
+            
+            try {
+                const itemsCollection = collection(db, "patrimonio");
+                onSnapshot(itemsCollection, (snapshot) => {
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado em tempo real</span>`;
+                    
+                    allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                    // Popula filtro de unidades dinamicamente
+                    const unidades = [...new Set(allItems.map(item => item.unidade))].sort();
+                    filtroUnidadeEl.innerHTML = '<option value="">TODAS</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+
+                    // Re-renderiza a visualização ativa
+                    const activeTab = document.querySelector('.nav-btn.active')?.dataset.tab || 'patrimonio';
+                    if (activeTab === 'patrimonio') {
+                        renderApp();
+                    } else if (activeTab === 'dashboard') {
+                        renderDashboard();
+                    }
+
+                }, (error) => {
+                    console.error("Erro ao buscar dados do Firestore: ", error);
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro de Conexão</span>`;
+                    mainContentAreaEl.innerHTML = `<div class="alert alert-error"><strong>Erro:</strong> Não foi possível carregar os dados. Verifique as regras de segurança do Firestore e a configuração do projeto.</div>`;
+                });
+
+            } catch(error) {
+                console.error("Erro na configuração do Firebase: ", error);
+                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro de Configuração</span>`;
+                mainContentAreaEl.innerHTML = `<div class="alert alert-error"><strong>Erro Crítico:</strong> Verifique se as credenciais do Firebase no arquivo HTML estão corretas.</div>`;
+            }
+
+            // Inicia na aba de patrimônio
+            switchTab('patrimonio');
+        });
+    </script>
+</body>
+</html>
