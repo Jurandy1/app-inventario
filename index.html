@@ -133,7 +133,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.8 (Patrimonio Actions Fix)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.9 (Auth Fix)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -331,7 +331,7 @@
         // Importações do SDK do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, query, where, orderBy, limit, getDocs, startAfter } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         // Configuração do Firebase
         const firebaseConfig = {
@@ -436,15 +436,17 @@
             connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
             
             if (unsubscribeNFs) unsubscribeNFs();
-            unsubscribeNFs = onSnapshot(query(collection(db, 'notas_fiscais'), orderBy("Cadastro", "desc")), (snapshot) => {
+            
+            const nfsQuery = query(collection(db, 'notas_fiscais'), orderBy("Cadastro", "desc"));
+            unsubscribeNFs = onSnapshot(nfsQuery, (snapshot) => {
                 allNFs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (!document.getElementById('content-notas-fiscais').classList.contains('hidden')) renderNFs();
-                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
+                 connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
             }, (error) => {
                 console.error("Erro ao buscar dados de NFs: ", error);
-                 if (error.code !== 'permission-denied') {
-                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro NFs</span>`;
-                 }
+                if (error.code !== 'permission-denied') {
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro ao carregar NFs</span>`;
+                }
             });
             
             loadAllPatrimonio();
@@ -467,7 +469,8 @@
             }
 
             try {
-                const querySnapshot = await getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
+                const patrimonioQuery = query(collection(db, 'patrimonio'), orderBy('Descrição'));
+                const querySnapshot = await getDocs(patrimonioQuery);
                 patrimonioFullList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 localStorage.setItem(cacheKey, JSON.stringify({ items: patrimonioFullList, timestamp: Date.now() }));
                 
@@ -477,13 +480,24 @@
 
             } catch (error) {
                  console.error("Erro ao carregar patrimônio: ", error);
-                 tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados do patrimônio. Verifique as regras do Firestore.</td></tr>`;
+                 tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados do patrimônio. Verifique suas permissões de acesso.</td></tr>`;
             }
         }
         
         onAuthStateChanged(auth, (user) => {
-            isLoggedIn = !!user;
-            updateUIVisibility();
+            if (user) {
+                // Usuário está logado (seja anonimamente ou com credenciais)
+                isLoggedIn = !user.isAnonymous;
+                updateUIVisibility();
+                listenToData(); // Busca os dados agora que a autenticação foi estabelecida
+            } else {
+                // Usuário deslogado, tenta login anônimo para acesso de leitura
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Falha no login anônimo:", error);
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Falha na Autenticação</span>`;
+                    tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Não foi possível conectar. Verifique as regras de segurança do Firebase.</td></tr>`;
+                });
+            }
         });
 
         function updateUIVisibility() {
@@ -493,6 +507,7 @@
                 openLoginModalBtn.classList.add('hidden');
                 adminActionsPatrimonio.classList.remove('hidden'); adminActionsPatrimonio.classList.add('flex');
                 document.getElementById('table-header-actions').classList.remove('hidden');
+                document.getElementById('nav-nf').classList.remove('hidden');
                 nfAdminActions.classList.remove('hidden'); nfAdminActions.classList.add('flex');
             } else {
                 userEmailEl.textContent = '';
@@ -500,6 +515,7 @@
                 openLoginModalBtn.classList.remove('hidden');
                 adminActionsPatrimonio.classList.add('hidden'); adminActionsPatrimonio.classList.remove('flex');
                 document.getElementById('table-header-actions').classList.add('hidden');
+                 document.getElementById('nav-nf').classList.add('hidden');
                 nfAdminActions.classList.add('hidden'); nfAdminActions.classList.remove('flex');
                 if (document.querySelector('.nav-btn.active').dataset.tab === 'notas-fiscais'){
                      switchTab('dashboard');
@@ -543,7 +559,6 @@
             const endIndex = startIndex + patrimonioItemsPerPage;
             const itemsToDisplay = patrimonioFilteredList.slice(startIndex, endIndex);
             
-            // CORREÇÃO: Adicionando a classe 'cursor-pointer' para melhor feedback visual.
             const actionButtonsHTML = (itemId) => !isLoggedIn ? '' : `
                 <button class="transfer-btn p-1 text-green-600 hover:text-green-800 cursor-pointer" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button>
                 <button class="edit-btn p-1 text-blue-600 hover:text-blue-800 cursor-pointer" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button>
@@ -578,8 +593,19 @@
                 </div>`;
         }
         
-        const openModal = (modalEl) => { modalEl.classList.remove('hidden'); setTimeout(() => { modalEl.querySelector('.modal-container').classList.remove('scale-95'); modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0'); }, 10); };
-        const closeModal = (modalEl) => { if(!modalEl) return; modalEl.querySelector('.modal-container').classList.add('scale-95'); modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0'); setTimeout(() => modalEl.classList.add('hidden'), 300); };
+        const openModal = (modalEl) => {
+            modalEl.classList.remove('hidden');
+            setTimeout(() => {
+                modalEl.querySelector('.modal-container')?.classList.remove('scale-95', 'opacity-0');
+                modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0');
+            }, 10);
+        };
+        const closeModal = (modalEl) => {
+            if(!modalEl) return;
+            modalEl.querySelector('.modal-container')?.classList.add('scale-95', 'opacity-0');
+            modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0');
+            setTimeout(() => modalEl.classList.add('hidden'), 300);
+        };
 
         function openItemModal(item = null) {
             itemForm.reset();
@@ -713,9 +739,7 @@
                     loginErrorEl.classList.remove('hidden');
                     return;
                 }
-                console.log("Tentando login com email:", email);
                 await signInWithEmailAndPassword(auth, email, password);
-                console.log("Login bem-sucedido");
                 closeModal(loginModal);
                 loginForm.reset();
             } catch (error) {
@@ -759,6 +783,7 @@
         function renderNFs() {
             if (!isLoggedIn) {
                 nfListContainer.innerHTML = '<p class="text-center text-slate-500 py-8">Faça login para gerenciar as notas fiscais.</p>';
+                nfPaginationControls.innerHTML = '';
                 return;
             }
 
@@ -956,8 +981,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
             
-            listenToData();
-
             const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 400);
 
             filtroTipoUnidadeEl.addEventListener('change', () => {
@@ -990,12 +1013,10 @@
                 if(page) { patrimonioCurrentPage = parseInt(page); renderPatrimonioTable(); }
             });
 
-            // CORREÇÃO: Listener de clique movido para um elemento pai estável ('mainContentAreaEl') para garantir o funcionamento após a recarga da tabela.
             mainContentAreaEl.addEventListener('click', (e) => {
                 const btn = e.target.closest('button');
                 if (!btn) return;
 
-                // Garante que o clique foi em um botão dentro da tabela de inventário
                 if (!btn.closest('#inventory-table-body')) return;
 
                 const isActionButton = btn.classList.contains('edit-btn') || btn.classList.contains('delete-btn') || btn.classList.contains('transfer-btn');
