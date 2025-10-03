@@ -133,7 +133,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.6 (Login Fix)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.8 (Patrimonio Actions Fix)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -198,7 +198,7 @@
                 </div>
             </div>
             
-            <main id="main-content-area" class="mt-2">
+            <div id="main-content-area" class="mt-2">
                  <div class="card p-0 overflow-x-auto">
                     <table class="table w-full text-sm">
                         <thead class="bg-slate-50">
@@ -218,7 +218,7 @@
                     </table>
                 </div>
                 <div id="pagination-controls" class="flex items-center justify-between mt-6"></div>
-            </main>
+            </div>
         </div>
 
         <!-- Notas Fiscais -->
@@ -259,7 +259,7 @@
     <!-- MODAIS -->
 
     <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
-    <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</col-md-4><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
+    <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</label><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
     <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
     <div id="export-pdf-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Exportar Relatório PDF</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6"> <p class="mb-4 text-slate-600">Selecione as colunas que deseja incluir no relatório:</p> <div id="export-columns-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4"> <label class="flex items-center space-x-2"><input type="checkbox" value="Tombamento" data-name="Tomb." class="rounded" checked><span>Tomb.</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Descrição" data-name="Descrição" class="rounded" checked><span>Descrição</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Unidade" data-name="Unidade" class="rounded" checked><span>Unidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Localização" data-name="Localização" class="rounded" checked><span>Localização</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Fornecedor" data-name="Fornecedor" class="rounded" checked><span>Fornecedor</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Estado" data-name="Estado" class="rounded" checked><span>Estado</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Quantidade" data-name="Qtd." class="rounded"><span>Quantidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Origem da Doação" data-name="Doação" class="rounded"><span>Doação</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Observação" data-name="Obs." class="rounded"><span>Observação</span></label> </div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="button" id="confirm-export-btn" class="btn btn-success">Exportar</button> </div></div></div>
     <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> </div></div></div>
@@ -352,7 +352,7 @@
         let unsubscribeNFs; 
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
-        let csvDataToUpload = []; // BUGFIX: Variável movida para o escopo global para ser acessível por ambas as funções de CSV.
+        let csvDataToUpload = [];
         
         // --- LÓGICA DE DADOS E FILTRAGEM PARA PATRIMÔNIO ---
         let patrimonioFullList = []; 
@@ -376,8 +376,8 @@
         const filtroTombamentoEl = document.getElementById('filtro-tombamento');
         const filtroLocalizacaoEl = document.getElementById('filtro-localizacao');
         const resetFiltersBtn = document.getElementById('reset-filters-btn');
-        const toggleAdvancedFiltersBtn = document.getElementById('toggle-advanced-filters-btn'); // BUGFIX: Elemento adicionado
-        const advancedFiltersContainer = document.getElementById('advanced-filters-container'); // BUGFIX: Elemento adicionado
+        const toggleAdvancedFiltersBtn = document.getElementById('toggle-advanced-filters-btn');
+        const advancedFiltersContainer = document.getElementById('advanced-filters-container');
         const itemModal = document.getElementById('item-modal');
         const openAddModalBtn = document.getElementById('open-add-modal-btn');
         const itemForm = document.getElementById('item-form');
@@ -410,6 +410,7 @@
         const nfSearchInput = document.getElementById('nf-search-input');
         const nfStatusFilter = document.getElementById('nf-status-filter');
         const nfPaginationControls = document.getElementById('nf-pagination-controls');
+        const mainContentAreaEl = document.getElementById('main-content-area');
 
         
         // --- LÓGICA DE DADOS ---
@@ -542,10 +543,11 @@
             const endIndex = startIndex + patrimonioItemsPerPage;
             const itemsToDisplay = patrimonioFilteredList.slice(startIndex, endIndex);
             
+            // CORREÇÃO: Adicionando a classe 'cursor-pointer' para melhor feedback visual.
             const actionButtonsHTML = (itemId) => !isLoggedIn ? '' : `
-                <button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button>
-                <button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button>
-                <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>`;
+                <button class="transfer-btn p-1 text-green-600 hover:text-green-800 cursor-pointer" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button>
+                <button class="edit-btn p-1 text-blue-600 hover:text-blue-800 cursor-pointer" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button>
+                <button class="delete-btn p-1 text-red-600 hover:text-red-800 cursor-pointer" data-id="${itemId}" title="Excluir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>`;
 
             tableBodyEl.innerHTML = itemsToDisplay.length === 0 
                 ? `<tr><td colspan="7" class="text-center py-10 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`
@@ -682,7 +684,6 @@
             if (tabName === 'notas-fiscais') renderNFs();
         }
 
-        // CORREÇÃO: Função 'renderDashboard' adicionada novamente.
         function renderDashboard(items) {
             if (!items || items.length === 0) return;
             const totalItens = items.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
@@ -700,13 +701,11 @@
             dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), { type: 'bar', data: { labels: Object.keys(tiposCount), datasets: [{ label: 'Qtd. de Itens', data: Object.values(tiposCount), backgroundColor: '#60a5fa' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         }
 
-        // BUGFIX 1: Função de login revisada para dar feedback de erro específico e corrigir a captura de valores.
         async function handleLogin(e) {
             e.preventDefault();
-            // CORREÇÃO: Usando getElementById para buscar os valores dos inputs, como sugerido.
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
-            loginErrorEl.classList.add('hidden'); // Oculta o erro anterior
+            loginErrorEl.classList.add('hidden');
 
             try {
                 if (!email || !password) {
@@ -714,13 +713,13 @@
                     loginErrorEl.classList.remove('hidden');
                     return;
                 }
-                console.log("Tentando login com email:", email); // Log para depuração
+                console.log("Tentando login com email:", email);
                 await signInWithEmailAndPassword(auth, email, password);
-                console.log("Login bem-sucedido"); // Log para depuração
+                console.log("Login bem-sucedido");
                 closeModal(loginModal);
                 loginForm.reset();
             } catch (error) {
-                console.error("Erro de login:", error.code, error.message); // Log detalhado para o console
+                console.error("Erro de login:", error.code, error.message);
                 let errorMessage = "Ocorreu um erro. Tente novamente.";
                 switch (error.code) {
                     case 'auth/user-not-found':
@@ -735,7 +734,7 @@
                         errorMessage = "Acesso bloqueado por muitas tentativas. Tente mais tarde.";
                         break;
                     default:
-                         errorMessage = `Erro: ${error.message}`; // Fallback para outros erros
+                         errorMessage = `Erro: ${error.message}`;
                          break;
                 }
                 loginErrorEl.textContent = errorMessage;
@@ -848,9 +847,8 @@
                 </div>`;
         }
         
-        // BUGFIX 3: Função revisada para usar a variável global `csvDataToUpload`.
         function handleCSVUpload() {
-            csvDataToUpload = []; // Limpa dados anteriores
+            csvDataToUpload = [];
             const file = document.getElementById('csv-file-input').files[0]; if (!file) return;
             Papa.parse(file, { header: true, skipEmptyLines: true, complete: (results) => {
                 const required = ['Nome Fornecedor', 'TOMBAMENTO', 'Descrição', 'Valor NF', 'Data NF', 'NF'];
@@ -866,7 +864,6 @@
             }});
         }
         
-        // BUGFIX 3: Função revisada para usar a variável global `csvDataToUpload`.
         async function saveCSVData() {
             if (csvDataToUpload.length === 0) {
                 alert('Nenhum dado de CSV para enviar. Selecione um arquivo válido primeiro.');
@@ -976,7 +973,6 @@
                 filtroLocalizacaoEl.addEventListener(evt, debouncedFilter);
             });
 
-            // BUGFIX 2: Adicionado evento de clique para o botão de filtros avançados.
             toggleAdvancedFiltersBtn.addEventListener('click', () => {
                 const isHidden = advancedFiltersContainer.classList.toggle('hidden');
                 toggleAdvancedFiltersBtn.textContent = isHidden ? 'Filtros Avançados' : 'Ocultar Filtros';
@@ -994,14 +990,33 @@
                 if(page) { patrimonioCurrentPage = parseInt(page); renderPatrimonioTable(); }
             });
 
-            tableBodyEl.addEventListener('click', (e) => {
-                const btn = e.target.closest('button'); if (!btn) return;
+            // CORREÇÃO: Listener de clique movido para um elemento pai estável ('mainContentAreaEl') para garantir o funcionamento após a recarga da tabela.
+            mainContentAreaEl.addEventListener('click', (e) => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+
+                // Garante que o clique foi em um botão dentro da tabela de inventário
+                if (!btn.closest('#inventory-table-body')) return;
+
+                const isActionButton = btn.classList.contains('edit-btn') || btn.classList.contains('delete-btn') || btn.classList.contains('transfer-btn');
+                if (!isActionButton) return;
+
                 const id = btn.dataset.id;
-                if (!id) return;
+                if (!id) {
+                    console.error("Botão de ação clicado, mas falta o atributo data-id.", btn);
+                    return;
+                }
+
                 const item = patrimonioFullList.find(i => i.id === id);
+                if (!item) {
+                    console.error(`Não foi possível encontrar o item com ID '${id}' na lista principal.`);
+                    alert('Erro: Não foi possível encontrar o item selecionado. Tente recarregar a página.');
+                    return;
+                }
+
                 if (btn.classList.contains('edit-btn')) openItemModal(item);
-                if (btn.classList.contains('delete-btn')) openDeleteModal(id);
-                if (btn.classList.contains('transfer-btn')) openTransferModal(id);
+                else if (btn.classList.contains('delete-btn')) openDeleteModal(id);
+                else if (btn.classList.contains('transfer-btn')) openTransferModal(id);
             });
             
             document.querySelectorAll('.modal .modal-overlay, .modal button[onclick*="closest"]').forEach(el => el.addEventListener('click', () => closeModal(el.closest('.modal'))));
@@ -1036,3 +1051,4 @@
     </script>
 </body>
 </html>
+
