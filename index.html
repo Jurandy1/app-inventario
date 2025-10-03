@@ -148,7 +148,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.6.0 (Otimizado)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.7.0 (Workflow NF)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -278,36 +278,45 @@
         </div>
     </div>
 
-    <!-- Modal de Registro de Entrega -->
-    <div id="delivery-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <!-- NOVO MODAL: Registrar e Transferir Item da NF para o Patrimônio -->
+    <div id="register-transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div class="modal-overlay absolute inset-0 bg-black/60"></div>
-        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
-             <form id="delivery-form">
+        <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95">
+             <form id="register-transfer-form">
                 <div class="flex items-center justify-between p-4 border-b">
-                    <h3 class="text-xl font-semibold">Registrar Entrega</h3>
-                    <button type="button" id="close-delivery-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+                    <h3 class="text-xl font-semibold">Alocar Item da NF no Patrimônio</h3>
+                    <button type="button" id="close-register-transfer-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
                 </div>
-                <div class="p-6 space-y-4">
-                    <input type="hidden" id="delivery-nf-id">
-                    <input type="hidden" id="delivery-item-index">
-                    <div>
-                        <p class="text-sm text-slate-500">Item</p>
-                        <p id="delivery-item-info" class="font-bold text-slate-800"></p>
+                <div class="p-6 space-y-4 overflow-y-auto" style="max-height: 70vh;">
+                    <input type="hidden" id="register-transfer-nf-id">
+                    <input type="hidden" id="register-transfer-item-index">
+                    
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-sm text-blue-800 font-semibold">Item de Origem (Nota Fiscal)</p>
+                        <p id="register-transfer-item-info" class="font-bold text-slate-800 text-lg"></p>
+                        <p id="register-transfer-item-details" class="text-sm text-slate-600"></p>
                     </div>
-                    <div><label for="delivery-person" class="block text-sm font-medium">Nome do Entregador</label><input type="text" id="delivery-person" class="w-full p-2 border rounded-lg mt-1" required></div>
-                    <div>
-                        <label class="block text-sm font-medium">Foto da Entrega</label>
-                        <input type="file" id="delivery-photo-input" accept="image/*" class="w-full p-2 border rounded-lg mt-1">
-                        <p class="text-xs text-center text-slate-500 my-2">OU</p>
-                        <button type="button" id="take-photo-btn" class="w-full btn btn-secondary">Tirar Foto com a Câmera</button>
-                    </div>
-                    <div id="photo-preview-container" class="hidden text-center">
-                        <img id="photo-preview" class="max-w-full max-h-48 mx-auto rounded-lg shadow-md">
-                        <p id="photo-feedback" class="text-xs text-green-600 mt-2"></p>
+
+                    <div class="border-t pt-4">
+                         <h4 class="font-semibold text-slate-800 text-lg mb-2">Destino do Item no Patrimônio</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><label for="register-transfer-tipo" class="block text-sm font-medium">Tipo de Unidade</label><select id="register-transfer-tipo" class="w-full p-2 border rounded-lg mt-1 bg-white" required></select></div>
+                            <div><label for="register-transfer-unidade" class="block text-sm font-medium">Unidade de Destino</label><select id="register-transfer-unidade" class="w-full p-2 border rounded-lg mt-1 bg-white" disabled required></select></div>
+                            <div class="sm:col-span-2"><label for="register-transfer-localizacao" class="block text-sm font-medium">Localização na Unidade</label><input type="text" id="register-transfer-localizacao" class="w-full p-2 border rounded-lg mt-1" placeholder="Ex: Sala da Coordenação, Recepção" required></div>
+                            <div>
+                                <label for="register-transfer-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label>
+                                <select id="register-transfer-estado" class="w-full p-2 border rounded-lg bg-white" required>
+                                    <option>Novo</option>
+                                    <option>Bom</option>
+                                    <option>Regular</option>
+                                    <option>Avariado</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end p-4 border-t bg-slate-50">
-                    <button type="submit" id="save-delivery-btn" class="btn btn-primary">Salvar Registro</button>
+                    <button type="submit" id="save-register-transfer-btn" class="btn btn-primary">Confirmar e Criar no Patrimônio</button>
                 </div>
             </form>
         </div>
@@ -348,8 +357,7 @@
         let firstVisibleDoc = null; // Primeiro documento da página atual
         let pageHistory = []; // Guarda o primeiro doc de cada página para o botão "Anterior"
         let currentPageNumber = 1;
-        let totalItems = 0; // Total de itens com os filtros aplicados
-
+        
         // --- ELEMENTOS DO DOM ---
         const connectionStatusEl = document.getElementById('connectionStatus');
         const tableBodyEl = document.getElementById('inventory-table-body');
@@ -405,14 +413,11 @@
         const csvFileInput = document.getElementById('csv-file-input');
         const csvUploadFeedback = document.getElementById('csv-upload-feedback');
         const uploadCsvBtn = document.getElementById('upload-csv-btn');
-        const deliveryModal = document.getElementById('delivery-modal');
-        const closeDeliveryModalBtn = document.getElementById('close-delivery-modal-btn');
-        const deliveryForm = document.getElementById('delivery-form');
-        const takePhotoBtn = document.getElementById('take-photo-btn');
-        const deliveryPhotoInput = document.getElementById('delivery-photo-input');
-        const photoPreviewContainer = document.getElementById('photo-preview-container');
-        const photoPreview = document.getElementById('photo-preview');
-        const photoFeedback = document.getElementById('photo-feedback');
+        // --- NOVO MODAL (NF -> Patrimônio) ---
+        const registerTransferModal = document.getElementById('register-transfer-modal');
+        const registerTransferForm = document.getElementById('register-transfer-form');
+        const closeRegisterTransferModalBtn = document.getElementById('close-register-transfer-modal-btn');
+
         
         // --- LÓGICA DE DADOS ---
         const normalizeStr = (str) => (str || '').trim().toLowerCase();
@@ -436,7 +441,6 @@
         function listenToData() {
             connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
             
-            // Listener para Notas Fiscais (só ativa se logado, mas prepara para todos)
             if (unsubscribeNFs) unsubscribeNFs();
             unsubscribeNFs = onSnapshot(collection(db, 'notas_fiscais'), (snapshot) => {
                 allNFs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -448,37 +452,28 @@
                     connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro NFs</span>`;
                  }
             });
-            // O listener de patrimônio foi movido para uma função de carregamento sob demanda.
+            
             loadPatrimonioPage();
-            // Carrega todos os itens em segundo plano para filtros e dashboard
             loadAllItemsForFiltersAndDashboard();
         }
 
-        /**
-         * OTIMIZAÇÃO: Carrega dados do patrimônio usando cache e paginação.
-         * @param {string} direction 'next', 'prev', ou 'first'
-         */
         async function loadPatrimonioPage(direction = 'first') {
             tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
 
-            // Otimização de Cache para a primeira página
             if (direction === 'first') {
                 const cacheKey = 'patrimonioCache_firstPage';
                 const cachedData = localStorage.getItem(cacheKey);
                 if (cachedData) {
                     const data = JSON.parse(cachedData);
-                    // Cache válido por 15 minutos para reduzir leituras
                     if (Date.now() - data.timestamp < 900000) { 
                         allItems = data.items;
                         renderTable();
-                        // Ainda faz a busca no Firebase em background para atualizar o cache, mas o usuário já vê os dados
                         fetchAndCacheFirstPage(); 
                         return;
                     }
                 }
             }
 
-            // Se não for 'first' ou o cache for inválido, busca no Firestore
             let q = query(collection(db, 'patrimonio'), orderBy("Descrição"), limit(itemsPerPage));
 
             try {
@@ -492,11 +487,11 @@
                 const querySnapshot = await getDocs(q);
                 
                 if (direction === 'next') {
-                    pageHistory.push(firstVisibleDoc); // Salva o início da página anterior
+                    pageHistory.push(firstVisibleDoc);
                     currentPageNumber++;
                 } else if (direction === 'prev') {
                     currentPageNumber--;
-                } else { // first
+                } else {
                     pageHistory = [];
                     currentPageNumber = 1;
                 }
@@ -506,10 +501,8 @@
                 
                 allItems = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // Se for a primeira página, salva no cache
                 if (direction === 'first') {
-                    const cacheKey = 'patrimonioCache_firstPage';
-                    localStorage.setItem(cacheKey, JSON.stringify({ items: allItems, timestamp: Date.now() }));
+                    localStorage.setItem('patrimonioCache_firstPage', JSON.stringify({ items: allItems, timestamp: Date.now() }));
                 }
 
                 renderTable();
@@ -525,15 +518,13 @@
                 const q = query(collection(db, 'patrimonio'), orderBy("Descrição"), limit(itemsPerPage));
                 const querySnapshot = await getDocs(q);
                 const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const cacheKey = 'patrimonioCache_firstPage';
-                localStorage.setItem(cacheKey, JSON.stringify({ items, timestamp: Date.now() }));
+                localStorage.setItem('patrimonioCache_firstPage', JSON.stringify({ items, timestamp: Date.now() }));
                 console.log("Cache da primeira página atualizado em background.");
             } catch (error) {
                 console.error("Erro ao atualizar cache em background:", error);
             }
         }
         
-        // Função para carregar todos os itens para filtros e dashboard, com cache.
         async function loadAllItemsForFiltersAndDashboard() {
             const cacheKey = 'patrimonioCache_allItems';
             const cachedData = localStorage.getItem(cacheKey);
@@ -541,22 +532,21 @@
 
             if (cachedData) {
                 const data = JSON.parse(cachedData);
-                if (Date.now() - data.timestamp < 3600000) { // Cache de 1 hora
+                if (Date.now() - data.timestamp < 3600000) { 
                     allItemsForAnalytics = data.items;
                     populateFilters(allItemsForAnalytics);
-                    renderDashboard(allItemsForAnalytics);
+                    if(document.getElementById('content-dashboard').offsetParent !== null) renderDashboard(allItemsForAnalytics);
                     return;
                 }
             }
             
-            // Se cache inválido, busca no Firestore
             try {
                 const querySnapshot = await getDocs(collection(db, 'patrimonio'));
                 allItemsForAnalytics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 localStorage.setItem(cacheKey, JSON.stringify({ items: allItemsForAnalytics, timestamp: Date.now() }));
                 
                 populateFilters(allItemsForAnalytics);
-                renderDashboard(allItemsForAnalytics);
+                if(document.getElementById('content-dashboard').offsetParent !== null) renderDashboard(allItemsForAnalytics);
             } catch(error) {
                 console.error("Erro ao carregar todos os itens para analytics:", error);
             }
@@ -598,7 +588,7 @@
                 nfAdminActions.classList.add('hidden');
                 nfAdminActions.classList.remove('flex');
             }
-            // A renderização da tabela agora é feita por loadPatrimonioPage
+            renderTable();
             renderNFs();
         }
 
@@ -610,7 +600,6 @@
         }
         
         async function updateUnidadeFilter() {
-            // Esta função agora precisa buscar os dados completos para popular o segundo filtro
             const cacheKey = 'patrimonioCache_allItems';
             const cachedData = localStorage.getItem(cacheKey);
             if(cachedData) {
@@ -629,17 +618,8 @@
                  filtroUnidadeEl.innerHTML = '<option value="">Carregando...</option>';
                  filtroUnidadeEl.disabled = true;
             }
-           // aplicarFiltros(); // TODO: Reimplementar filtros com queries do Firestore
         }
-
-        // TODO: Reimplementar a busca com queries do Firestore. Por enquanto, a paginação é a otimização principal.
-        function applyFiltersAndRender() {
-            // Esta função precisaria ser reescrita para fazer queries ao invés de filtrar um array local.
-            // Por enquanto, vamos recarregar a primeira página para manter a simplicidade.
-            loadPatrimonioPage('first');
-        }
-
-
+        
         function renderTable() {
             const itemsToDisplay = allItems;
             
@@ -745,12 +725,11 @@
                 if (id) await updateDoc(doc(db, 'patrimonio', id), itemData);
                 else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
                 closeModal(itemModal);
-                loadPatrimonioPage('first'); // Recarrega a primeira página
+                loadPatrimonioPage('first');
             } catch (error) { console.error("Erro ao salvar o item: ", error); alert("Ocorreu um erro ao salvar."); }
         }
         
         function openDeleteModal(id) {
-            // Como allItems só tem a página atual, precisamos buscar o item específico
             const item = allItems.find(i => i.id === id);
             if (!item) return;
             deleteItemInfoEl.textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
@@ -763,7 +742,7 @@
             try {
                 await deleteDoc(doc(db, 'patrimonio', confirmDeleteBtn.dataset.id));
                 closeModal(deleteConfirmModal);
-                loadPatrimonioPage('first'); // Recarrega
+                loadPatrimonioPage('first');
             } catch(error) { console.error("Erro ao excluir item: ", error); alert("Ocorreu um erro ao excluir."); }
         }
 
@@ -776,7 +755,6 @@
             document.getElementById('transfer-item-description').textContent = item.Descrição;
             document.getElementById('transfer-item-current-unit').textContent = `${item.Unidade} (${item.Localização || 'N/D'})`;
 
-            // Usa os dados de filtros que já foram carregados
             const cachedData = localStorage.getItem('patrimonioCache_allItems');
              if(cachedData) {
                 const allItemsFromCache = JSON.parse(cachedData).items;
@@ -792,20 +770,20 @@
             openModal(transferModal);
         }
 
-        function updateTransferUnidadeSelect() {
+        function updateTransferUnidadeSelect(tipoSelectEl, unidadeSelectEl) {
             const cachedData = localStorage.getItem('patrimonioCache_allItems');
             if(!cachedData) return;
 
             const allItemsFromCache = JSON.parse(cachedData).items;
-            const selectedTipo = transferTipoEl.value;
-            transferUnidadeEl.innerHTML = '';
+            const selectedTipo = tipoSelectEl.value;
+            unidadeSelectEl.innerHTML = '';
             if (selectedTipo) {
                 const unidades = [...new Set(allItemsFromCache.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
-                transferUnidadeEl.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
-                transferUnidadeEl.disabled = false;
+                unidadeSelectEl.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                unidadeSelectEl.disabled = false;
             } else {
-                transferUnidadeEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
-                transferUnidadeEl.disabled = true;
+                unidadeSelectEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
+                unidadeSelectEl.disabled = true;
             }
         }
 
@@ -848,7 +826,7 @@
         function switchTab(tabName) {
             navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
-            if (tabName === 'dashboard') loadAllItemsForFiltersAndDashboard(); // Recarrega dados do dashboard
+            if (tabName === 'dashboard') loadAllItemsForFiltersAndDashboard();
             if (tabName === 'patrimonio') loadPatrimonioPage();
             if (tabName === 'notas-fiscais') renderNFs();
         }
@@ -889,7 +867,6 @@
         }
         
         async function generatePdfReport() {
-            // Para gerar PDF de todos os itens, precisamos carregar todos eles primeiro.
             alert("Carregando todos os itens para o relatório. Isso pode levar um momento.");
             const querySnapshot = await getDocs(collection(db, 'patrimonio'));
             const allItemsForPdf = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -942,7 +919,7 @@
                     return acc;
                 }, {});
 
-                html += `<details class="nf-group bg-white rounded-lg shadow-sm">
+                html += `<details class="nf-group bg-white rounded-lg shadow-sm" open>
                     <summary class="flex justify-between items-center">
                         <span>${fornecedor}</span>
                         <span class="text-sm font-normal text-slate-500">${groupedByFornecedor[fornecedor].length} itens</span>
@@ -963,19 +940,26 @@
         }
 
         function renderNFItem(nf, item, itemIndex) {
-            const isDelivered = item.entrega && item.entrega.data;
-            return `<div class="border rounded-md p-3 flex justify-between items-center ${isDelivered ? 'bg-green-50' : ''}">
+            const isTransferred = item.transferencia && item.transferencia.patrimonioId;
+            let actionButtonHTML = '';
+
+            if (isTransferred) {
+                actionButtonHTML = `<div class="text-right"><p class="font-semibold text-sm text-green-700">Alocado</p><p class="text-xs text-slate-500">Em: ${item.transferencia.unidadeDestino}</p></div>`;
+            } else {
+                 actionButtonHTML = `<button class="register-transfer-btn btn btn-primary text-xs" data-nf-id="${nf.id}" data-item-index="${itemIndex}">Alocar no Patrimônio</button>`;
+            }
+
+            return `<div class="border rounded-md p-3 flex justify-between items-center ${isTransferred ? 'bg-green-50' : 'bg-white'}">
                 <div>
                     <p class="font-semibold">${item.Descrição}</p>
                     <p class="text-xs text-slate-500">NF: ${item.NF} | Tomb: ${item.TOMBAMENTO}</p>
                 </div>
                 <div>
-                    ${isDelivered ? 
-                    `<a href="${item.entrega.fotoURL}" target="_blank" class="btn btn-secondary text-xs">Ver Entrega</a>` : 
-                    `<button class="register-delivery-btn btn btn-primary text-xs" data-nf-id="${nf.id}" data-item-index="${itemIndex}">Registrar Entrega</button>`}
+                    ${actionButtonHTML}
                 </div>
             </div>`;
         }
+
 
         function handleCSVUpload() {
             const file = csvFileInput.files[0];
@@ -1005,8 +989,7 @@
             uploadCsvBtn.disabled = true;
             uploadCsvBtn.textContent = 'Enviando...';
 
-            // --- NOVA LÓGICA PARA SUPORTAR ARQUIVOS GRANDES ---
-            const maxBatchSize = 500; // Limite do Firestore para operações em lote
+            const maxBatchSize = 499; // Ligeiramente abaixo do limite para segurança
             let recordsProcessed = 0;
 
             try {
@@ -1048,100 +1031,107 @@
             }
         }
         
-        function openDeliveryModal(nfId, itemIndex) {
+        function openRegisterTransferModal(nfId, itemIndex) {
             const nf = allNFs.find(n => n.id === nfId);
             if (!nf) return;
             const item = nf.items[itemIndex];
             
-            deliveryForm.reset();
-            photoPreviewContainer.classList.add('hidden');
-            document.getElementById('delivery-nf-id').value = nfId;
-            document.getElementById('delivery-item-index').value = itemIndex;
-            document.getElementById('delivery-item-info').textContent = `${item.Descrição} (Tomb: ${item.TOMBAMENTO})`;
+            registerTransferForm.reset();
             
-            openModal(deliveryModal);
+            document.getElementById('register-transfer-nf-id').value = nfId;
+            document.getElementById('register-transfer-item-index').value = itemIndex;
+            document.getElementById('register-transfer-item-info').textContent = item.Descrição;
+            document.getElementById('register-transfer-item-details').textContent = `Tomb: ${item.TOMBAMENTO} | NF: ${item.NF} | Fornecedor: ${nf['Nome Fornecedor']}`;
+            
+            const tipoSelect = document.getElementById('register-transfer-tipo');
+            const unidadeSelect = document.getElementById('register-transfer-unidade');
+
+            const cachedData = localStorage.getItem('patrimonioCache_allItems');
+             if(cachedData) {
+                const allItemsFromCache = JSON.parse(cachedData).items;
+                const tipos = [...new Set(allItemsFromCache.map(i => i.Tipo).filter(Boolean))].sort();
+                tipoSelect.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+             } else {
+                 tipoSelect.innerHTML = '<option value="">Carregando...</option>';
+             }
+            unidadeSelect.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
+            unidadeSelect.disabled = true;
+
+            openModal(registerTransferModal);
         }
 
-        async function handlePhoto(file) {
-            if (!file) return;
-            photoFeedback.textContent = 'Otimizando imagem...';
-            photoPreview.src = URL.createObjectURL(file);
-            photoPreviewContainer.classList.remove('hidden');
-
-            const resizedFile = await resizeImage(file, 800, 0.8);
-            deliveryPhotoInput.filesData = [resizedFile]; 
-            photoFeedback.textContent = `Imagem pronta! (${(resizedFile.size / 1024).toFixed(1)} KB)`;
-        }
-
-        function resizeImage(file, maxSize, quality) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        let { width, height } = img;
-                        if (width > height) {
-                            if (width > maxSize) { height *= maxSize / width; width = maxSize; }
-                        } else {
-                            if (height > maxSize) { width *= maxSize / height; height = maxSize; }
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        canvas.toBlob((blob) => {
-                            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
-                        }, 'image/jpeg', quality);
-                    };
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        }
-
-        async function handleDeliverySubmit(e) {
+        async function handleRegisterAndTransferSubmit(e) {
             e.preventDefault();
-            const nfId = document.getElementById('delivery-nf-id').value;
-            const itemIndex = parseInt(document.getElementById('delivery-item-index').value);
-            const person = document.getElementById('delivery-person').value;
-            const file = deliveryPhotoInput.filesData?.[0];
+            const saveBtn = document.getElementById('save-register-transfer-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Processando...';
 
-            if (!person || !file) {
-                alert('Preencha o nome do entregador e adicione uma foto.');
+            const nfId = document.getElementById('register-transfer-nf-id').value;
+            const itemIndex = parseInt(document.getElementById('register-transfer-item-index').value);
+            const tipo = document.getElementById('register-transfer-tipo').value;
+            const unidade = document.getElementById('register-transfer-unidade').value;
+            const localizacao = document.getElementById('register-transfer-localizacao').value.trim();
+            const estado = document.getElementById('register-transfer-estado').value;
+
+            if (!nfId || itemIndex < 0 || !tipo || !unidade || !localizacao) {
+                alert('Todos os campos de destino são obrigatórios.');
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Confirmar e Criar no Patrimônio';
                 return;
             }
 
-            const saveBtn = document.getElementById('save-delivery-btn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Salvando...';
+            const nfDoc = allNFs.find(n => n.id === nfId);
+            const itemFromNf = nfDoc.items[itemIndex];
+
+            const batch = writeBatch(db);
+
+            // 1. Criar novo item no patrimônio
+            const newPatrimonioRef = doc(collection(db, 'patrimonio'));
+            const observacao = `Item recebido via NF ${itemFromNf.NF} (${nfDoc['Nome Fornecedor']}) em ${new Date().toLocaleDateString('pt-BR')}.`;
+            
+            const patrimonioData = {
+                Descrição: itemFromNf.Descrição,
+                Tombamento: itemFromNf.TOMBAMENTO,
+                Fornecedor: nfDoc['Nome Fornecedor'],
+                Tipo: tipo,
+                Unidade: unidade,
+                Localização: localizacao,
+                Estado: estado,
+                Quantidade: 1, // Assumindo 1 por item da NF
+                Observação: observacao,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            };
+            batch.set(newPatrimonioRef, patrimonioData);
+
+            // 2. Atualizar o item na nota fiscal
+            const nfDocRef = doc(db, 'notas_fiscais', nfId);
+            const updatedNfItems = [...nfDoc.items]; // Criar uma cópia
+            updatedNfItems[itemIndex].transferencia = {
+                patrimonioId: newPatrimonioRef.id,
+                data: serverTimestamp(),
+                usuario: auth.currentUser.email,
+                unidadeDestino: unidade,
+                localizacaoDestino: localizacao
+            };
+            batch.update(nfDocRef, { items: updatedNfItems });
 
             try {
-                const photoRef = ref(storage, `entregas/${nfId}_${Date.now()}.jpg`);
-                await uploadBytes(photoRef, file);
-                const photoURL = await getDownloadURL(photoRef);
-
-                const nfDocRef = doc(db, 'notas_fiscais', nfId);
-                const nfToUpdate = allNFs.find(n => n.id === nfId);
-                const updatedItems = JSON.parse(JSON.stringify(nfToUpdate.items)); // Deep copy
-                updatedItems[itemIndex].entrega = {
-                    data: serverTimestamp(),
-                    responsavel: person,
-                    fotoURL: photoURL
-                };
-
-                await updateDoc(nfDocRef, { items: updatedItems });
-                closeModal(deliveryModal);
-
+                await batch.commit();
+                alert('Item alocado no patrimônio com sucesso!');
+                closeModal(registerTransferModal);
+                // Força a atualização do cache de todos os itens para refletir o novo item
+                localStorage.removeItem('patrimonioCache_allItems');
+                loadAllItemsForFiltersAndDashboard();
             } catch (error) {
-                console.error("Erro ao salvar entrega:", error);
-                alert('Ocorreu um erro ao salvar o registro de entrega.');
+                console.error("Erro ao alocar item:", error);
+                alert('Ocorreu um erro. Verifique o console.');
             } finally {
                 saveBtn.disabled = false;
-                saveBtn.textContent = 'Salvar Registro';
+                saveBtn.textContent = 'Confirmar e Criar no Patrimônio';
             }
         }
+        
         
         // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -1149,12 +1139,8 @@
 
             // A lógica de filtros precisará ser mais complexa com queries
             filtroTipoUnidadeEl.addEventListener('change', updateUnidadeFilter);
-            //filtroUnidadeEl.addEventListener('change', applyFiltersAndRender);
-            //filtroEstadoEl.addEventListener('change', applyFiltersAndRender);
-            //[filtroBuscaEl, filtroTombamentoEl, filtroLocalizacaoEl].forEach(el => el.addEventListener('input', debounceFilter(applyFiltersAndRender, 400)));
             
             resetFiltersBtn.addEventListener('click', () => {
-                // Reseta os filtros e recarrega a primeira página
                 filtroTipoUnidadeEl.value = '';
                 filtroEstadoEl.value = '';
                 filtroBuscaEl.value = '';
@@ -1166,7 +1152,7 @@
 
             toggleAdvancedFiltersBtn.addEventListener('click', () => advancedFiltersContainer.classList.toggle('hidden'));
             paginationControlsEl.addEventListener('click', (e) => { 
-                const direction = e.target.dataset.page;
+                const direction = e.target.closest('button')?.dataset.page;
                 if(direction) loadPatrimonioPage(direction);
             });
 
@@ -1196,7 +1182,7 @@
             
             closeTransferModalBtn.addEventListener('click', () => closeModal(transferModal));
             cancelTransferBtn.addEventListener('click', () => closeModal(transferModal));
-            transferTipoEl.addEventListener('change', updateTransferUnidadeSelect);
+            transferTipoEl.addEventListener('change', (e) => updateTransferUnidadeSelect(e.target, transferUnidadeEl));
             transferForm.addEventListener('submit', handleTransferSubmit);
             
             navButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
@@ -1207,13 +1193,16 @@
             uploadCsvBtn.addEventListener('click', saveCSVData);
 
             nfListContainer.addEventListener('click', (e) => {
-                const btn = e.target.closest('.register-delivery-btn');
-                if(btn) openDeliveryModal(btn.dataset.nfId, parseInt(btn.dataset.itemIndex));
+                const btn = e.target.closest('.register-transfer-btn');
+                if(btn) openRegisterTransferModal(btn.dataset.nfId, parseInt(btn.dataset.itemIndex));
             });
-            closeDeliveryModalBtn.addEventListener('click', () => closeModal(deliveryModal));
-            deliveryForm.addEventListener('submit', handleDeliverySubmit);
-            takePhotoBtn.addEventListener('click', () => deliveryPhotoInput.click());
-            deliveryPhotoInput.addEventListener('change', (e) => handlePhoto(e.target.files[0]));
+            
+            // Listeners do novo modal
+            closeRegisterTransferModalBtn.addEventListener('click', () => closeModal(registerTransferModal));
+            registerTransferForm.addEventListener('submit', handleRegisterAndTransferSubmit);
+            const rtTipoSelect = document.getElementById('register-transfer-tipo');
+            const rtUnidadeSelect = document.getElementById('register-transfer-unidade');
+            rtTipoSelect.addEventListener('change', () => updateTransferUnidadeSelect(rtTipoSelect, rtUnidadeSelect));
         });
     </script>
 </body>
