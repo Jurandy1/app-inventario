@@ -8,8 +8,6 @@
     <!-- Scripts e Links -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -36,14 +34,21 @@
             border-radius: 0.75rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             padding: 1.5rem;
-            transition: all 0.3s ease;
         }
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            white-space: nowrap;
         }
-        .alert { padding: 1rem; border-radius: 0.5rem; border: 1px solid; }
-        .alert-error { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .btn-primary { background-color: var(--primary-blue); color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-danger { background-color: var(--error); color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-secondary { background-color: #e2e8f0; color: #475569; }
+        .btn-secondary:hover { background-color: #cbd5e1; }
+
         .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
         .badge-green { background: #d1fae5; color: #059669; }
         .badge-blue { background: #dbeafe; color: #2563eb; }
@@ -67,8 +72,15 @@
         }
         .nav-btn:hover { background-color: #f8fafc; }
         .nav-btn.active { color: var(--secondary-blue); border-bottom-color: var(--secondary-blue); }
+        
+        /* Modal */
+        .modal-overlay { transition: opacity 0.3s ease; }
+        .modal-container { transition: all 0.3s ease; max-height: 90vh; }
 
         /* Animações */
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
         .loading-spinner {
             border: 5px solid #e5e7eb;
             border-top: 5px solid var(--secondary-blue);
@@ -79,14 +91,7 @@
             margin: auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .fade-in { animation: fadeIn 0.4s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .modal-overlay { transition: opacity 0.3s ease; }
-        .modal-container { transition: all 0.3s ease; max-height: 90vh; }
-        .chart-container { position: relative; width: 100%; height: 350px; }
 
-        /* Estilos específicos das abas... (mantidos da versão anterior) */
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -105,10 +110,8 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.4.0 Firebase</span></h2>
-            <div class="flex items-center space-x-4 text-sm">
-                <div id="connectionStatus" class="flex items-center gap-2 font-semibold"></div>
-            </div>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.4.3 (Firebase)</span></h2>
+            <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
 
@@ -116,9 +119,8 @@
     <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[92px] md:top-[88px]">
         <div class="container mx-auto px-4">
             <div class="flex space-x-1 overflow-x-auto">
-                <button class="nav-btn" data-tab="dashboard">📊 Dashboard</button>
+                <button class="nav-btn active" data-tab="dashboard">📊 Dashboard</button>
                 <button class="nav-btn" data-tab="patrimonio">💼 Patrimônio</button>
-                <button class="nav-btn" data-tab="estoque">📦 Estoque</button>
             </div>
         </div>
     </nav>
@@ -127,155 +129,564 @@
     <main class="container mx-auto p-4 sm:p-6 lg:p-8">
         
         <!-- Dashboard -->
-        <div id="content-dashboard" class="hidden fade-in">
-            <!-- Conteúdo do Dashboard (mantido) -->
-             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div id="content-dashboard" class="fade-in">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Total de Itens</p><p id="kpi-total-itens" class="text-4xl font-bold text-blue-600 mt-2">0</p></div>
                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Unidades Mapeadas</p><p id="kpi-total-unidades" class="text-4xl font-bold text-blue-600 mt-2">0</p></div>
                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Itens Avariados</p><p id="kpi-total-avariados" class="text-4xl font-bold text-red-600 mt-2">0</p></div>
-                <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Itens Novos</p><p id="kpi-total-novos" class="text-4xl font-bold text-green-600 mt-2">0</p></div>
+                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Itens Novos</p><p id="kpi-total-novos" class="text-4xl font-bold text-green-600 mt-2">0</p></div>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 card"><h3 class="text-lg font-semibold text-slate-800 mb-4">Distribuição por Estado</h3><div class="chart-container" style="height: 400px;"><canvas id="dashboardEstadoChart"></canvas></div></div>
-                <div class="card"><h3 class="text-lg font-semibold text-slate-800 mb-4">Distribuição por Tipo</h3><div class="chart-container" style="height: 400px;"><canvas id="dashboardTipoChart"></canvas></div></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card"><h3 class="text-lg font-semibold text-slate-800 mb-4">Distribuição por Estado</h3><div style="height: 400px;"><canvas id="dashboardEstadoChart"></canvas></div></div>
+                <div class="card"><h3 class="text-lg font-semibold text-slate-800 mb-4">Distribuição por Tipo de Unidade</h3><div style="height: 400px;"><canvas id="dashboardTipoChart"></canvas></div></div>
             </div>
         </div>
-
+        
         <!-- Patrimônio -->
         <div id="content-patrimonio" class="hidden fade-in">
              <div class="card mb-8">
-                <!-- Filtros -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <div><label for="filtro-tipo" class="block text-sm font-medium mb-1">Tipo</label><select id="filtro-tipo" class="w-full p-2 border rounded-lg"></select></div>
-                    <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg"></select></div>
-                    <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg"></select></div>
-                    <div><label for="filtro-doacao" class="block text-sm font-medium mb-1">Origem</label><select id="filtro-doacao" class="w-full p-2 border rounded-lg"><option value="">TODAS</option><option value="sim">DOAÇÕES</option><option value="nao">PRÓPRIOS</option></select></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                    <div><label for="filtro-tipo-unidade" class="block text-sm font-medium mb-1">Tipo de Unidade</label><select id="filtro-tipo-unidade" class="w-full p-2 border rounded-lg bg-white"></select></div>
+                    <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg bg-white" disabled></select></div>
+                    <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg bg-white"></select></div>
+                    <div class="lg:col-span-3"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida</label><input type="text" id="filtro-busca" placeholder="Buscar por tombamento, descrição..." class="w-full p-2 border rounded-lg"></div>
                 </div>
-                 <div class="mt-4">
-                    <label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Geral</label>
-                    <input type="text" id="filtro-busca" placeholder="Buscar por descrição, tombamento, local, etc..." class="w-full p-2 border rounded-lg">
+                <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <button id="ver-resumo-geral-btn" class="w-full sm:w-auto btn btn-secondary">Limpar Filtros</button>
+                    <button id="open-add-modal-btn" class="w-full sm:w-auto btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="inline-block -mt-1 mr-2" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+                        Adicionar Item
+                    </button>
                 </div>
             </div>
-             <!-- Botões de Ação -->
-            <div class="flex justify-between items-center mb-6">
-                <button id="add-item-btn" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></svg>
-                    Adicionar Novo Item
-                </button>
-                <button id="export-pdf-btn" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm disabled:opacity-50" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg>
-                    Exportar para PDF
-                </button>
-            </div>
-            <main id="main-content-area" class="mt-2"></main>
+            
+            <main id="main-content-area" class="mt-2">
+                 <div class="card p-0 overflow-x-auto">
+                    <table class="table w-full text-sm">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="p-3 text-left">Tomb.</th>
+                                <th class="p-3 text-left">Descrição</th>
+                                <th class="p-3 text-left">Unidade</th>
+                                <th class="p-3 text-left">Localização</th>
+                                <th class="p-3 text-left">Estado</th>
+                                <th class="p-3 text-left">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body">
+                           <tr><td colspan="6" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados do Firebase...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="pagination-controls" class="flex items-center justify-between mt-6"></div>
+            </main>
         </div>
-
-        <!-- Estoque (Pode ser integrado futuramente) -->
-        <div id="content-estoque" class="hidden fade-in">
-            <div class="card text-center">
-                <h2 class="text-xl font-bold">Módulo de Estoque</h2>
-                <p class="mt-2 text-slate-600">Este módulo pode ser integrado com o Firebase futuramente.</p>
-            </div>
-        </div>
-
     </main>
 
     <!-- Rodapé -->
     <footer class="text-center mt-12 mb-6 text-sm text-slate-500">
-        <p>Painel desenvolvido por: Jurandy | SEMCAS</p>
+        <p>Painel desenvolvido por: Jurandy | SEMCAS | Firebase Edition</p>
     </footer>
 
-    <!-- Modal de Adicionar/Editar Item -->
+    <!-- Modal Adicionar/Editar Item -->
     <div id="item-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div id="modal-overlay" class="absolute inset-0 bg-black/60 opacity-0"></div>
-        <div class="modal-container bg-white w-full max-w-4xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
-            <div class="flex items-center justify-between p-4 border-b">
-                <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3>
-                <button id="close-modal-btn" class="p-2 rounded-full hover:bg-slate-200 text-2xl leading-none">&times;</button>
-            </div>
-            <form id="item-form" class="p-6 overflow-y-auto flex-1">
-                <input type="hidden" id="item-id">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Coluna 1 -->
-                    <div>
-                        <label for="Tipo" class="block text-sm font-medium mb-1">Tipo</label>
-                        <select id="Tipo" name="Tipo" class="w-full p-2 border rounded-lg" required>
-                            <option value="conselho">CONSELHO</option>
-                            <option value="cras">CRAS</option><option value="creas">CREAS</option>
-                            <option value="externa">UNIDADE EXTERNA</option>
-                            <option value="centro_pop">CENTRO POP</option>
-                            <option value="abrigo">ABRIGO</option><option value="sede">SEDE</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="Tombamento" class="block text-sm font-medium mb-1">Tombamento</label>
-                        <input type="text" id="Tombamento" name="Tombamento" class="w-full p-2 border rounded-lg" placeholder="S/T para sem tombo">
-                    </div>
-                     <div>
-                        <label for="Descricao" class="block text-sm font-medium mb-1">Descrição</label>
-                        <input type="text" id="Descricao" name="Descricao" class="w-full p-2 border rounded-lg" required>
-                    </div>
-                    <!-- Coluna 2 -->
-                    <div>
-                        <label for="Unidade" class="block text-sm font-medium mb-1">Unidade</label>
-                        <input type="text" id="Unidade" name="Unidade" class="w-full p-2 border rounded-lg" required>
-                    </div>
-                    <div>
-                        <label for="Quantidade" class="block text-sm font-medium mb-1">Quantidade</label>
-                        <input type="number" id="Quantidade" name="Quantidade" value="1" class="w-full p-2 border rounded-lg" required>
-                    </div>
-                    <div>
-                        <label for="Localizacao" class="block text-sm font-medium mb-1">Local na Unidade</label>
-                        <input type="text" id="Localizacao" name="Localizacao" class="w-full p-2 border rounded-lg">
-                    </div>
-                    <!-- Coluna 3 -->
-                    <div>
-                        <label for="Estado" class="block text-sm font-medium mb-1">Estado</label>
-                        <select id="Estado" name="Estado" class="w-full p-2 border rounded-lg" required>
-                            <option>Novo</option><option>Bom</option><option selected>Regular</option><option>Avariado</option>
-                        </select>
-                    </div>
-                     <div>
-                        <label for="Origem da Doacao" class="block text-sm font-medium mb-1">Origem da Doação</label>
-                        <input type="text" id="Origem da Doacao" name="Origem da Doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for">
-                    </div>
-                    <div>
-                        <label for="Fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label>
-                        <input type="text" id="Fornecedor" name="Fornecedor" class="w-full p-2 border rounded-lg">
-                    </div>
-                    <!-- Campo de Observação -->
-                     <div class="md:col-span-2 lg:col-span-3">
-                        <label for="Observacao" class="block text-sm font-medium mb-1">Observação</label>
-                        <textarea id="Observacao" name="Observacao" rows="3" class="w-full p-2 border rounded-lg"></textarea>
+        <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <form id="item-form">
+                <div class="flex items-center justify-between p-4 border-b">
+                    <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3>
+                    <button type="button" id="close-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+                </div>
+                <div class="p-6 overflow-y-auto" style="max-height: 70vh;">
+                    <input type="hidden" id="item-id">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div>
+                        <div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div>
+                        <div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div>
+                        <div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div>
+                         <div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div>
+                        <div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</col-md-4><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div>
+                        <div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div>
+                        <div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div>
+                        <div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div>
+                        <div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div>
                     </div>
                 </div>
+                <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
+                    <button type="button" id="cancel-btn" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" id="save-btn" class="btn btn-primary">Salvar Item</button>
+                </div>
             </form>
-            <div class="flex justify-end p-4 border-t bg-slate-50 space-x-2">
-                 <button type="button" id="cancel-btn" class="px-4 py-2 bg-slate-200 font-semibold rounded-lg hover:bg-slate-300">Cancelar</button>
-                 <button type="submit" form="item-form" id="save-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Salvar</button>
-            </div>
         </div>
     </div>
     
-    <!-- Modal de Confirmação de Exclusão -->
-    <div id="delete-confirm-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+     <!-- Modal de Confirmação de Exclusão -->
+    <div id="delete-confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div class="absolute inset-0 bg-black/60"></div>
-        <div class="bg-white w-full max-w-md rounded-lg shadow-2xl p-6 relative">
-            <h3 class="text-lg font-bold">Confirmar Exclusão</h3>
-            <p class="mt-2 text-slate-600">Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.</p>
-            <div id="delete-item-info" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm"></div>
-            <div class="flex justify-end mt-6 space-x-2">
-                <button id="cancel-delete-btn" class="px-4 py-2 bg-slate-200 font-semibold rounded-lg hover:bg-slate-300">Cancelar</button>
-                <button id="confirm-delete-btn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Excluir</button>
+        <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95">
+            <div class="p-6 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3>
+                <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p>
+                <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button>
+                <button id="cancel-delete-btn" type="button" class="btn btn-secondary">Cancelar</button>
             </div>
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-    <script type="module" src="./main.js"></script>
+    <script type="module">
+        // Importações do SDK do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        // Configuração do Firebase com suas credenciais
+        const firebaseConfig = {
+            apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
+            authDomain: "controle-de-patrimonio-semcas.firebaseapp.com",
+            projectId: "controle-de-patrimonio-semcas",
+            storageBucket: "controle-de-patrimonio-semcas.firebasestorage.app",
+            messagingSenderId: "438620819929",
+            appId: "1:438620819929:web:6fcbc12905a0c928e549c8"
+        };
+
+        // Inicialização do Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // --- VARIÁVEIS GLOBAIS E ESTADO DA APLICAÇÃO ---
+        let allItems = []; // Guarda todos os itens do Firebase
+        let filteredItems = []; // Guarda os itens após a filtragem
+        let currentPage = 1;
+        const itemsPerPage = 15;
+        let unsubscribe; // Função para parar de ouvir as atualizações do Firebase
+
+        // Chart instances
+        let dashboardEstadoChart, dashboardTipoChart;
+
+        // --- ELEMENTOS DO DOM ---
+        const connectionStatusEl = document.getElementById('connectionStatus');
+        const tableBodyEl = document.getElementById('inventory-table-body');
+        const paginationControlsEl = document.getElementById('pagination-controls');
+        
+        // Filtros
+        const filtroTipoUnidadeEl = document.getElementById('filtro-tipo-unidade');
+        const filtroUnidadeEl = document.getElementById('filtro-unidade');
+        const filtroEstadoEl = document.getElementById('filtro-estado');
+        const filtroBuscaEl = document.getElementById('filtro-busca');
+        const verResumoGeralBtn = document.getElementById('ver-resumo-geral-btn');
+        
+        // Modal de Item
+        const itemModal = document.getElementById('item-modal');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const openAddModalBtn = document.getElementById('open-add-modal-btn');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const itemForm = document.getElementById('item-form');
+        const modalTitle = document.getElementById('modal-title');
+        
+        // Modal de Exclusão
+        const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const deleteItemInfoEl = document.getElementById('delete-item-info');
+
+        // Navegação
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
+
+        // --- FUNÇÕES DE LÓGICA DE DADOS ---
+        const normalizeStr = (str) => (str || '').trim().toLowerCase();
+
+        const getNormalizedEstado = (estadoStr) => {
+            const normalized = normalizeStr(estadoStr);
+            const avariadoKeywords = ['avariado', 'avariada', 'pessimo estado', 'péssimo estado', 'quebrado', 'quebrada', 'defeito', 'danificado', 'danificada', 'nao funciona', 'não funciona'];
+            
+            if (avariadoKeywords.some(keyword => normalized.includes(keyword))) {
+                return 'Avariado';
+            }
+            if (normalized === 'novo') {
+                return 'Novo';
+            }
+            if (normalized === 'bom' || normalized === 'otimo' || normalized === 'ótimo') {
+                return 'Bom';
+            }
+            // Qualquer outra coisa, incluindo 'regular' ou strings vazias, será 'Regular'
+            return 'Regular';
+        };
+
+        // --- FUNÇÕES PRINCIPAIS ---
+
+        // Conecta e busca os dados do Firebase em tempo real
+        async function connectToFirebase() {
+            connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
+            try {
+                await signInAnonymously(auth); // Autenticação anônima
+                
+                const patrimonioCollection = collection(db, 'patrimonio');
+                
+                unsubscribe = onSnapshot(patrimonioCollection, (snapshot) => {
+                    allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
+                    
+                    populateFilters();
+                    applyFiltersAndRender();
+                    switchTab('dashboard'); // Inicia na aba Dashboard
+                }, (error) => {
+                    console.error("Erro ao buscar dados: ", error);
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro de Conexão</span>`;
+                    tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10 text-red-600">Falha ao carregar os dados. Verifique o console para mais detalhes.</td></tr>`;
+                });
+
+            } catch (error) {
+                console.error("Erro na autenticação: ", error);
+                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Falha na Autenticação</span>`;
+                
+                if (error.code === 'auth/configuration-not-found') {
+                    document.getElementById('content-dashboard').innerHTML = `<div class="card text-center p-10 text-red-600">
+                        <strong class="text-lg">Erro de Configuração do Firebase</strong><br>
+                        O método de login "Anônimo" precisa ser ativado no seu projeto.<br><br>
+                        <strong class="text-left block">Como corrigir:</strong>
+                        <ol class="list-decimal list-inside text-left inline-block">
+                            <li>Vá para o <a href="https://console.firebase.google.com/" target="_blank" class="text-blue-600 underline">Console do Firebase</a>.</li>
+                            <li>Selecione seu projeto (controle-de-patrimonio-semcas).</li>
+                            <li>No menu à esquerda, vá para <strong>Authentication</strong>.</li>
+                            <li>Clique na aba <strong>Sign-in method</strong>.</li>
+                            <li>Encontre <strong>Anônimo</strong> na lista e ative-o.</li>
+                        </ol>
+                    </div>`;
+                }
+            }
+        }
+        
+        // Popula os filtros com base nos dados carregados
+        function populateFilters() {
+            // Popula filtro de Tipo de Unidade
+            const tipos = [...new Set(allItems.map(item => item.Tipo).filter(Boolean))].sort();
+            filtroTipoUnidadeEl.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            
+            // Popula filtro de Estado
+            const estados = [...new Set(allItems.map(item => getNormalizedEstado(item.Estado)))];
+            filtroEstadoEl.innerHTML = '<option value="">TODOS OS ESTADOS</option>' + ['Novo', 'Bom', 'Regular', 'Avariado'].filter(e => estados.includes(e)).map(e => `<option value="${e}">${e}</option>`).join('');
+        }
+        
+        function updateUnidadeFilter() {
+            const selectedTipo = filtroTipoUnidadeEl.value;
+            filtroUnidadeEl.value = ''; // Reseta o filtro de unidade
+            
+            if (selectedTipo) {
+                const unidades = [...new Set(allItems.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+                filtroUnidadeEl.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                filtroUnidadeEl.disabled = false;
+            } else {
+                filtroUnidadeEl.innerHTML = '<option value="">Selecione um Tipo</option>';
+                filtroUnidadeEl.disabled = true;
+            }
+            applyFiltersAndRender();
+        }
+
+        // Aplica os filtros e chama a renderização
+        function applyFiltersAndRender() {
+            const tipo = filtroTipoUnidadeEl.value;
+            const unidade = filtroUnidadeEl.value;
+            const estado = filtroEstadoEl.value;
+            const busca = filtroBuscaEl.value.toLowerCase();
+
+            filteredItems = allItems.filter(item => {
+                const searchMatch = !busca ||
+                    (item.Tombamento && item.Tombamento.toLowerCase().includes(busca)) ||
+                    (item.Descrição && item.Descrição.toLowerCase().includes(busca));
+                
+                return (!tipo || item.Tipo === tipo) &&
+                       (!unidade || item.Unidade === unidade) &&
+                       (!estado || getNormalizedEstado(item.Estado) === estado) &&
+                       searchMatch;
+            });
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Renderiza a tabela de patrimônio
+        function renderTable() {
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const itemsToDisplay = filteredItems.slice(startIndex, endIndex);
+
+            if (itemsToDisplay.length === 0) {
+                 if (allItems.length > 0) {
+                     tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-500">Nenhum item encontrado com os filtros aplicados.</td></tr>`;
+                 } else if (!connectionStatusEl.textContent.includes('Erro')) {
+                    tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
+                 }
+            } else {
+                 tableBodyEl.innerHTML = itemsToDisplay.map(item => `
+                    <tr class="border-b border-slate-200 hover:bg-slate-50">
+                        <td class="px-3 py-2 font-mono text-xs">${item.Tombamento || 'S/T'}</td>
+                        <td class="px-3 py-2 font-medium text-slate-900">${item.Descrição || 'N/A'}</td>
+                        <td class="px-3 py-2">${item.Unidade || 'N/A'}</td>
+                        <td class="px-3 py-2">${item.Localização || 'N/A'}</td>
+                        <td class="px-3 py-2"><span class="badge ${getStateColor(item.Estado)}">${item.Estado || 'N/A'}</span></td>
+                        <td class="px-3 py-2 space-x-2">
+                            <button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${item.id}" title="Editar Item">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
+                            </button>
+                            <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${item.id}" title="Excluir Item">
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            renderPagination();
+        }
+        
+        // Renderiza os controles de paginação
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+            if (totalPages <= 1) {
+                paginationControlsEl.innerHTML = '';
+                return;
+            }
+            paginationControlsEl.innerHTML = `
+                <span class="text-sm text-slate-600">Página ${currentPage} de ${totalPages} (${filteredItems.length} itens)</span>
+                <div class="inline-flex">
+                    <button data-page="${currentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
+                    <button data-page="${currentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
+                </div>
+            `;
+        }
+        
+        // --- FUNÇÕES DO MODAL (ADICIONAR/EDITAR) ---
+        function openModal(item = null) {
+            itemForm.reset();
+            if (item) {
+                // Modo Edição
+                modalTitle.textContent = 'Editar Item';
+                document.getElementById('item-id').value = item.id;
+                document.getElementById('item-tombamento').value = item.Tombamento || '';
+                document.getElementById('item-tipo').value = item.Tipo || '';
+                document.getElementById('item-descricao').value = item.Descrição || '';
+                document.getElementById('item-unidade').value = item.Unidade || '';
+                document.getElementById('item-quantidade').value = item.Quantidade || 1;
+                document.getElementById('item-localizacao').value = item.Localização || '';
+                document.getElementById('item-estado').value = item.Estado || 'Bom';
+                document.getElementById('item-fornecedor').value = item.Fornecedor || '';
+                document.getElementById('item-doacao').value = item['Origem da Doação'] || '';
+                document.getElementById('item-observacao').value = item.Observação || '';
+            } else {
+                // Modo Adição
+                modalTitle.textContent = 'Adicionar Novo Item';
+                document.getElementById('item-id').value = '';
+            }
+            
+            itemModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalOverlay.classList.remove('opacity-0');
+                itemModal.querySelector('.modal-container').classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeModal() {
+            itemModal.querySelector('.modal-container').classList.add('scale-95', 'opacity-0');
+            modalOverlay.classList.add('opacity-0');
+            setTimeout(() => itemModal.classList.add('hidden'), 300);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('item-id').value;
+            const itemData = {
+                Tombamento: document.getElementById('item-tombamento').value.trim(),
+                Tipo: document.getElementById('item-tipo').value.trim(),
+                Descrição: document.getElementById('item-descricao').value.trim(),
+                Unidade: document.getElementById('item-unidade').value.trim(),
+                Quantidade: parseInt(document.getElementById('item-quantidade').value),
+                Localização: document.getElementById('item-localizacao').value.trim(),
+                Estado: document.getElementById('item-estado').value,
+                Fornecedor: document.getElementById('item-fornecedor').value.trim(),
+                'Origem da Doação': document.getElementById('item-doacao').value.trim(),
+                Observação: document.getElementById('item-observacao').value.trim(),
+                updatedAt: serverTimestamp()
+            };
+
+            try {
+                if (id) {
+                    // Atualizar
+                    const itemRef = doc(db, 'patrimonio', id);
+                    await updateDoc(itemRef, itemData);
+                } else {
+                    // Adicionar
+                    itemData.createdAt = serverTimestamp();
+                    await addDoc(collection(db, 'patrimonio'), itemData);
+                }
+                closeModal();
+            } catch (error) {
+                console.error("Erro ao salvar o item: ", error);
+                alert("Ocorreu um erro ao salvar. Verifique o console.");
+            }
+        }
+        
+        // --- FUNÇÕES DE EXCLUSÃO ---
+        function openDeleteModal(id) {
+            const item = allItems.find(i => i.id === id);
+            if (!item) return;
+            
+            deleteItemInfoEl.textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
+            confirmDeleteBtn.dataset.id = id;
+            
+            deleteConfirmModal.classList.remove('hidden');
+            setTimeout(() => {
+                deleteConfirmModal.querySelector('.modal-container').classList.remove('scale-95');
+            }, 10);
+        }
+        
+        function closeDeleteModal() {
+             deleteConfirmModal.querySelector('.modal-container').classList.add('scale-95');
+             setTimeout(() => deleteConfirmModal.classList.add('hidden'), 300);
+        }
+        
+        async function handleDelete() {
+            const id = confirmDeleteBtn.dataset.id;
+            try {
+                await deleteDoc(doc(db, 'patrimonio', id));
+                closeDeleteModal();
+            } catch(error) {
+                console.error("Erro ao excluir item: ", error);
+                alert("Ocorreu um erro ao excluir. Verifique o console.");
+            }
+        }
+
+        // --- FUNÇÕES AUXILIARES E DASHBOARD ---
+        function getStateColor(state) {
+            const normalizedEstado = getNormalizedEstado(state);
+            const stateColors = { 'Novo': 'badge-green', 'Bom': 'badge-blue', 'Regular': 'badge-yellow', 'Avariado': 'badge-red' };
+            return stateColors[normalizedEstado] || 'bg-slate-200';
+        }
+
+        function switchTab(tabName) {
+            navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
+            if (tabName === 'dashboard') {
+                renderDashboard();
+            }
+        }
+
+        function renderDashboard() {
+            if (allItems.length === 0) return;
+
+            const totalItens = allItems.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
+            const totalUnidades = new Set(allItems.map(i => i.Unidade)).size;
+            
+            const estadosCount = allItems.reduce((acc, item) => {
+                const normalizedEstado = getNormalizedEstado(item.Estado);
+                acc[normalizedEstado] = (acc[normalizedEstado] || 0) + (item.Quantidade || 1);
+                return acc;
+            }, { 'Novo': 0, 'Bom': 0, 'Regular': 0, 'Avariado': 0 });
+
+            const totalAvariados = estadosCount['Avariado'];
+            const totalNovos = estadosCount['Novo'];
+            
+            document.getElementById('kpi-total-itens').textContent = totalItens;
+            document.getElementById('kpi-total-unidades').textContent = totalUnidades;
+            document.getElementById('kpi-total-avariados').textContent = totalAvariados;
+            document.getElementById('kpi-total-novos').textContent = totalNovos;
+            
+            // Gráfico de Estado
+            const estadoLabels = ['Novo', 'Bom', 'Regular', 'Avariado'];
+            const estadoData = estadoLabels.map(label => estadosCount[label] || 0);
+            
+            if (dashboardEstadoChart) dashboardEstadoChart.destroy();
+            dashboardEstadoChart = new Chart(document.getElementById('dashboardEstadoChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: estadoLabels,
+                    datasets: [{ data: estadoData, backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Gráfico de Tipo de Unidade
+            const tiposCount = allItems.reduce((acc, item) => {
+                const tipo = item.Tipo || 'N/A';
+                acc[tipo] = (acc[tipo] || 0) + (item.Quantidade || 1);
+                return acc;
+            }, {});
+
+            if (dashboardTipoChart) dashboardTipoChart.destroy();
+            dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(tiposCount),
+                    datasets: [{
+                        label: 'Qtd. de Itens',
+                        data: Object.values(tiposCount),
+                        backgroundColor: '#60a5fa'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+
+        // --- EVENT LISTENERS ---
+        document.addEventListener('DOMContentLoaded', connectToFirebase);
+        
+        // Filtros
+        filtroTipoUnidadeEl.addEventListener('change', updateUnidadeFilter);
+        filtroUnidadeEl.addEventListener('change', applyFiltersAndRender);
+        filtroEstadoEl.addEventListener('change', applyFiltersAndRender);
+        filtroBuscaEl.addEventListener('input', () => { setTimeout(applyFiltersAndRender, 300); });
+        
+        verResumoGeralBtn.addEventListener('click', () => {
+            filtroTipoUnidadeEl.value = '';
+            filtroEstadoEl.value = '';
+            filtroBuscaEl.value = '';
+            updateUnidadeFilter(); // Isso irá resetar e desabilitar o filtro de unidade também
+        });
+
+        // Paginação
+        paginationControlsEl.addEventListener('click', (e) => {
+            if (e.target.dataset.page) {
+                currentPage = parseInt(e.target.dataset.page);
+                renderTable();
+            }
+        });
+
+        // Ações da tabela (Editar/Excluir)
+        tableBodyEl.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-btn');
+            const deleteBtn = e.target.closest('.delete-btn');
+
+            if (editBtn) {
+                const item = allItems.find(i => i.id === editBtn.dataset.id);
+                openModal(item);
+            }
+            if (deleteBtn) {
+                openDeleteModal(deleteBtn.dataset.id);
+            }
+        });
+
+        // Modal de Item
+        openAddModalBtn.addEventListener('click', () => openModal());
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', closeModal);
+        itemForm.addEventListener('submit', handleFormSubmit);
+        
+        // Modal de Exclusão
+        confirmDeleteBtn.addEventListener('click', handleDelete);
+        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
+
+        // Navegação por abas
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => switchTab(button.dataset.tab));
+        });
+
+    </script>
 </body>
 </html>
 
