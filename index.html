@@ -1005,30 +1005,41 @@
             uploadCsvBtn.disabled = true;
             uploadCsvBtn.textContent = 'Enviando...';
 
-            const batch = writeBatch(db);
-            csvDataToUpload.forEach(row => {
-                const newDocRef = doc(collection(db, 'notas_fiscais'));
-                const nfData = {
-                    'Nome Fornecedor': row['Nome Fornecedor'],
-                    Cadastro: serverTimestamp(),
-                    items: [{
-                        TOMBAMENTO: row.TOMBAMENTO,
-                        Descrição: row.Descrição,
-                        'Valor NF': row['Valor NF'],
-                        'Data NF': row['Data NF'],
-                        NF: row.NF
-                    }]
-                };
-                batch.set(newDocRef, nfData);
-            });
+            // --- NOVA LÓGICA PARA SUPORTAR ARQUIVOS GRANDES ---
+            const maxBatchSize = 500; // Limite do Firestore para operações em lote
+            let recordsProcessed = 0;
 
             try {
-                await batch.commit();
+                for (let i = 0; i < csvDataToUpload.length; i += maxBatchSize) {
+                    const chunk = csvDataToUpload.slice(i, i + maxBatchSize);
+                    const batch = writeBatch(db);
+
+                    chunk.forEach(row => {
+                        const newDocRef = doc(collection(db, 'notas_fiscais'));
+                        const nfData = {
+                            'Nome Fornecedor': row['Nome Fornecedor'],
+                            Cadastro: serverTimestamp(),
+                            items: [{
+                                TOMBAMENTO: row.TOMBAMENTO,
+                                Descrição: row.Descrição,
+                                'Valor NF': row['Valor NF'],
+                                'Data NF': row['Data NF'],
+                                NF: row.NF
+                            }]
+                        };
+                        batch.set(newDocRef, nfData);
+                    });
+                    
+                    await batch.commit();
+                    recordsProcessed += chunk.length;
+                    uploadCsvBtn.textContent = `Enviando... (${recordsProcessed}/${csvDataToUpload.length})`;
+                }
+
                 closeModal(csvUploadModal);
                 alert(`${csvDataToUpload.length} notas fiscais importadas com sucesso!`);
             } catch (error) {
                 console.error("Erro ao importar CSV:", error);
-                alert("Ocorreu um erro na importação.");
+                alert("Ocorreu um erro na importação. Verifique o console para mais detalhes.");
             } finally {
                 csvDataToUpload = [];
                 csvFileInput.value = '';
@@ -1207,3 +1218,4 @@
     </script>
 </body>
 </html>
+
