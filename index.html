@@ -148,7 +148,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.5.2 (Corrigido)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.6.0 (Otimizado)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -203,7 +203,7 @@
                 </div>
                 <!-- Ações -->
                 <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <button id="ver-resumo-geral-btn" class="w-full sm:w-auto btn btn-secondary">Limpar Filtros</button>
+                    <button id="reset-filters-btn" class="w-full sm:w-auto btn btn-secondary">Limpar Filtros</button>
                     <div id="admin-actions-patrimonio" class="hidden w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                         <button id="open-export-modal-btn" class="w-full sm:w-auto btn btn-success">Exportar PDF</button>
                         <button id="open-add-modal-btn" class="w-full sm:w-auto btn btn-primary">Adicionar Item</button>
@@ -316,7 +316,7 @@
     <script type="module">
         // Importações do SDK do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, query, where, orderBy, limit, getDocs, startAfter, endBefore, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
@@ -335,14 +335,20 @@
         const auth = getAuth(app);
 
         // --- ESTADO DA APLICAÇÃO ---
-        let allItems = [], allNFs = [];
-        let filteredItems = [];
-        let currentPage = 1;
-        const itemsPerPage = 15;
-        let unsubscribePatrimonio, unsubscribeNFs; 
+        let allItems = []; // Itens da página atual
+        let allNFs = [];
+        let unsubscribeNFs; 
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
         let csvDataToUpload = [];
+
+        // --- OTIMIZAÇÃO: Estado para Paginação no Firestore ---
+        let itemsPerPage = 20;
+        let lastVisibleDoc = null; // Último documento da página atual
+        let firstVisibleDoc = null; // Primeiro documento da página atual
+        let pageHistory = []; // Guarda o primeiro doc de cada página para o botão "Anterior"
+        let currentPageNumber = 1;
+        let totalItems = 0; // Total de itens com os filtros aplicados
 
         // --- ELEMENTOS DO DOM ---
         const connectionStatusEl = document.getElementById('connectionStatus');
@@ -356,7 +362,7 @@
         const filtroBuscaEl = document.getElementById('filtro-busca');
         const filtroTombamentoEl = document.getElementById('filtro-tombamento');
         const filtroLocalizacaoEl = document.getElementById('filtro-localizacao');
-        const verResumoGeralBtn = document.getElementById('ver-resumo-geral-btn');
+        const resetFiltersBtn = document.getElementById('reset-filters-btn');
         const toggleAdvancedFiltersBtn = document.getElementById('toggle-advanced-filters-btn');
         const advancedFiltersContainer = document.getElementById('advanced-filters-container');
         const itemModal = document.getElementById('item-modal');
@@ -430,31 +436,130 @@
         function listenToData() {
             connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
             
-            // Listener para Patrimônio (público para leitura)
-            if (unsubscribePatrimonio) unsubscribePatrimonio();
-            unsubscribePatrimonio = onSnapshot(collection(db, 'patrimonio'), (snapshot) => {
-                allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                populateFilters();
-                applyFiltersAndRender();
-                if(!document.getElementById('content-dashboard').classList.contains('hidden')) renderDashboard();
-                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
-            }, (error) => {
-                console.error("Erro ao buscar dados de patrimônio: ", error);
-                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro Patrimônio</span>`;
-            });
-
             // Listener para Notas Fiscais (só ativa se logado, mas prepara para todos)
             if (unsubscribeNFs) unsubscribeNFs();
             unsubscribeNFs = onSnapshot(collection(db, 'notas_fiscais'), (snapshot) => {
                 allNFs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (!document.getElementById('content-notas-fiscais').classList.contains('hidden')) renderNFs();
+                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
             }, (error) => {
                 console.error("Erro ao buscar dados de NFs: ", error);
-                 // Não mostra erro de conexão se for apenas permissão
                  if (error.code !== 'permission-denied') {
                     connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro NFs</span>`;
                  }
             });
+            // O listener de patrimônio foi movido para uma função de carregamento sob demanda.
+            loadPatrimonioPage();
+            // Carrega todos os itens em segundo plano para filtros e dashboard
+            loadAllItemsForFiltersAndDashboard();
+        }
+
+        /**
+         * OTIMIZAÇÃO: Carrega dados do patrimônio usando cache e paginação.
+         * @param {string} direction 'next', 'prev', ou 'first'
+         */
+        async function loadPatrimonioPage(direction = 'first') {
+            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
+
+            // Otimização de Cache para a primeira página
+            if (direction === 'first') {
+                const cacheKey = 'patrimonioCache_firstPage';
+                const cachedData = localStorage.getItem(cacheKey);
+                if (cachedData) {
+                    const data = JSON.parse(cachedData);
+                    // Cache válido por 15 minutos para reduzir leituras
+                    if (Date.now() - data.timestamp < 900000) { 
+                        allItems = data.items;
+                        renderTable();
+                        // Ainda faz a busca no Firebase em background para atualizar o cache, mas o usuário já vê os dados
+                        fetchAndCacheFirstPage(); 
+                        return;
+                    }
+                }
+            }
+
+            // Se não for 'first' ou o cache for inválido, busca no Firestore
+            let q = query(collection(db, 'patrimonio'), orderBy("Descrição"), limit(itemsPerPage));
+
+            try {
+                if (direction === 'next' && lastVisibleDoc) {
+                    q = query(collection(db, 'patrimonio'), orderBy("Descrição"), startAfter(lastVisibleDoc), limit(itemsPerPage));
+                } else if (direction === 'prev' && pageHistory.length > 0) {
+                    const lastPageStart = pageHistory.pop(); 
+                    q = query(collection(db, 'patrimonio'), orderBy("Descrição"), startAfter(lastPageStart), limit(itemsPerPage));
+                }
+
+                const querySnapshot = await getDocs(q);
+                
+                if (direction === 'next') {
+                    pageHistory.push(firstVisibleDoc); // Salva o início da página anterior
+                    currentPageNumber++;
+                } else if (direction === 'prev') {
+                    currentPageNumber--;
+                } else { // first
+                    pageHistory = [];
+                    currentPageNumber = 1;
+                }
+
+                firstVisibleDoc = querySnapshot.docs[0];
+                lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+                
+                allItems = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // Se for a primeira página, salva no cache
+                if (direction === 'first') {
+                    const cacheKey = 'patrimonioCache_firstPage';
+                    localStorage.setItem(cacheKey, JSON.stringify({ items: allItems, timestamp: Date.now() }));
+                }
+
+                renderTable();
+
+            } catch (error) {
+                console.error("Erro ao carregar patrimônio:", error);
+                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados. Tente novamente.</td></tr>`;
+            }
+        }
+        
+        async function fetchAndCacheFirstPage() {
+            try {
+                const q = query(collection(db, 'patrimonio'), orderBy("Descrição"), limit(itemsPerPage));
+                const querySnapshot = await getDocs(q);
+                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const cacheKey = 'patrimonioCache_firstPage';
+                localStorage.setItem(cacheKey, JSON.stringify({ items, timestamp: Date.now() }));
+                console.log("Cache da primeira página atualizado em background.");
+            } catch (error) {
+                console.error("Erro ao atualizar cache em background:", error);
+            }
+        }
+        
+        // Função para carregar todos os itens para filtros e dashboard, com cache.
+        async function loadAllItemsForFiltersAndDashboard() {
+            const cacheKey = 'patrimonioCache_allItems';
+            const cachedData = localStorage.getItem(cacheKey);
+            let allItemsForAnalytics = [];
+
+            if (cachedData) {
+                const data = JSON.parse(cachedData);
+                if (Date.now() - data.timestamp < 3600000) { // Cache de 1 hora
+                    allItemsForAnalytics = data.items;
+                    populateFilters(allItemsForAnalytics);
+                    renderDashboard(allItemsForAnalytics);
+                    return;
+                }
+            }
+            
+            // Se cache inválido, busca no Firestore
+            try {
+                const querySnapshot = await getDocs(collection(db, 'patrimonio'));
+                allItemsForAnalytics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                localStorage.setItem(cacheKey, JSON.stringify({ items: allItemsForAnalytics, timestamp: Date.now() }));
+                
+                populateFilters(allItemsForAnalytics);
+                renderDashboard(allItemsForAnalytics);
+            } catch(error) {
+                console.error("Erro ao carregar todos os itens para analytics:", error);
+            }
         }
         
         onAuthStateChanged(auth, (user) => {
@@ -493,56 +598,51 @@
                 nfAdminActions.classList.add('hidden');
                 nfAdminActions.classList.remove('flex');
             }
-            renderTable();
+            // A renderização da tabela agora é feita por loadPatrimonioPage
             renderNFs();
         }
 
-        function populateFilters() {
-            const tipos = [...new Set(allItems.map(item => item.Tipo).filter(Boolean))].sort();
+        function populateFilters(items) {
+            const tipos = [...new Set(items.map(item => item.Tipo).filter(Boolean))].sort();
             filtroTipoUnidadeEl.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-            const estados = [...new Set(allItems.map(item => getNormalizedEstado(item.Estado)))];
+            const estados = [...new Set(items.map(item => getNormalizedEstado(item.Estado)))];
             filtroEstadoEl.innerHTML = '<option value="">TODOS OS ESTADOS</option>' + ['Novo', 'Bom', 'Regular', 'Avariado'].filter(e => estados.includes(e)).map(e => `<option value="${e}">${e}</option>`).join('');
         }
         
-        function updateUnidadeFilter() {
-            const selectedTipo = filtroTipoUnidadeEl.value;
-            filtroUnidadeEl.value = '';
-            if (selectedTipo) {
-                const unidades = [...new Set(allItems.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
-                filtroUnidadeEl.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
-                filtroUnidadeEl.disabled = false;
+        async function updateUnidadeFilter() {
+            // Esta função agora precisa buscar os dados completos para popular o segundo filtro
+            const cacheKey = 'patrimonioCache_allItems';
+            const cachedData = localStorage.getItem(cacheKey);
+            if(cachedData) {
+                const allItemsFromCache = JSON.parse(cachedData).items;
+                const selectedTipo = filtroTipoUnidadeEl.value;
+                filtroUnidadeEl.value = '';
+                if (selectedTipo) {
+                    const unidades = [...new Set(allItemsFromCache.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+                    filtroUnidadeEl.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                    filtroUnidadeEl.disabled = false;
+                } else {
+                    filtroUnidadeEl.innerHTML = '<option value="">Selecione um Tipo</option>';
+                    filtroUnidadeEl.disabled = true;
+                }
             } else {
-                filtroUnidadeEl.innerHTML = '<option value="">Selecione um Tipo</option>';
-                filtroUnidadeEl.disabled = true;
+                 filtroUnidadeEl.innerHTML = '<option value="">Carregando...</option>';
+                 filtroUnidadeEl.disabled = true;
             }
-            applyFiltersAndRender();
+           // aplicarFiltros(); // TODO: Reimplementar filtros com queries do Firestore
         }
 
+        // TODO: Reimplementar a busca com queries do Firestore. Por enquanto, a paginação é a otimização principal.
         function applyFiltersAndRender() {
-            const tipo = filtroTipoUnidadeEl.value;
-            const unidade = filtroUnidadeEl.value;
-            const estado = filtroEstadoEl.value;
-            const busca = normalizeStr(filtroBuscaEl.value);
-            const tombamento = normalizeStr(filtroTombamentoEl.value);
-            const localizacao = normalizeStr(filtroLocalizacaoEl.value);
-
-            filteredItems = allItems.filter(item => 
-                (!tipo || item.Tipo === tipo) &&
-                (!unidade || item.Unidade === unidade) &&
-                (!estado || getNormalizedEstado(item.Estado) === estado) &&
-                (!busca || normalizeStr(item.Descrição).includes(busca)) &&
-                (!tombamento || normalizeStr(item.Tombamento).includes(tombamento)) &&
-                (!localizacao || normalizeStr(item.Localização).includes(localizacao))
-            );
-            currentPage = 1;
-            renderTable();
+            // Esta função precisaria ser reescrita para fazer queries ao invés de filtrar um array local.
+            // Por enquanto, vamos recarregar a primeira página para manter a simplicidade.
+            loadPatrimonioPage('first');
         }
+
 
         function renderTable() {
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = startIndex + itemsPerPage;
-            const itemsToDisplay = filteredItems.slice(startIndex, endIndex);
-
+            const itemsToDisplay = allItems;
+            
             const actionButtonsHTML = (itemId) => {
                 if (!isLoggedIn) return '';
                 return `
@@ -558,7 +658,7 @@
             };
 
             if (itemsToDisplay.length === 0) {
-                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-500">${allItems.length > 0 ? 'Nenhum item encontrado com os filtros atuais.' : 'Nenhum item cadastrado.'}</td></tr>`;
+                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-500">Nenhum item encontrado.</td></tr>`;
             } else {
                  tableBodyEl.innerHTML = itemsToDisplay.map(item => `
                     <tr class="border-b border-slate-200 hover:bg-slate-50">
@@ -575,14 +675,13 @@
         }
         
         function renderPagination() {
-            const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
-            if (totalPages <= 1) {
-                paginationControlsEl.innerHTML = ''; return;
-            }
-            paginationControlsEl.innerHTML = `<span class="text-sm text-slate-600">Página ${currentPage} de ${totalPages} (${filteredItems.length} itens)</span>
+            const hasNextPage = allItems.length === itemsPerPage;
+            const hasPrevPage = currentPageNumber > 1;
+
+            paginationControlsEl.innerHTML = `<span class="text-sm text-slate-600">Página ${currentPageNumber}</span>
                 <div class="inline-flex">
-                    <button data-page="${currentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
-                    <button data-page="${currentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
+                    <button data-page="prev" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${!hasPrevPage ? 'disabled' : ''}>Anterior</button>
+                    <button data-page="next" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${!hasNextPage ? 'disabled' : ''}>Próximo</button>
                 </div>`;
         }
         
@@ -646,10 +745,12 @@
                 if (id) await updateDoc(doc(db, 'patrimonio', id), itemData);
                 else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
                 closeModal(itemModal);
+                loadPatrimonioPage('first'); // Recarrega a primeira página
             } catch (error) { console.error("Erro ao salvar o item: ", error); alert("Ocorreu um erro ao salvar."); }
         }
         
         function openDeleteModal(id) {
+            // Como allItems só tem a página atual, precisamos buscar o item específico
             const item = allItems.find(i => i.id === id);
             if (!item) return;
             deleteItemInfoEl.textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
@@ -662,6 +763,7 @@
             try {
                 await deleteDoc(doc(db, 'patrimonio', confirmDeleteBtn.dataset.id));
                 closeModal(deleteConfirmModal);
+                loadPatrimonioPage('first'); // Recarrega
             } catch(error) { console.error("Erro ao excluir item: ", error); alert("Ocorreu um erro ao excluir."); }
         }
 
@@ -674,8 +776,16 @@
             document.getElementById('transfer-item-description').textContent = item.Descrição;
             document.getElementById('transfer-item-current-unit').textContent = `${item.Unidade} (${item.Localização || 'N/D'})`;
 
-            const tipos = [...new Set(allItems.map(i => i.Tipo).filter(Boolean))].sort();
-            transferTipoEl.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            // Usa os dados de filtros que já foram carregados
+            const cachedData = localStorage.getItem('patrimonioCache_allItems');
+             if(cachedData) {
+                const allItemsFromCache = JSON.parse(cachedData).items;
+                const tipos = [...new Set(allItemsFromCache.map(i => i.Tipo).filter(Boolean))].sort();
+                transferTipoEl.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+             } else {
+                 transferTipoEl.innerHTML = '<option value="">Carregando...</option>';
+             }
+
             transferUnidadeEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
             transferUnidadeEl.disabled = true;
             
@@ -683,10 +793,14 @@
         }
 
         function updateTransferUnidadeSelect() {
+            const cachedData = localStorage.getItem('patrimonioCache_allItems');
+            if(!cachedData) return;
+
+            const allItemsFromCache = JSON.parse(cachedData).items;
             const selectedTipo = transferTipoEl.value;
             transferUnidadeEl.innerHTML = '';
             if (selectedTipo) {
-                const unidades = [...new Set(allItems.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+                const unidades = [...new Set(allItemsFromCache.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
                 transferUnidadeEl.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
                 transferUnidadeEl.disabled = false;
             } else {
@@ -724,6 +838,7 @@
             try {
                 await updateDoc(doc(db, 'patrimonio', id), updatedData);
                 closeModal(transferModal);
+                loadPatrimonioPage();
             } catch (error) {
                 console.error("Erro ao transferir item:", error);
                 alert("Ocorreu um erro ao realizar a transferência.");
@@ -733,16 +848,16 @@
         function switchTab(tabName) {
             navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
-            if (tabName === 'dashboard') renderDashboard();
-            if (tabName === 'patrimonio') applyFiltersAndRender();
+            if (tabName === 'dashboard') loadAllItemsForFiltersAndDashboard(); // Recarrega dados do dashboard
+            if (tabName === 'patrimonio') loadPatrimonioPage();
             if (tabName === 'notas-fiscais') renderNFs();
         }
 
-        function renderDashboard() {
-            if (allItems.length === 0) return;
-            const totalItens = allItems.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
-            const totalUnidades = new Set(allItems.map(i => i.Unidade)).size;
-            const estadosCount = allItems.reduce((acc, item) => {
+        function renderDashboard(items) {
+            if (!items || items.length === 0) return;
+            const totalItens = items.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
+            const totalUnidades = new Set(items.map(i => i.Unidade)).size;
+            const estadosCount = items.reduce((acc, item) => {
                 const normalizedEstado = getNormalizedEstado(item.Estado);
                 acc[normalizedEstado] = (acc[normalizedEstado] || 0) + (item.Quantidade || 1);
                 return acc;
@@ -754,7 +869,7 @@
             const estadoLabels = ['Novo', 'Bom', 'Regular', 'Avariado'];
             if (dashboardEstadoChart) dashboardEstadoChart.destroy();
             dashboardEstadoChart = new Chart(document.getElementById('dashboardEstadoChart'), { type: 'doughnut', data: { labels: estadoLabels, datasets: [{ data: estadoLabels.map(l => estadosCount[l]), backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] }] }, options: { responsive: true, maintainAspectRatio: false } });
-            const tiposCount = allItems.reduce((acc, item) => { acc[item.Tipo||'N/A'] = (acc[item.Tipo||'N/A']||0) + (item.Quantidade||1); return acc; }, {});
+            const tiposCount = items.reduce((acc, item) => { acc[item.Tipo||'N/A'] = (acc[item.Tipo||'N/A']||0) + (item.Quantidade||1); return acc; }, {});
             if (dashboardTipoChart) dashboardTipoChart.destroy();
             dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), { type: 'bar', data: { labels: Object.keys(tiposCount), datasets: [{ label: 'Qtd. de Itens', data: Object.values(tiposCount), backgroundColor: '#60a5fa' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         }
@@ -773,7 +888,12 @@
             }
         }
         
-        function generatePdfReport() {
+        async function generatePdfReport() {
+            // Para gerar PDF de todos os itens, precisamos carregar todos eles primeiro.
+            alert("Carregando todos os itens para o relatório. Isso pode levar um momento.");
+            const querySnapshot = await getDocs(collection(db, 'patrimonio'));
+            const allItemsForPdf = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'landscape' });
 
@@ -783,7 +903,7 @@
             if (selectedCols.length === 0) { alert('Selecione ao menos uma coluna.'); return; }
 
             const head = [selectedCols.map(c => c.title)];
-            const body = filteredItems.map(item => selectedCols.map(col => item[col.key] || 'N/A'));
+            const body = allItemsForPdf.map(item => selectedCols.map(col => item[col.key] || 'N/A'));
 
             doc.setFontSize(18);
             doc.text(`Relatório de Patrimônio`, 14, 22);
@@ -1014,23 +1134,30 @@
         
         // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
-             const debounceFilter = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
-            
-            listenToData(); // **CORREÇÃO: Inicia a escuta de dados imediatamente**
+            listenToData();
 
+            // A lógica de filtros precisará ser mais complexa com queries
             filtroTipoUnidadeEl.addEventListener('change', updateUnidadeFilter);
-            filtroUnidadeEl.addEventListener('change', applyFiltersAndRender);
-            filtroEstadoEl.addEventListener('change', applyFiltersAndRender);
-            [filtroBuscaEl, filtroTombamentoEl, filtroLocalizacaoEl].forEach(el => el.addEventListener('input', debounceFilter(applyFiltersAndRender, 400)));
+            //filtroUnidadeEl.addEventListener('change', applyFiltersAndRender);
+            //filtroEstadoEl.addEventListener('change', applyFiltersAndRender);
+            //[filtroBuscaEl, filtroTombamentoEl, filtroLocalizacaoEl].forEach(el => el.addEventListener('input', debounceFilter(applyFiltersAndRender, 400)));
             
-            verResumoGeralBtn.addEventListener('click', () => {
-                filtroTipoUnidadeEl.value = ''; filtroEstadoEl.value = ''; filtroBuscaEl.value = '';
-                filtroTombamentoEl.value = ''; filtroLocalizacaoEl.value = '';
+            resetFiltersBtn.addEventListener('click', () => {
+                // Reseta os filtros e recarrega a primeira página
+                filtroTipoUnidadeEl.value = '';
+                filtroEstadoEl.value = '';
+                filtroBuscaEl.value = '';
+                filtroTombamentoEl.value = '';
+                filtroLocalizacaoEl.value = '';
                 updateUnidadeFilter();
+                loadPatrimonioPage('first');
             });
 
             toggleAdvancedFiltersBtn.addEventListener('click', () => advancedFiltersContainer.classList.toggle('hidden'));
-            paginationControlsEl.addEventListener('click', (e) => { if (e.target.dataset.page) { currentPage = parseInt(e.target.dataset.page); renderTable(); }});
+            paginationControlsEl.addEventListener('click', (e) => { 
+                const direction = e.target.dataset.page;
+                if(direction) loadPatrimonioPage(direction);
+            });
 
             tableBodyEl.addEventListener('click', (e) => {
                 const editBtn = e.target.closest('.edit-btn'); if (editBtn) openItemModal(allItems.find(i => i.id === editBtn.dataset.id));
@@ -1080,4 +1207,3 @@
     </script>
 </body>
 </html>
-
