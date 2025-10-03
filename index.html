@@ -105,21 +105,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Estilos específicos da Aba NF */
-        .nf-group summary {
-            cursor: pointer;
-            padding: 1rem;
-            background-color: #f8fafc;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-        .nf-group[open] summary {
-            background-color: #eef2ff;
-        }
-        .nf-group summary:hover {
-            background-color: #f1f5f9;
-        }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -148,7 +133,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.8.0 (UI/UX Melhorado)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.2 </span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -184,23 +169,25 @@
         <!-- Patrimônio -->
         <div id="content-patrimonio" class="hidden fade-in">
              <div class="card mb-8">
-                <!-- Filtros Principais -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                    <div><label for="filtro-tipo-unidade" class="block text-sm font-medium mb-1">Tipo de Unidade</label><select id="filtro-tipo-unidade" class="w-full p-2 border rounded-lg bg-white"></select></div>
-                    <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg bg-white" disabled></select></div>
-                    <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg bg-white"></select></div>
-                </div>
-                <!-- Busca e Filtros Avançados -->
-                <div class="mt-4 border-t pt-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="md:col-span-2"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida (Descrição)</label><input type="text" id="filtro-busca" placeholder="Buscar por descrição..." class="w-full p-2 border rounded-lg"></div>
-                        <div><label class="block text-sm font-medium mb-1">&nbsp;</label><button id="toggle-advanced-filters-btn" class="w-full btn btn-secondary">Filtros Avançados</button></div>
+                 <form id="patrimonio-filters-form">
+                    <!-- Filtros Principais -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                        <div><label for="filtro-tipo-unidade" class="block text-sm font-medium mb-1">Tipo de Unidade</label><select id="filtro-tipo-unidade" class="w-full p-2 border rounded-lg bg-white"></select></div>
+                        <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg bg-white" disabled></select></div>
+                        <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg bg-white"></select></div>
                     </div>
-                     <div id="advanced-filters-container" class="hidden mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label for="filtro-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="filtro-tombamento" placeholder="Buscar por n° de tombamento..." class="w-full p-2 border rounded-lg"></div>
-                        <div><label for="filtro-localizacao" class="block text-sm font-medium mb-1">Localização na Unidade</label><input type="text" id="filtro-localizacao" placeholder="Buscar por sala, setor..." class="w-full p-2 border rounded-lg"></div>
+                    <!-- Busca e Filtros Avançados -->
+                    <div class="mt-4 border-t pt-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-2"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida (Descrição)</label><input type="text" id="filtro-busca" placeholder="Buscar por descrição..." class="w-full p-2 border rounded-lg"></div>
+                            <div><label class="block text-sm font-medium mb-1">&nbsp;</label><button type="button" id="toggle-advanced-filters-btn" class="w-full btn btn-secondary">Filtros Avançados</button></div>
+                        </div>
+                         <div id="advanced-filters-container" class="hidden mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><label for="filtro-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="filtro-tombamento" placeholder="Buscar por n° de tombamento..." class="w-full p-2 border rounded-lg"></div>
+                            <div><label for="filtro-localizacao" class="block text-sm font-medium mb-1">Localização na Unidade</label><input type="text" id="filtro-localizacao" placeholder="Buscar por sala, setor..." class="w-full p-2 border rounded-lg"></div>
+                        </div>
                     </div>
-                </div>
+                 </form>
                 <!-- Ações -->
                 <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <button id="reset-filters-btn" class="w-full sm:w-auto btn btn-secondary">Limpar Filtros</button>
@@ -237,32 +224,45 @@
         <!-- Notas Fiscais -->
         <div id="content-notas-fiscais" class="hidden fade-in">
             <div id="nf-admin-actions" class="card mb-6 flex-col sm:flex-row gap-4 hidden justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-800">Controle de Notas Fiscais</h2>
+                <h2 class="text-2xl font-bold text-slate-800">Itens Pendentes de Alocação</h2>
                 <button id="open-csv-upload-modal-btn" class="btn btn-primary w-full sm:w-auto">Importar CSV</button>
             </div>
-            <!-- NOVO: Barra de busca para NFs -->
-            <div class="card mb-6">
-                <label for="nf-search-input" class="block text-sm font-medium mb-1">Buscar em Notas Fiscais</label>
-                <input type="text" id="nf-search-input" placeholder="Buscar por fornecedor, descrição, tombamento, nº da NF..." class="w-full p-2 border rounded-lg">
-            </div>
-            <div id="nf-list-container" class="space-y-4">
-                <!-- Conteúdo gerado dinamicamente -->
+            <div class="card">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="nf-search-input" class="block text-sm font-medium mb-1">Buscar Itens</label>
+                        <input type="text" id="nf-search-input" placeholder="Buscar por descrição, tombo, fornecedor..." class="w-full p-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label for="nf-status-filter" class="block text-sm font-medium mb-1">Filtrar por Status</label>
+                        <select id="nf-status-filter" class="w-full p-2 border rounded-lg bg-white">
+                            <option value="all">Todos os Itens</option>
+                            <option value="pending" selected>Apenas Pendentes</option>
+                            <option value="allocated">Apenas Alocados</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="nf-list-container" class="overflow-x-auto">
+                    <!-- Tabela de NFs será renderizada aqui -->
+                </div>
+                 <div id="nf-pagination-controls" class="flex items-center justify-between mt-6"></div>
             </div>
         </div>
     </main>
 
     <!-- Rodapé -->
     <footer class="text-center mt-12 mb-6 text-sm text-slate-500">
-        <p>Painel desenvolvido por: Jurandy | SEMCAS | Firebase Edition</p>
+        <p>Painel desenvolvido por: Jurandy | SEMCAS |</p>
     </footer>
 
     <!-- MODAIS -->
 
-    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" id="close-login-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
-    <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" id="close-item-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</col-md-4><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" id="cancel-item-btn" class="btn btn-secondary">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
-    <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" id="close-transfer-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" id="cancel-transfer-btn" class="btn btn-secondary">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
-    <div id="export-pdf-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Exportar Relatório PDF</h3> <button type="button" id="close-export-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6"> <p class="mb-4 text-slate-600">Selecione as colunas que deseja incluir no relatório:</p> <div id="export-columns-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4"> <label class="flex items-center space-x-2"><input type="checkbox" value="Tombamento" data-name="Tomb." class="rounded" checked><span>Tomb.</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Descrição" data-name="Descrição" class="rounded" checked><span>Descrição</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Unidade" data-name="Unidade" class="rounded" checked><span>Unidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Localização" data-name="Localização" class="rounded" checked><span>Localização</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Fornecedor" data-name="Fornecedor" class="rounded" checked><span>Fornecedor</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Estado" data-name="Estado" class="rounded" checked><span>Estado</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Quantidade" data-name="Qtd." class="rounded"><span>Quantidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Origem da Doação" data-name="Doação" class="rounded"><span>Doação</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Observação" data-name="Obs." class="rounded"><span>Observação</span></label> </div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" id="cancel-export-btn" class="btn btn-secondary">Cancelar</button> <button type="button" id="confirm-export-btn" class="btn btn-success">Exportar</button> </div></div></div>
-    <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button id="cancel-delete-btn" type="button" class="btn btn-secondary">Cancelar</button> </div></div></div>
+    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
+    <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</col-md-4><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
+    <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
+    <div id="export-pdf-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Exportar Relatório PDF</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6"> <p class="mb-4 text-slate-600">Selecione as colunas que deseja incluir no relatório:</p> <div id="export-columns-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4"> <label class="flex items-center space-x-2"><input type="checkbox" value="Tombamento" data-name="Tomb." class="rounded" checked><span>Tomb.</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Descrição" data-name="Descrição" class="rounded" checked><span>Descrição</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Unidade" data-name="Unidade" class="rounded" checked><span>Unidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Localização" data-name="Localização" class="rounded" checked><span>Localização</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Fornecedor" data-name="Fornecedor" class="rounded" checked><span>Fornecedor</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Estado" data-name="Estado" class="rounded" checked><span>Estado</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Quantidade" data-name="Qtd." class="rounded"><span>Quantidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Origem da Doação" data-name="Doação" class="rounded"><span>Doação</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Observação" data-name="Obs." class="rounded"><span>Observação</span></label> </div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="button" id="confirm-export-btn" class="btn btn-success">Exportar</button> </div></div></div>
+    <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> </div></div></div>
 
     <!-- Modal de Upload de CSV -->
     <div id="csv-upload-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
@@ -270,7 +270,7 @@
         <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
             <div class="flex items-center justify-between p-4 border-b">
                 <h3 class="text-xl font-semibold">Importar Notas Fiscais via CSV</h3>
-                <button type="button" id="close-csv-upload-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+                <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button>
             </div>
             <div class="p-6">
                 <p class="text-sm text-slate-600 mb-4">Selecione um arquivo CSV com as colunas: <code class="text-xs bg-slate-100 p-1 rounded">Nome Fornecedor,TOMBAMENTO,Descrição,Valor NF,Data NF,NF</code>.</p>
@@ -290,7 +290,7 @@
              <form id="register-transfer-form">
                 <div class="flex items-center justify-between p-4 border-b">
                     <h3 class="text-xl font-semibold">Alocar Item da NF no Patrimônio</h3>
-                    <button type="button" id="close-register-transfer-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+                    <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button>
                 </div>
                 <div class="p-6 space-y-4 overflow-y-auto" style="max-height: 70vh;">
                     <input type="hidden" id="register-transfer-nf-id">
@@ -330,12 +330,11 @@
     <script type="module">
         // Importações do SDK do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, query, where, orderBy, limit, getDocs, startAfter, endBefore, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, query, where, orderBy, limit, getDocs, startAfter } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
+            apiKey: "AIzaSyBq9vMW3DABAa8fqgXfRNtxqOltnTiaKjnU", // Chave de API de exemplo
             authDomain: "controle-de-patrimonio-semcas.firebaseapp.com",
             projectId: "controle-de-patrimonio-semcas",
             storageBucket: "controle-de-patrimonio-semcas.appspot.com",
@@ -345,53 +344,48 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const storage = getStorage(app);
         const auth = getAuth(app);
 
         // --- ESTADO DA APLICAÇÃO ---
-        let allItems = []; 
         let allNFs = [];
         let unsubscribeNFs; 
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
-        let csvDataToUpload = [];
+        
+        // --- NOVO: LÓGICA DE DADOS E FILTRAGEM PARA PATRIMÔNIO (CLIENT-SIDE) ---
+        let patrimonioFullList = []; // Guarda todos os itens do patrimônio
+        let patrimonioFilteredList = []; // Guarda a lista após filtros
+        let patrimonioCurrentPage = 1;
+        let patrimonioItemsPerPage = 20;
 
-        // --- Paginação no Firestore ---
-        let itemsPerPage = 20;
-        let lastVisibleDoc = null; 
-        let firstVisibleDoc = null; 
-        let pageHistory = []; 
-        let currentPageNumber = 1;
+
+        // --- Paginação e Estado para a Tabela de NFs ---
+        let nfItemsPerPage = 15;
+        let nfCurrentPage = 1;
         
         // --- ELEMENTOS DO DOM ---
         const connectionStatusEl = document.getElementById('connectionStatus');
         const tableBodyEl = document.getElementById('inventory-table-body');
-        const tableHeaderActions = document.getElementById('table-header-actions');
         const paginationControlsEl = document.getElementById('pagination-controls');
+        const patrimonioFiltersForm = document.getElementById('patrimonio-filters-form');
         const filtroTipoUnidadeEl = document.getElementById('filtro-tipo-unidade');
         const filtroUnidadeEl = document.getElementById('filtro-unidade');
         const filtroEstadoEl = document.getElementById('filtro-estado');
+        const filtroBuscaEl = document.getElementById('filtro-busca');
+        const filtroTombamentoEl = document.getElementById('filtro-tombamento');
+        const filtroLocalizacaoEl = document.getElementById('filtro-localizacao');
         const resetFiltersBtn = document.getElementById('reset-filters-btn');
         const itemModal = document.getElementById('item-modal');
         const openAddModalBtn = document.getElementById('open-add-modal-btn');
-        const closeItemModalBtn = document.getElementById('close-item-modal-btn');
-        const cancelItemBtn = document.getElementById('cancel-item-btn');
         const itemForm = document.getElementById('item-form');
         const modalTitle = document.getElementById('modal-title');
         const loginModal = document.getElementById('login-modal');
         const openLoginModalBtn = document.getElementById('open-login-modal-btn');
-        const closeLoginModalBtn = document.getElementById('close-login-modal-btn');
         const loginForm = document.getElementById('login-form');
         const loginErrorEl = document.getElementById('login-error');
-        const exportPdfModal = document.getElementById('export-pdf-modal');
         const openExportModalBtn = document.getElementById('open-export-modal-btn');
-        const closeExportModalBtn = document.getElementById('close-export-modal-btn');
-        const cancelExportBtn = document.getElementById('cancel-export-btn');
-        const confirmExportBtn = document.getElementById('confirm-export-btn');
         const transferModal = document.getElementById('transfer-modal');
         const transferForm = document.getElementById('transfer-form');
-        const closeTransferModalBtn = document.getElementById('close-transfer-modal-btn');
-        const cancelTransferBtn = document.getElementById('cancel-transfer-btn');
         const transferTipoEl = document.getElementById('transfer-tipo');
         const transferUnidadeEl = document.getElementById('transfer-unidade');
         const userInfoEl = document.getElementById('user-info');
@@ -400,7 +394,6 @@
         const adminActionsPatrimonio = document.getElementById('admin-actions-patrimonio');
         const deleteConfirmModal = document.getElementById('delete-confirm-modal');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
         const deleteItemInfoEl = document.getElementById('delete-item-info');
         const navButtons = document.querySelectorAll('.nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
@@ -408,13 +401,11 @@
         const nfAdminActions = document.getElementById('nf-admin-actions');
         const openCsvUploadModalBtn = document.getElementById('open-csv-upload-modal-btn');
         const csvUploadModal = document.getElementById('csv-upload-modal');
-        const closeCsvUploadModalBtn = document.getElementById('close-csv-upload-modal-btn');
-        const csvFileInput = document.getElementById('csv-file-input');
         const uploadCsvBtn = document.getElementById('upload-csv-btn');
-        const registerTransferModal = document.getElementById('register-transfer-modal');
         const registerTransferForm = document.getElementById('register-transfer-form');
-        const closeRegisterTransferModalBtn = document.getElementById('close-register-transfer-modal-btn');
         const nfSearchInput = document.getElementById('nf-search-input');
+        const nfStatusFilter = document.getElementById('nf-status-filter');
+        const nfPaginationControls = document.getElementById('nf-pagination-controls');
 
         
         // --- LÓGICA DE DADOS ---
@@ -440,7 +431,7 @@
             connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
             
             if (unsubscribeNFs) unsubscribeNFs();
-            unsubscribeNFs = onSnapshot(collection(db, 'notas_fiscais'), (snapshot) => {
+            unsubscribeNFs = onSnapshot(query(collection(db, 'notas_fiscais'), orderBy("Cadastro", "desc")), (snapshot) => {
                 allNFs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (!document.getElementById('content-notas-fiscais').classList.contains('hidden')) renderNFs();
                 connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
@@ -451,141 +442,66 @@
                  }
             });
             
-            loadPatrimonioPage();
-            loadAllItemsForFiltersAndDashboard();
+            loadAllPatrimonio(); // CORREÇÃO: Carrega todos os itens do patrimônio de uma vez
         }
 
-        async function loadPatrimonioPage(direction = 'first') {
-            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
-
-            if (direction === 'first') {
-                const cacheKey = 'patrimonioCache_firstPage';
-                const cachedData = localStorage.getItem(cacheKey);
-                if (cachedData) {
-                    const data = JSON.parse(cachedData);
-                    if (Date.now() - data.timestamp < 900000) { 
-                        allItems = data.items;
-                        renderTable();
-                        fetchAndCacheFirstPage(); 
-                        return;
-                    }
-                }
-            }
-
-            let q = query(collection(db, 'patrimonio'), orderBy("Descrição"), limit(itemsPerPage));
-
-            try {
-                if (direction === 'next' && lastVisibleDoc) {
-                    q = query(collection(db, 'patrimonio'), orderBy("Descrição"), startAfter(lastVisibleDoc), limit(itemsPerPage));
-                } else if (direction === 'prev' && pageHistory.length > 0) {
-                    const lastPageStart = pageHistory.pop(); 
-                    q = query(collection(db, 'patrimonio'), orderBy("Descrição"), startAfter(lastPageStart), limit(itemsPerPage));
-                }
-
-                const querySnapshot = await getDocs(q);
-                
-                if (direction === 'next') {
-                    pageHistory.push(firstVisibleDoc);
-                    currentPageNumber++;
-                } else if (direction === 'prev') {
-                    currentPageNumber--;
-                } else {
-                    pageHistory = [];
-                    currentPageNumber = 1;
-                }
-
-                firstVisibleDoc = querySnapshot.docs[0];
-                lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-                
-                allItems = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                if (direction === 'first') {
-                    localStorage.setItem('patrimonioCache_firstPage', JSON.stringify({ items: allItems, timestamp: Date.now() }));
-                }
-
-                renderTable();
-
-            } catch (error) {
-                console.error("Erro ao carregar patrimônio:", error);
-                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados. Tente novamente.</td></tr>`;
-            }
-        }
-        
-        async function fetchAndCacheFirstPage() {
-            try {
-                const q = query(collection(db, 'patrimonio'), orderBy("Descrição"), limit(itemsPerPage));
-                const querySnapshot = await getDocs(q);
-                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                localStorage.setItem('patrimonioCache_firstPage', JSON.stringify({ items, timestamp: Date.now() }));
-            } catch (error) {
-                console.error("Erro ao atualizar cache em background:", error);
-            }
-        }
-        
-        async function loadAllItemsForFiltersAndDashboard() {
-            const cacheKey = 'patrimonioCache_allItems';
+        async function loadAllPatrimonio() {
+            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados do patrimônio...</p></td></tr>`;
+            const cacheKey = 'patrimonioCache_fullList';
             const cachedData = localStorage.getItem(cacheKey);
-            let allItemsForAnalytics = [];
 
-            if (cachedData) {
+            if(cachedData) {
                 const data = JSON.parse(cachedData);
-                if (Date.now() - data.timestamp < 3600000) { 
-                    allItemsForAnalytics = data.items;
-                    populateFilters(allItemsForAnalytics);
-                    if(document.getElementById('content-dashboard').offsetParent !== null) renderDashboard(allItemsForAnalytics);
+                if(Date.now() - data.timestamp < 900000) { // Cache de 15 minutos
+                    patrimonioFullList = data.items;
+                    populateFilters(patrimonioFullList);
+                    applyPatrimonioFiltersAndRender();
+                    if(!document.getElementById('content-dashboard').classList.contains('hidden')) renderDashboard(patrimonioFullList);
                     return;
                 }
             }
-            
+
             try {
-                const querySnapshot = await getDocs(collection(db, 'patrimonio'));
-                allItemsForAnalytics = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                localStorage.setItem(cacheKey, JSON.stringify({ items: allItemsForAnalytics, timestamp: Date.now() }));
+                const querySnapshot = await getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
+                patrimonioFullList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                localStorage.setItem(cacheKey, JSON.stringify({ items: patrimonioFullList, timestamp: Date.now() }));
                 
-                populateFilters(allItemsForAnalytics);
-                if(document.getElementById('content-dashboard').offsetParent !== null) renderDashboard(allItemsForAnalytics);
-            } catch(error) {
-                console.error("Erro ao carregar todos os itens para analytics:", error);
+                populateFilters(patrimonioFullList);
+                applyPatrimonioFiltersAndRender();
+                if(!document.getElementById('content-dashboard').classList.contains('hidden')) renderDashboard(patrimonioFullList);
+
+            } catch (error) {
+                 console.error("Erro ao carregar patrimônio: ", error);
+                 tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados do patrimônio.</td></tr>`;
             }
         }
         
         onAuthStateChanged(auth, (user) => {
             isLoggedIn = !!user;
-            if (user) {
-                userEmailEl.textContent = user.email;
-            } else {
-                userEmailEl.textContent = '';
-                if (document.querySelector('.nav-btn.active').dataset.tab === 'notas-fiscais'){
-                     switchTab('dashboard');
-                }
-            }
             updateUIVisibility();
         });
 
         function updateUIVisibility() {
-            const modals = document.querySelectorAll('.modal');
-            modals.forEach(closeModal);
-            
             if (isLoggedIn) {
-                userInfoEl.classList.remove('hidden');
-                userInfoEl.classList.add('flex');
+                userEmailEl.textContent = auth.currentUser.email;
+                userInfoEl.classList.remove('hidden'); userInfoEl.classList.add('flex');
                 openLoginModalBtn.classList.add('hidden');
-                adminActionsPatrimonio.classList.remove('hidden');
-                adminActionsPatrimonio.classList.add('flex');
-                tableHeaderActions.classList.remove('hidden');
-                nfAdminActions.classList.remove('hidden');
-                nfAdminActions.classList.add('flex');
+                adminActionsPatrimonio.classList.remove('hidden'); adminActionsPatrimonio.classList.add('flex');
+                document.getElementById('table-header-actions').classList.remove('hidden');
+                nfAdminActions.classList.remove('hidden'); nfAdminActions.classList.add('flex');
             } else {
-                userInfoEl.classList.add('hidden');
-                userInfoEl.classList.remove('flex');
+                userEmailEl.textContent = '';
+                userInfoEl.classList.add('hidden'); userInfoEl.classList.remove('flex');
                 openLoginModalBtn.classList.remove('hidden');
-                adminActionsPatrimonio.classList.add('hidden');
-                adminActionsPatrimonio.classList.remove('flex');
-                tableHeaderActions.classList.add('hidden');
-                nfAdminActions.classList.add('hidden');
-                nfAdminActions.classList.remove('flex');
+                adminActionsPatrimonio.classList.add('hidden'); adminActionsPatrimonio.classList.remove('flex');
+                document.getElementById('table-header-actions').classList.add('hidden');
+                nfAdminActions.classList.add('hidden'); nfAdminActions.classList.remove('flex');
+                if (document.querySelector('.nav-btn.active').dataset.tab === 'notas-fiscais'){
+                     switchTab('dashboard');
+                }
             }
-            renderTable();
+            document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+            applyPatrimonioFiltersAndRender();
             renderNFs();
         }
 
@@ -596,48 +512,40 @@
             filtroEstadoEl.innerHTML = '<option value="">TODOS OS ESTADOS</option>' + ['Novo', 'Bom', 'Regular', 'Avariado'].filter(e => estados.includes(e)).map(e => `<option value="${e}">${e}</option>`).join('');
         }
         
-        async function updateUnidadeFilter() {
-            const cacheKey = 'patrimonioCache_allItems';
-            const cachedData = localStorage.getItem(cacheKey);
-            if(cachedData) {
-                const allItemsFromCache = JSON.parse(cachedData).items;
-                const selectedTipo = filtroTipoUnidadeEl.value;
-                filtroUnidadeEl.value = '';
-                if (selectedTipo) {
-                    const unidades = [...new Set(allItemsFromCache.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
-                    filtroUnidadeEl.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
-                    filtroUnidadeEl.disabled = false;
-                } else {
-                    filtroUnidadeEl.innerHTML = '<option value="">Selecione um Tipo</option>';
-                    filtroUnidadeEl.disabled = true;
-                }
-            } else {
-                 filtroUnidadeEl.innerHTML = '<option value="">Carregando...</option>';
-                 filtroUnidadeEl.disabled = true;
-            }
-        }
-        
-        function renderTable() {
-            const itemsToDisplay = allItems;
-            
-            const actionButtonsHTML = (itemId) => {
-                if (!isLoggedIn) return '';
-                return `
-                    <button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg>
-                    </button>
-                    <button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
-                    </button>
-                    <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>
-                    </button>`;
-            };
+        function applyPatrimonioFiltersAndRender() {
+            const tipo = filtroTipoUnidadeEl.value;
+            const unidade = filtroUnidadeEl.value;
+            const estado = filtroEstadoEl.value;
+            const busca = normalizeStr(filtroBuscaEl.value);
+            const tombamento = normalizeStr(filtroTombamentoEl.value);
+            const localizacao = normalizeStr(filtroLocalizacaoEl.value);
 
-            if (itemsToDisplay.length === 0) {
-                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-500">Nenhum item encontrado.</td></tr>`;
-            } else {
-                 tableBodyEl.innerHTML = itemsToDisplay.map(item => `
+            patrimonioFilteredList = patrimonioFullList.filter(item => {
+                return (!tipo || item.Tipo === tipo) &&
+                       (!unidade || item.Unidade === unidade) &&
+                       (!estado || getNormalizedEstado(item.Estado) === estado) &&
+                       (!busca || normalizeStr(item.Descrição).includes(busca)) &&
+                       (!tombamento || normalizeStr(item.Tombamento).includes(tombamento)) &&
+                       (!localizacao || normalizeStr(item.Localização).includes(localizacao));
+            });
+
+            patrimonioCurrentPage = 1;
+            renderPatrimonioTable();
+        }
+
+        function renderPatrimonioTable() {
+            const startIndex = (patrimonioCurrentPage - 1) * patrimonioItemsPerPage;
+            const endIndex = startIndex + patrimonioItemsPerPage;
+            const itemsToDisplay = patrimonioFilteredList.slice(startIndex, endIndex);
+            
+            const actionButtonsHTML = (itemId) => !isLoggedIn ? '' : `
+                <button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button>
+                <button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button>
+                <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>`;
+
+            tableBodyEl.innerHTML = itemsToDisplay.length === 0 
+                ? `<tr><td colspan="7" class="text-center py-10 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`
+                : itemsToDisplay.map(item => `
                     <tr class="border-b border-slate-200 hover:bg-slate-50">
                         <td class="px-3 py-2 font-mono text-xs">${item.Tombamento || 'S/T'}</td>
                         <td class="px-3 py-2 font-medium text-slate-900">${item.Descrição || 'N/A'}</td>
@@ -647,54 +555,36 @@
                         <td class="px-3 py-2"><span class="badge ${getStateColor(item.Estado)}">${item.Estado || 'N/A'}</span></td>
                         <td class="px-3 py-2 space-x-2">${actionButtonsHTML(item.id)}</td>
                     </tr>`).join('');
-            }
-            renderPagination();
+            renderPatrimonioPagination();
         }
         
-        function renderPagination() {
-            const hasNextPage = allItems.length === itemsPerPage;
-            const hasPrevPage = currentPageNumber > 1;
-
-            paginationControlsEl.innerHTML = `<span class="text-sm text-slate-600">Página ${currentPageNumber}</span>
+        function renderPatrimonioPagination() {
+            const totalItems = patrimonioFilteredList.length;
+            const totalPages = Math.ceil(totalItems / patrimonioItemsPerPage);
+            if (totalPages <= 1) {
+                paginationControlsEl.innerHTML = '';
+                return;
+            }
+            paginationControlsEl.innerHTML = `<span class="text-sm text-slate-600">Página ${patrimonioCurrentPage} de ${totalPages} (${totalItems} itens)</span>
                 <div class="inline-flex">
-                    <button data-page="prev" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${!hasPrevPage ? 'disabled' : ''}>Anterior</button>
-                    <button data-page="next" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${!hasNextPage ? 'disabled' : ''}>Próximo</button>
+                    <button data-page="${patrimonioCurrentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${patrimonioCurrentPage === 1 ? 'disabled' : ''}>Anterior</button>
+                    <button data-page="${patrimonioCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${patrimonioCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button>
                 </div>`;
         }
         
-        // --- MODAL FUNCTIONS ---
-        const openModal = (modalEl) => {
-            modalEl.classList.remove('hidden');
-            setTimeout(() => {
-                modalEl.querySelector('.modal-container').classList.remove('scale-95');
-                modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0');
-            }, 10);
-        };
-        const closeModal = (modalEl) => {
-            if(!modalEl) return;
-            modalEl.querySelector('.modal-container').classList.add('scale-95');
-            modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0');
-            setTimeout(() => modalEl.classList.add('hidden'), 300);
-        };
+        const openModal = (modalEl) => { modalEl.classList.remove('hidden'); setTimeout(() => { modalEl.querySelector('.modal-container').classList.remove('scale-95'); modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0'); }, 10); };
+        const closeModal = (modalEl) => { if(!modalEl) return; modalEl.querySelector('.modal-container').classList.add('scale-95'); modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0'); setTimeout(() => modalEl.classList.add('hidden'), 300); };
 
         function openItemModal(item = null) {
             itemForm.reset();
+            modalTitle.textContent = item ? 'Editar Item' : 'Adicionar Novo Item';
+            document.getElementById('item-id').value = item ? item.id : '';
             if (item) {
-                modalTitle.textContent = 'Editar Item';
-                document.getElementById('item-id').value = item.id;
-                document.getElementById('item-tombamento').value = item.Tombamento || '';
-                document.getElementById('item-tipo').value = item.Tipo || '';
-                document.getElementById('item-descricao').value = item.Descrição || '';
-                document.getElementById('item-unidade').value = item.Unidade || '';
-                document.getElementById('item-quantidade').value = item.Quantidade || 1;
-                document.getElementById('item-localizacao').value = item.Localização || '';
-                document.getElementById('item-estado').value = item.Estado || 'Bom';
-                document.getElementById('item-fornecedor').value = item.Fornecedor || '';
-                document.getElementById('item-doacao').value = item['Origem da Doação'] || '';
-                document.getElementById('item-observacao').value = item.Observação || '';
-            } else {
-                modalTitle.textContent = 'Adicionar Novo Item';
-                document.getElementById('item-id').value = '';
+                Object.keys(item).forEach(key => {
+                    const elName = `item-${key.toLowerCase().replace(/[\sçã]/g, c => ({' ': '-', 'ç': 'c', 'ã': 'a'})[c] || '')}`;
+                    const el = document.getElementById(elName);
+                    if (el) el.value = item[key];
+                });
             }
             openModal(itemModal);
         }
@@ -704,28 +594,19 @@
             if(!isLoggedIn) { alert('Acesso negado.'); return; }
             const id = document.getElementById('item-id').value;
             const itemData = {
-                Tombamento: document.getElementById('item-tombamento').value.trim(),
-                Tipo: document.getElementById('item-tipo').value.trim(),
-                Descrição: document.getElementById('item-descricao').value.trim(),
-                Unidade: document.getElementById('item-unidade').value.trim(),
-                Quantidade: parseInt(document.getElementById('item-quantidade').value),
-                Localização: document.getElementById('item-localizacao').value.trim(),
-                Estado: document.getElementById('item-estado').value,
-                Fornecedor: document.getElementById('item-fornecedor').value.trim(),
-                'Origem da Doação': document.getElementById('item-doacao').value.trim(),
-                Observação: document.getElementById('item-observacao').value.trim(),
-                updatedAt: serverTimestamp()
+                Tombamento: document.getElementById('item-tombamento').value.trim(), Tipo: document.getElementById('item-tipo').value.trim(), Descrição: document.getElementById('item-descricao').value.trim(), Unidade: document.getElementById('item-unidade').value.trim(), Quantidade: parseInt(document.getElementById('item-quantidade').value), Localização: document.getElementById('item-localizacao').value.trim(), Estado: document.getElementById('item-estado').value, Fornecedor: document.getElementById('item-fornecedor').value.trim(), 'Origem da Doação': document.getElementById('item-doacao').value.trim(), Observação: document.getElementById('item-observacao').value.trim(), updatedAt: serverTimestamp()
             };
             try {
                 if (id) await updateDoc(doc(db, 'patrimonio', id), itemData);
                 else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
                 closeModal(itemModal);
-                loadPatrimonioPage('first');
+                localStorage.removeItem('patrimonioCache_fullList'); // Invalida o cache
+                loadAllPatrimonio();
             } catch (error) { console.error("Erro ao salvar o item: ", error); alert("Ocorreu um erro ao salvar."); }
         }
         
         function openDeleteModal(id) {
-            const item = allItems.find(i => i.id === id);
+            const item = patrimonioFullList.find(i => i.id === id);
             if (!item) return;
             deleteItemInfoEl.textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
             confirmDeleteBtn.dataset.id = id;
@@ -737,47 +618,34 @@
             try {
                 await deleteDoc(doc(db, 'patrimonio', confirmDeleteBtn.dataset.id));
                 closeModal(deleteConfirmModal);
-                loadPatrimonioPage('first');
+                localStorage.removeItem('patrimonioCache_fullList');
+                loadAllPatrimonio();
             } catch(error) { console.error("Erro ao excluir item: ", error); alert("Ocorreu um erro ao excluir."); }
         }
 
         function openTransferModal(id) {
-            const item = allItems.find(i => i.id === id);
+            const item = patrimonioFullList.find(i => i.id === id);
             if (!item) return;
-
             transferForm.reset();
             document.getElementById('transfer-item-id').value = id;
             document.getElementById('transfer-item-description').textContent = item.Descrição;
             document.getElementById('transfer-item-current-unit').textContent = `${item.Unidade} (${item.Localização || 'N/D'})`;
-
-            const cachedData = localStorage.getItem('patrimonioCache_allItems');
-             if(cachedData) {
-                const allItemsFromCache = JSON.parse(cachedData).items;
-                const tipos = [...new Set(allItemsFromCache.map(i => i.Tipo).filter(Boolean))].sort();
-                transferTipoEl.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-             } else {
-                 transferTipoEl.innerHTML = '<option value="">Carregando...</option>';
-             }
-
+            const tipos = [...new Set(patrimonioFullList.map(i => i.Tipo).filter(Boolean))].sort();
+            transferTipoEl.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
             transferUnidadeEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
             transferUnidadeEl.disabled = true;
-            
             openModal(transferModal);
         }
 
-        function updateTransferUnidadeSelect(tipoSelectEl, unidadeSelectEl) {
-            const cachedData = localStorage.getItem('patrimonioCache_allItems');
-            if(!cachedData) return;
-
-            const allItemsFromCache = JSON.parse(cachedData).items;
+        function updateUnidadeFilter(tipoSelectEl, unidadeSelectEl) {
             const selectedTipo = tipoSelectEl.value;
             unidadeSelectEl.innerHTML = '';
             if (selectedTipo) {
-                const unidades = [...new Set(allItemsFromCache.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
-                unidadeSelectEl.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                const unidades = [...new Set(patrimonioFullList.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+                unidadeSelectEl.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
                 unidadeSelectEl.disabled = false;
             } else {
-                unidadeSelectEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
+                unidadeSelectEl.innerHTML = '<option value="">Selecione um Tipo</option>';
                 unidadeSelectEl.disabled = true;
             }
         }
@@ -785,44 +653,28 @@
         async function handleTransferSubmit(e) {
             e.preventDefault();
             if(!isLoggedIn) { alert('Acesso negado.'); return; }
-            
             const id = document.getElementById('transfer-item-id').value;
             const newTipo = document.getElementById('transfer-tipo').value;
             const newUnidade = document.getElementById('transfer-unidade').value;
             const newLocalizacao = document.getElementById('transfer-localizacao').value.trim();
-
-            if (!id || !newTipo || !newUnidade || !newLocalizacao) {
-                alert('Por favor, preencha todos os campos de destino.');
-                return;
-            }
-
-            const originalItem = allItems.find(i => i.id === id);
+            if (!id || !newTipo || !newUnidade || !newLocalizacao) { alert('Por favor, preencha todos os campos de destino.'); return; }
+            const originalItem = patrimonioFullList.find(i => i.id === id);
             const transferNote = `Transferido de ${originalItem.Unidade} (${originalItem.Localização || 'N/D'}) para ${newUnidade} em ${new Date().toLocaleDateString('pt-BR')}.`;
             const updatedObservacao = originalItem.Observação ? `${originalItem.Observação}\n${transferNote}` : transferNote;
-
-            const updatedData = {
-                Tipo: newTipo,
-                Unidade: newUnidade,
-                Localização: newLocalizacao,
-                Observação: updatedObservacao,
-                updatedAt: serverTimestamp()
-            };
-
+            const updatedData = { Tipo: newTipo, Unidade: newUnidade, Localização: newLocalizacao, Observação: updatedObservacao, updatedAt: serverTimestamp() };
             try {
                 await updateDoc(doc(db, 'patrimonio', id), updatedData);
                 closeModal(transferModal);
-                loadPatrimonioPage();
-            } catch (error) {
-                console.error("Erro ao transferir item:", error);
-                alert("Ocorreu um erro ao realizar a transferência.");
-            }
+                localStorage.removeItem('patrimonioCache_fullList');
+                loadAllPatrimonio();
+            } catch (error) { console.error("Erro ao transferir item:", error); alert("Ocorreu um erro ao realizar a transferência."); }
         }
         
         function switchTab(tabName) {
             navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
-            if (tabName === 'dashboard') loadAllItemsForFiltersAndDashboard();
-            if (tabName === 'patrimonio') loadPatrimonioPage();
+            if (tabName === 'dashboard') renderDashboard(patrimonioFullList);
+            if (tabName === 'patrimonio') applyPatrimonioFiltersAndRender();
             if (tabName === 'notas-fiscais') renderNFs();
         }
 
@@ -830,15 +682,11 @@
             if (!items || items.length === 0) return;
             const totalItens = items.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
             const totalUnidades = new Set(items.map(i => i.Unidade)).size;
-            const estadosCount = items.reduce((acc, item) => {
-                const normalizedEstado = getNormalizedEstado(item.Estado);
-                acc[normalizedEstado] = (acc[normalizedEstado] || 0) + (item.Quantidade || 1);
-                return acc;
-            }, { 'Novo': 0, 'Bom': 0, 'Regular': 0, 'Avariado': 0 });
+            const estadosCount = items.reduce((acc, item) => { const norm = getNormalizedEstado(item.Estado); acc[norm] = (acc[norm] || 0) + (item.Quantidade || 1); return acc; }, {});
             document.getElementById('kpi-total-itens').textContent = totalItens;
             document.getElementById('kpi-total-unidades').textContent = totalUnidades;
-            document.getElementById('kpi-total-avariados').textContent = estadosCount['Avariado'];
-            document.getElementById('kpi-total-novos').textContent = estadosCount['Novo'];
+            document.getElementById('kpi-total-avariados').textContent = estadosCount['Avariado'] || 0;
+            document.getElementById('kpi-total-novos').textContent = estadosCount['Novo'] || 0;
             const estadoLabels = ['Novo', 'Bom', 'Regular', 'Avariado'];
             if (dashboardEstadoChart) dashboardEstadoChart.destroy();
             dashboardEstadoChart = new Chart(document.getElementById('dashboardEstadoChart'), { type: 'doughnut', data: { labels: estadoLabels, datasets: [{ data: estadoLabels.map(l => estadosCount[l]), backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] }] }, options: { responsive: true, maintainAspectRatio: false } });
@@ -847,42 +695,16 @@
             dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), { type: 'bar', data: { labels: Object.keys(tiposCount), datasets: [{ label: 'Qtd. de Itens', data: Object.values(tiposCount), backgroundColor: '#60a5fa' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         }
 
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            loginErrorEl.classList.add('hidden');
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                closeModal(loginModal);
-            } catch (error) {
-                 loginErrorEl.textContent = "Email ou senha inválidos.";
-                 loginErrorEl.classList.remove('hidden');
-            }
-        }
-        
+        async function handleLogin(e) { e.preventDefault(); try { await signInWithEmailAndPassword(auth, loginForm.email.value, loginForm.password.value); closeModal(loginModal); } catch (error) { loginErrorEl.textContent = "Email ou senha inválidos."; loginErrorEl.classList.remove('hidden'); } }
         async function generatePdfReport() {
-            alert("Carregando todos os itens para o relatório. Isso pode levar um momento.");
-            const querySnapshot = await getDocs(collection(db, 'patrimonio'));
-            const allItemsForPdf = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
+            alert("Gerando PDF com os itens atualmente filtrados.");
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'landscape' });
-
-            const selectedCols = Array.from(document.querySelectorAll('#export-columns-container input:checked'))
-                .map(cb => ({ key: cb.value, title: cb.dataset.name }));
-            
+            const selectedCols = Array.from(document.querySelectorAll('#export-columns-container input:checked')).map(cb => ({ key: cb.value, title: cb.dataset.name }));
             if (selectedCols.length === 0) { alert('Selecione ao menos uma coluna.'); return; }
-
             const head = [selectedCols.map(c => c.title)];
-            const body = allItemsForPdf.map(item => selectedCols.map(col => item[col.key] || 'N/A'));
-
-            doc.setFontSize(18);
-            doc.text(`Relatório de Patrimônio`, 14, 22);
-            doc.setFontSize(11);
-            doc.setTextColor(100);
-            doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 29);
-            
+            const body = patrimonioFilteredList.map(item => selectedCols.map(col => item[col.key] || 'N/A'));
+            doc.setFontSize(18); doc.text(`Relatório de Patrimônio`, 14, 22); doc.setFontSize(11); doc.setTextColor(100); doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 29);
             doc.autoTable({ head, body, startY: 35, theme: 'striped', headStyles: { fillColor: [22, 100, 74] } });
             doc.save(`relatorio-patrimonio-${new Date().toISOString().slice(0,10)}.pdf`);
             closeModal(exportPdfModal);
@@ -890,336 +712,248 @@
         
         function renderNFs() {
             if (!isLoggedIn) {
-                nfListContainer.innerHTML = '<div class="card text-center"><h3 class="font-semibold">Acesso Restrito</h3><p class="text-sm text-slate-500 mt-2">Faça login para visualizar e gerenciar as notas fiscais.</p></div>';
+                nfListContainer.innerHTML = '<p class="text-center text-slate-500 py-8">Faça login para gerenciar as notas fiscais.</p>';
                 return;
             }
+
+            let allNfItems = allNFs.flatMap(nf => nf.items.map((item, index) => ({...item, nfId: nf.id, itemIndex: index, fornecedor: nf['Nome Fornecedor'], cadastro: nf.Cadastro })));
+            
+            allNfItems.sort((a, b) => {
+                const descComp = normalizeStr(a.Descrição).localeCompare(normalizeStr(b.Descrição));
+                if (descComp !== 0) return descComp;
+                return normalizeStr(a.TOMBAMENTO).localeCompare(normalizeStr(b.TOMBAMENTO));
+            });
 
             const searchTerm = normalizeStr(nfSearchInput.value);
-            let filteredNFs = allNFs;
+            const statusFilter = nfStatusFilter.value;
 
             if (searchTerm) {
-                filteredNFs = allNFs.map(nf => {
-                    const matchingItems = nf.items.filter(item => 
-                        normalizeStr(nf['Nome Fornecedor']).includes(searchTerm) ||
-                        normalizeStr(item.Descrição).includes(searchTerm) ||
-                        normalizeStr(item.TOMBAMENTO).includes(searchTerm) ||
-                        normalizeStr(item.NF).includes(searchTerm)
-                    );
-                    if (matchingItems.length > 0) {
-                        return { ...nf, items: matchingItems };
-                    }
-                    return null;
-                }).filter(Boolean);
+                allNfItems = allNfItems.filter(item => 
+                    normalizeStr(item.fornecedor).includes(searchTerm) ||
+                    normalizeStr(item.Descrição).includes(searchTerm) ||
+                    normalizeStr(item.TOMBAMENTO).includes(searchTerm) ||
+                    normalizeStr(item.NF).includes(searchTerm)
+                );
             }
 
-            if(filteredNFs.length === 0){
-                nfListContainer.innerHTML = '<div class="card text-center"><p class="text-slate-500">Nenhuma nota fiscal encontrada.</p></div>';
+            if (statusFilter !== 'all') {
+                allNfItems = allNfItems.filter(item => {
+                    const isAllocated = item.transferencia && item.transferencia.patrimonioId;
+                    return statusFilter === 'allocated' ? isAllocated : !isAllocated;
+                });
+            }
+
+            const totalPages = Math.ceil(allNfItems.length / nfItemsPerPage);
+            nfCurrentPage = Math.min(nfCurrentPage, totalPages) || 1;
+            const startIndex = (nfCurrentPage - 1) * nfItemsPerPage;
+            const endIndex = startIndex + nfItemsPerPage;
+            const itemsToDisplay = allNfItems.slice(startIndex, endIndex);
+
+            if (itemsToDisplay.length === 0) {
+                nfListContainer.innerHTML = '<p class="text-center text-slate-500 py-8">Nenhum item encontrado com os filtros atuais.</p>';
+                nfPaginationControls.innerHTML = '';
                 return;
             }
 
-            const groupedByFornecedor = filteredNFs.reduce((acc, nf) => {
-                const fornecedor = nf['Nome Fornecedor'] || 'Fornecedor Desconhecido';
-                if (!acc[fornecedor]) acc[fornecedor] = [];
-                acc[fornecedor].push(nf);
-                return acc;
-            }, {});
-
-            let html = '';
-            for (const fornecedor in groupedByFornecedor) {
-                const groupedByDate = groupedByFornecedor[fornecedor].reduce((acc, nf) => {
-                    const date = nf.Cadastro?.toDate().toLocaleDateString('pt-BR') || 'Data Desconhecida';
-                    if(!acc[date]) acc[date] = [];
-                    acc[date].push(nf);
-                    return acc;
-                }, {});
-
-                html += `<details class="nf-group bg-white rounded-lg shadow-sm">
-                    <summary class="flex justify-between items-center">
-                        <span>${fornecedor}</span>
-                        <span class="text-sm font-normal text-slate-500">${groupedByFornecedor[fornecedor].length} itens</span>
-                    </summary>
-                    <div class="p-4 space-y-2 border-t">`;
-                
-                for(const date in groupedByDate) {
-                    html += `<h4 class="font-semibold text-sm text-slate-600 pt-2">Cadastrado em: ${date}</h4>`;
-                    groupedByDate[date].forEach((nf) => {
-                       nf.items.forEach((item, itemIndex) => {
-                           html += renderNFItem(nf, item, itemIndex);
-                       });
-                    });
-                }
-                html += `</div></details>`;
-            }
-            nfListContainer.innerHTML = html;
+            const tableHTML = `
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="p-3 text-left">Item (Descrição / Tombo)</th>
+                            <th class="p-3 text-left">Fornecedor / NF</th>
+                            <th class="p-3 text-left">Status</th>
+                            <th class="p-3 text-left">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsToDisplay.map(item => `
+                            <tr class="border-b border-slate-200">
+                                <td class="p-3">
+                                    <p class="font-semibold text-slate-800">${item.Descrição}</p>
+                                    <p class="text-xs text-slate-500 font-mono">Tomb: ${item.TOMBAMENTO || 'N/A'}</p>
+                                </td>
+                                <td class="p-3">
+                                    <p class="font-medium">${item.fornecedor}</p>
+                                    <p class="text-xs text-slate-500 font-mono">NF: ${item.NF || 'N/A'}</p>
+                                </td>
+                                <td class="p-3">
+                                    ${item.transferencia ? `<span class="badge badge-green">Alocado</span>` : `<span class="badge badge-yellow">Pendente</span>`}
+                                </td>
+                                <td class="p-3">
+                                    ${item.transferencia ? `<p class="text-xs text-slate-600">Em: ${item.transferencia.unidadeDestino}</p>` : `<button class="register-transfer-btn btn btn-primary text-xs" data-nf-id="${item.nfId}" data-item-index="${item.itemIndex}">Alocar</button>`}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+            
+            nfListContainer.innerHTML = tableHTML;
+            renderNFPagination(allNfItems.length);
         }
 
-        function renderNFItem(nf, item, itemIndex) {
-            const isTransferred = item.transferencia && item.transferencia.patrimonioId;
-            let actionButtonHTML = '';
-            let iconHTML = '';
-
-            if (isTransferred) {
-                iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`;
-                actionButtonHTML = `<div class="text-right w-full"><p class="font-semibold text-sm text-green-700">✔️ Alocado</p><p class="text-xs text-slate-500">Em: ${item.transferencia.unidadeDestino}</p></div>`;
-            } else {
-                 iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2m-4-1v8m0 0l3-3m-3 3L9 8m-5 5h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 001.414 0l2.414-2.414a1 1 0 01.707-.293H19" /></svg>`;
-                 actionButtonHTML = `<button class="register-transfer-btn btn btn-primary w-full text-xs" data-nf-id="${nf.id}" data-item-index="${itemIndex}">Alocar no Patrimônio</button>`;
-            }
-
-            return `<div class="border rounded-md p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${isTransferred ? 'bg-green-50' : 'bg-white'}">
-                <div class="flex items-center gap-3">
-                    ${iconHTML}
-                    <div>
-                        <p class="font-semibold">${item.Descrição}</p>
-                        <p class="text-xs text-slate-500">NF: ${item.NF} | Tomb: ${item.TOMBAMENTO}</p>
-                    </div>
-                </div>
-                <div class="w-full sm:w-auto flex-shrink-0">
-                    ${actionButtonHTML}
-                </div>
-            </div>`;
+        function renderNFPagination(totalItems) {
+            const totalPages = Math.ceil(totalItems / nfItemsPerPage);
+            if (totalPages <= 1) { nfPaginationControls.innerHTML = ''; return; }
+            nfPaginationControls.innerHTML = `<span class="text-sm text-slate-600">Página ${nfCurrentPage} de ${totalPages} (${totalItems} itens)</span>
+                <div class="inline-flex">
+                    <button data-page="${nfCurrentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${nfCurrentPage === 1 ? 'disabled' : ''}>Anterior</button>
+                    <button data-page="${nfCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${nfCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button>
+                </div>`;
         }
 
         function handleCSVUpload() {
-            const file = csvFileInput.files[0];
-            if (!file) return;
-
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    const requiredHeaders = ['Nome Fornecedor', 'TOMBAMENTO', 'Descrição', 'Valor NF', 'Data NF', 'NF'];
-                    const missingHeaders = requiredHeaders.filter(h => !results.meta.fields.includes(h));
-
-                    if (missingHeaders.length > 0) {
-                        csvUploadFeedback.innerHTML = `<p class="text-red-600">Erro: Cabeçalhos ausentes no arquivo: ${missingHeaders.join(', ')}</p>`;
-                        uploadCsvBtn.disabled = true;
-                        return;
-                    }
-                    csvDataToUpload = results.data;
-                    csvUploadFeedback.innerHTML = `<p class="text-green-600">${results.data.length} registros prontos para upload.</p>`;
-                    uploadCsvBtn.disabled = false;
-                }
-            });
+            let csvDataToUpload = [];
+            const file = document.getElementById('csv-file-input').files[0]; if (!file) return;
+            Papa.parse(file, { header: true, skipEmptyLines: true, complete: (results) => {
+                const required = ['Nome Fornecedor', 'TOMBAMENTO', 'Descrição', 'Valor NF', 'Data NF', 'NF'];
+                const missing = required.filter(h => !results.meta.fields.includes(h));
+                if (missing.length > 0) { document.getElementById('csv-upload-feedback').innerHTML = `<p class="text-red-600">Erro: Cabeçalhos ausentes: ${missing.join(', ')}</p>`; uploadCsvBtn.disabled = true; return; }
+                csvDataToUpload = results.data;
+                document.getElementById('csv-upload-feedback').innerHTML = `<p class="text-green-600">${results.data.length} registros prontos.</p>`;
+                uploadCsvBtn.disabled = false;
+            }});
         }
         
         async function saveCSVData() {
+            let csvDataToUpload = []; // Assume this is populated by handleCSVUpload
             if (csvDataToUpload.length === 0) return;
-            uploadCsvBtn.disabled = true;
-            uploadCsvBtn.textContent = 'Enviando...';
-
-            const maxBatchSize = 499;
-            let recordsProcessed = 0;
-
+            uploadCsvBtn.disabled = true; uploadCsvBtn.textContent = 'Enviando...';
+            const maxBatch = 499; let processed = 0;
             try {
-                for (let i = 0; i < csvDataToUpload.length; i += maxBatchSize) {
-                    const chunk = csvDataToUpload.slice(i, i + maxBatchSize);
+                for (let i = 0; i < csvDataToUpload.length; i += maxBatch) {
+                    const chunk = csvDataToUpload.slice(i, i + maxBatch);
                     const batch = writeBatch(db);
-
                     chunk.forEach(row => {
                         const newDocRef = doc(collection(db, 'notas_fiscais'));
-                        const nfData = {
-                            'Nome Fornecedor': row['Nome Fornecedor'],
-                            Cadastro: serverTimestamp(),
-                            items: [{
-                                TOMBAMENTO: row.TOMBAMENTO,
-                                Descrição: row.Descrição,
-                                'Valor NF': row['Valor NF'],
-                                'Data NF': row['Data NF'],
-                                NF: row.NF
-                            }]
-                        };
+                        const nfData = { 'Nome Fornecedor': row['Nome Fornecedor'], Cadastro: serverTimestamp(), items: [{ TOMBAMENTO: row.TOMBAMENTO, Descrição: row.Descrição, 'Valor NF': row['Valor NF'], 'Data NF': row['Data NF'], NF: row.NF }]};
                         batch.set(newDocRef, nfData);
                     });
-                    
                     await batch.commit();
-                    recordsProcessed += chunk.length;
-                    uploadCsvBtn.textContent = `Enviando... (${recordsProcessed}/${csvDataToUpload.length})`;
+                    processed += chunk.length;
+                    uploadCsvBtn.textContent = `Enviando... (${processed}/${csvDataToUpload.length})`;
                 }
-
-                closeModal(csvUploadModal);
-                alert(`${csvDataToUpload.length} notas fiscais importadas com sucesso!`);
-            } catch (error) {
-                console.error("Erro ao importar CSV:", error);
-                alert("Ocorreu um erro na importação. Verifique o console para mais detalhes.");
-            } finally {
-                csvDataToUpload = [];
-                csvFileInput.value = '';
-                uploadCsvBtn.disabled = true;
-                uploadCsvBtn.textContent = 'Enviar para o Banco de Dados';
-            }
+                closeModal(csvUploadModal); alert(`${csvDataToUpload.length} notas fiscais importadas!`);
+            } catch (error) { console.error("Erro ao importar CSV:", error); alert("Ocorreu um erro na importação.");
+            } finally { csvDataToUpload = []; document.getElementById('csv-file-input').value = ''; uploadCsvBtn.disabled = true; uploadCsvBtn.textContent = 'Enviar para o Banco de Dados'; }
         }
         
         function openRegisterTransferModal(nfId, itemIndex) {
-            const nf = allNFs.find(n => n.id === nfId);
-            if (!nf) return;
+            const nf = allNFs.find(n => n.id === nfId); if (!nf) return;
             const item = nf.items[itemIndex];
-            
             registerTransferForm.reset();
-            
             document.getElementById('register-transfer-nf-id').value = nfId;
             document.getElementById('register-transfer-item-index').value = itemIndex;
             document.getElementById('register-transfer-item-info').textContent = item.Descrição;
             document.getElementById('register-transfer-item-details').textContent = `Tomb: ${item.TOMBAMENTO} | NF: ${item.NF} | Fornecedor: ${nf['Nome Fornecedor']}`;
-            
             const tipoSelect = document.getElementById('register-transfer-tipo');
-            const unidadeSelect = document.getElementById('register-transfer-unidade');
-
-            const cachedData = localStorage.getItem('patrimonioCache_allItems');
-             if(cachedData) {
-                const allItemsFromCache = JSON.parse(cachedData).items;
-                const tipos = [...new Set(allItemsFromCache.map(i => i.Tipo).filter(Boolean))].sort();
-                tipoSelect.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-             } else {
-                 tipoSelect.innerHTML = '<option value="">Carregando...</option>';
-             }
-            unidadeSelect.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
-            unidadeSelect.disabled = true;
-
+            const tipos = [...new Set(patrimonioFullList.map(i => i.Tipo).filter(Boolean))].sort();
+            tipoSelect.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            document.getElementById('register-transfer-unidade').innerHTML = '<option value="">Selecione um Tipo</option>';
+            document.getElementById('register-transfer-unidade').disabled = true;
             openModal(registerTransferModal);
         }
 
         async function handleRegisterAndTransferSubmit(e) {
             e.preventDefault();
             const saveBtn = document.getElementById('save-register-transfer-btn');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Processando...';
-
+            saveBtn.disabled = true; saveBtn.textContent = 'Processando...';
             const nfId = document.getElementById('register-transfer-nf-id').value;
             const itemIndex = parseInt(document.getElementById('register-transfer-item-index').value);
-            const tipo = document.getElementById('register-transfer-tipo').value;
-            const unidade = document.getElementById('register-transfer-unidade').value;
-            const localizacao = document.getElementById('register-transfer-localizacao').value.trim();
-            const estado = document.getElementById('register-transfer-estado').value;
-
-            if (!nfId || itemIndex < 0 || !tipo || !unidade || !localizacao) {
-                alert('Todos os campos de destino são obrigatórios.');
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Confirmar e Criar no Patrimônio';
-                return;
-            }
-
+            const { value: tipo } = document.getElementById('register-transfer-tipo');
+            const { value: unidade } = document.getElementById('register-transfer-unidade');
+            const { value: localizacao } = document.getElementById('register-transfer-localizacao');
+            const { value: estado } = document.getElementById('register-transfer-estado');
+            if (!nfId || itemIndex < 0 || !tipo || !unidade || !localizacao.trim()) { alert('Todos os campos de destino são obrigatórios.'); saveBtn.disabled = false; saveBtn.textContent = 'Confirmar e Criar'; return; }
             const nfDoc = allNFs.find(n => n.id === nfId);
             const itemFromNf = nfDoc.items[itemIndex];
-
             const batch = writeBatch(db);
-
             const newPatrimonioRef = doc(collection(db, 'patrimonio'));
             const observacao = `Item recebido via NF ${itemFromNf.NF} (${nfDoc['Nome Fornecedor']}) em ${new Date().toLocaleDateString('pt-BR')}.`;
-            
-            const patrimonioData = {
-                Descrição: itemFromNf.Descrição,
-                Tombamento: itemFromNf.TOMBAMENTO,
-                Fornecedor: nfDoc['Nome Fornecedor'],
-                Tipo: tipo,
-                Unidade: unidade,
-                Localização: localizacao,
-                Estado: estado,
-                Quantidade: 1,
-                Observação: observacao,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
-            batch.set(newPatrimonioRef, patrimonioData);
-
+            batch.set(newPatrimonioRef, { Descrição: itemFromNf.Descrição, Tombamento: itemFromNf.TOMBAMENTO, Fornecedor: nfDoc['Nome Fornecedor'], Tipo: tipo, Unidade: unidade, Localização: localizacao.trim(), Estado: estado, Quantidade: 1, Observação: observacao, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
             const nfDocRef = doc(db, 'notas_fiscais', nfId);
             const updatedNfItems = [...nfDoc.items]; 
-            updatedNfItems[itemIndex].transferencia = {
-                patrimonioId: newPatrimonioRef.id,
-                data: serverTimestamp(),
-                usuario: auth.currentUser.email,
-                unidadeDestino: unidade,
-                localizacaoDestino: localizacao
-            };
+            updatedNfItems[itemIndex].transferencia = { patrimonioId: newPatrimonioRef.id, data: serverTimestamp(), usuario: auth.currentUser.email, unidadeDestino: unidade, localizacaoDestino: localizacao.trim() };
             batch.update(nfDocRef, { items: updatedNfItems });
-
             try {
                 await batch.commit();
                 alert('Item alocado no patrimônio com sucesso!');
                 closeModal(registerTransferModal);
-                localStorage.removeItem('patrimonioCache_allItems');
-                loadAllItemsForFiltersAndDashboard();
-            } catch (error) {
-                console.error("Erro ao alocar item:", error);
-                alert('Ocorreu um erro. Verifique o console.');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Confirmar e Criar no Patrimônio';
-            }
+                localStorage.removeItem('patrimonioCache_fullList');
+                loadAllPatrimonio();
+            } catch (error) { console.error("Erro ao alocar item:", error); alert('Ocorreu um erro.');
+            } finally { saveBtn.disabled = false; saveBtn.textContent = 'Confirmar e Criar no Patrimônio'; }
         }
         
-        
-        // --- EVENT LISTENERS ---
+        // --- EVENT LISTENERS (CORRIGIDO) ---
         document.addEventListener('DOMContentLoaded', () => {
-            const debounceFilter = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
+            const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
             
             listenToData();
 
-            filtroTipoUnidadeEl.addEventListener('change', updateUnidadeFilter);
+            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 400);
+
+            filtroTipoUnidadeEl.addEventListener('change', () => {
+                updateUnidadeFilter(filtroTipoUnidadeEl, filtroUnidadeEl);
+                debouncedFilter();
+            });
             
-            resetFiltersBtn.addEventListener('click', () => {
-                filtroTipoUnidadeEl.value = '';
-                filtroEstadoEl.value = '';
-                document.getElementById('filtro-busca').value = '';
-                document.getElementById('filtro-tombamento').value = '';
-                document.getElementById('filtro-localizacao').value = '';
-                updateUnidadeFilter();
-                loadPatrimonioPage('first');
+            ['change', 'input'].forEach(evt => {
+                filtroUnidadeEl.addEventListener(evt, debouncedFilter);
+                filtroEstadoEl.addEventListener(evt, debouncedFilter);
+                filtroBuscaEl.addEventListener(evt, debouncedFilter);
+                filtroTombamentoEl.addEventListener(evt, debouncedFilter);
+                filtroLocalizacaoEl.addEventListener(evt, debouncedFilter);
+            });
+
+            resetFiltersBtn.addEventListener('click', () => { 
+                patrimonioFiltersForm.reset(); 
+                filtroUnidadeEl.innerHTML = '<option value="">Selecione um Tipo</option>';
+                filtroUnidadeEl.disabled = true;
+                applyPatrimonioFiltersAndRender();
             });
 
             paginationControlsEl.addEventListener('click', (e) => { 
-                const direction = e.target.closest('button')?.dataset.page;
-                if(direction) loadPatrimonioPage(direction);
+                const page = e.target.closest('button')?.dataset.page; 
+                if(page) { patrimonioCurrentPage = parseInt(page); renderPatrimonioTable(); }
             });
 
             tableBodyEl.addEventListener('click', (e) => {
-                const editBtn = e.target.closest('.edit-btn'); if (editBtn) openItemModal(allItems.find(i => i.id === editBtn.dataset.id));
-                const deleteBtn = e.target.closest('.delete-btn'); if (deleteBtn) openDeleteModal(deleteBtn.dataset.id);
-                const transferBtn = e.target.closest('.transfer-btn'); if (transferBtn) openTransferModal(transferBtn.dataset.id);
+                const btn = e.target.closest('button'); if (!btn) return;
+                const id = btn.dataset.id;
+                const item = patrimonioFullList.find(i => i.id === id);
+                if (btn.classList.contains('edit-btn')) openItemModal(item);
+                if (btn.classList.contains('delete-btn')) openDeleteModal(id);
+                if (btn.classList.contains('transfer-btn')) openTransferModal(id);
             });
+            
+            document.querySelectorAll('.modal .modal-overlay, .modal button[onclick*="closest"]').forEach(el => el.addEventListener('click', () => el.closest('.modal').classList.add('hidden')));
 
             openAddModalBtn.addEventListener('click', () => openItemModal());
-            closeItemModalBtn.addEventListener('click', () => closeModal(itemModal));
-            cancelItemBtn.addEventListener('click', () => closeModal(itemModal));
             itemForm.addEventListener('submit', handleFormSubmit);
-
             openLoginModalBtn.addEventListener('click', () => openModal(loginModal));
-            closeLoginModalBtn.addEventListener('click', () => closeModal(loginModal));
             loginForm.addEventListener('submit', handleLogin);
             logoutBtn.addEventListener('click', () => signOut(auth));
-
             openExportModalBtn.addEventListener('click', () => openModal(exportPdfModal));
-            closeExportModalBtn.addEventListener('click', () => closeModal(exportPdfModal));
-            cancelExportBtn.addEventListener('click', () => closeModal(exportPdfModal));
-            confirmExportBtn.addEventListener('click', generatePdfReport);
-
+            document.getElementById('confirm-export-btn').addEventListener('click', generatePdfReport);
             confirmDeleteBtn.addEventListener('click', handleDelete);
-            cancelDeleteBtn.addEventListener('click', () => closeModal(deleteConfirmModal));
-            
-            closeTransferModalBtn.addEventListener('click', () => closeModal(transferModal));
-            cancelTransferBtn.addEventListener('click', () => closeModal(transferModal));
-            transferTipoEl.addEventListener('change', (e) => updateTransferUnidadeSelect(e.target, transferUnidadeEl));
+            transferTipoEl.addEventListener('change', () => updateUnidadeFilter(transferTipoEl, transferUnidadeEl));
             transferForm.addEventListener('submit', handleTransferSubmit);
-            
             navButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
-
             openCsvUploadModalBtn.addEventListener('click', () => openModal(csvUploadModal));
-            closeCsvUploadModalBtn.addEventListener('click', () => closeModal(csvUploadModal));
-            csvFileInput.addEventListener('change', handleCSVUpload);
+            document.getElementById('csv-file-input').addEventListener('change', handleCSVUpload);
             uploadCsvBtn.addEventListener('click', saveCSVData);
-
             nfListContainer.addEventListener('click', (e) => {
                 const btn = e.target.closest('.register-transfer-btn');
                 if(btn) openRegisterTransferModal(btn.dataset.nfId, parseInt(btn.dataset.itemIndex));
             });
-            
-            // Listeners do novo modal e busca de NFs
-            nfSearchInput.addEventListener('input', debounceFilter(renderNFs, 400));
-            closeRegisterTransferModalBtn.addEventListener('click', () => closeModal(registerTransferModal));
+            nfSearchInput.addEventListener('input', debounce(renderNFs, 400));
+            nfStatusFilter.addEventListener('change', renderNFs);
+            nfPaginationControls.addEventListener('click', (e) => {
+                const page = e.target.closest('button')?.dataset.page;
+                if(page) { nfCurrentPage = parseInt(page); renderNFs(); }
+            });
             registerTransferForm.addEventListener('submit', handleRegisterAndTransferSubmit);
-            const rtTipoSelect = document.getElementById('register-transfer-tipo');
-            const rtUnidadeSelect = document.getElementById('register-transfer-unidade');
-            rtTipoSelect.addEventListener('change', () => updateTransferUnidadeSelect(rtTipoSelect, rtUnidadeSelect));
+            document.getElementById('register-transfer-tipo').addEventListener('change', (e) => updateUnidadeFilter(e.target, document.getElementById('register-transfer-unidade')));
         });
     </script>
 </body>
