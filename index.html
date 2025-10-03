@@ -133,7 +133,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.4 (JS Hotfix)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.9.6 (Login Fix)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -333,7 +333,7 @@
         import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, query, where, orderBy, limit, getDocs, startAfter } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        // CORREÇÃO: Usando a firebaseConfig correta fornecida pelo usuário.
+        // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
             authDomain: "controle-de-patrimonio-semcas.firebaseapp.com",
@@ -352,13 +352,13 @@
         let unsubscribeNFs; 
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
+        let csvDataToUpload = []; // BUGFIX: Variável movida para o escopo global para ser acessível por ambas as funções de CSV.
         
-        // --- NOVO: LÓGICA DE DADOS E FILTRAGEM PARA PATRIMÔNIO (CLIENT-SIDE) ---
-        let patrimonioFullList = []; // Guarda todos os itens do patrimônio
-        let patrimonioFilteredList = []; // Guarda a lista após filtros
+        // --- LÓGICA DE DADOS E FILTRAGEM PARA PATRIMÔNIO ---
+        let patrimonioFullList = []; 
+        let patrimonioFilteredList = []; 
         let patrimonioCurrentPage = 1;
         let patrimonioItemsPerPage = 20;
-
 
         // --- Paginação e Estado para a Tabela de NFs ---
         let nfItemsPerPage = 15;
@@ -376,6 +376,8 @@
         const filtroTombamentoEl = document.getElementById('filtro-tombamento');
         const filtroLocalizacaoEl = document.getElementById('filtro-localizacao');
         const resetFiltersBtn = document.getElementById('reset-filters-btn');
+        const toggleAdvancedFiltersBtn = document.getElementById('toggle-advanced-filters-btn'); // BUGFIX: Elemento adicionado
+        const advancedFiltersContainer = document.getElementById('advanced-filters-container'); // BUGFIX: Elemento adicionado
         const itemModal = document.getElementById('item-modal');
         const openAddModalBtn = document.getElementById('open-add-modal-btn');
         const itemForm = document.getElementById('item-form');
@@ -403,7 +405,7 @@
         const openCsvUploadModalBtn = document.getElementById('open-csv-upload-modal-btn');
         const csvUploadModal = document.getElementById('csv-upload-modal');
         const uploadCsvBtn = document.getElementById('upload-csv-btn');
-        const registerTransferModal = document.getElementById('register-transfer-modal'); // CORREÇÃO: Adicionando a variável que faltava
+        const registerTransferModal = document.getElementById('register-transfer-modal');
         const registerTransferForm = document.getElementById('register-transfer-form');
         const nfSearchInput = document.getElementById('nf-search-input');
         const nfStatusFilter = document.getElementById('nf-status-filter');
@@ -444,7 +446,7 @@
                  }
             });
             
-            loadAllPatrimonio(); // CORREÇÃO: Carrega todos os itens do patrimônio de uma vez
+            loadAllPatrimonio();
         }
 
         async function loadAllPatrimonio() {
@@ -474,7 +476,7 @@
 
             } catch (error) {
                  console.error("Erro ao carregar patrimônio: ", error);
-                 tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados do patrimônio.</td></tr>`;
+                 tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10 text-red-500">Falha ao carregar dados do patrimônio. Verifique as regras do Firestore.</td></tr>`;
             }
         }
         
@@ -602,7 +604,7 @@
                 if (id) await updateDoc(doc(db, 'patrimonio', id), itemData);
                 else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
                 closeModal(itemModal);
-                localStorage.removeItem('patrimonioCache_fullList'); // Invalida o cache
+                localStorage.removeItem('patrimonioCache_fullList'); 
                 loadAllPatrimonio();
             } catch (error) { console.error("Erro ao salvar o item: ", error); alert("Ocorreu um erro ao salvar."); }
         }
@@ -680,6 +682,7 @@
             if (tabName === 'notas-fiscais') renderNFs();
         }
 
+        // CORREÇÃO: Função 'renderDashboard' adicionada novamente.
         function renderDashboard(items) {
             if (!items || items.length === 0) return;
             const totalItens = items.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
@@ -697,7 +700,49 @@
             dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), { type: 'bar', data: { labels: Object.keys(tiposCount), datasets: [{ label: 'Qtd. de Itens', data: Object.values(tiposCount), backgroundColor: '#60a5fa' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         }
 
-        async function handleLogin(e) { e.preventDefault(); try { await signInWithEmailAndPassword(auth, loginForm.email.value, loginForm.password.value); closeModal(loginModal); } catch (error) { loginErrorEl.textContent = "Email ou senha inválidos."; loginErrorEl.classList.remove('hidden'); } }
+        // BUGFIX 1: Função de login revisada para dar feedback de erro específico e corrigir a captura de valores.
+        async function handleLogin(e) {
+            e.preventDefault();
+            // CORREÇÃO: Usando getElementById para buscar os valores dos inputs, como sugerido.
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginErrorEl.classList.add('hidden'); // Oculta o erro anterior
+
+            try {
+                if (!email || !password) {
+                    loginErrorEl.textContent = "Por favor, preencha o email e a senha.";
+                    loginErrorEl.classList.remove('hidden');
+                    return;
+                }
+                console.log("Tentando login com email:", email); // Log para depuração
+                await signInWithEmailAndPassword(auth, email, password);
+                console.log("Login bem-sucedido"); // Log para depuração
+                closeModal(loginModal);
+                loginForm.reset();
+            } catch (error) {
+                console.error("Erro de login:", error.code, error.message); // Log detalhado para o console
+                let errorMessage = "Ocorreu um erro. Tente novamente.";
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                    case 'auth/invalid-email':
+                        errorMessage = "Nenhum usuário encontrado com este email.";
+                        break;
+                    case 'auth/wrong-password':
+                    case 'auth/invalid-credential':
+                        errorMessage = "A senha está incorreta. Verifique e tente novamente.";
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMessage = "Acesso bloqueado por muitas tentativas. Tente mais tarde.";
+                        break;
+                    default:
+                         errorMessage = `Erro: ${error.message}`; // Fallback para outros erros
+                         break;
+                }
+                loginErrorEl.textContent = errorMessage;
+                loginErrorEl.classList.remove('hidden');
+            }
+        }
+
         async function generatePdfReport() {
             alert("Gerando PDF com os itens atualmente filtrados.");
             const { jsPDF } = window.jspdf;
@@ -709,7 +754,7 @@
             doc.setFontSize(18); doc.text(`Relatório de Patrimônio`, 14, 22); doc.setFontSize(11); doc.setTextColor(100); doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 29);
             doc.autoTable({ head, body, startY: 35, theme: 'striped', headStyles: { fillColor: [22, 100, 74] } });
             doc.save(`relatorio-patrimonio-${new Date().toISOString().slice(0,10)}.pdf`);
-            closeModal(exportPdfModal);
+            closeModal(document.getElementById('export-pdf-modal'));
         }
         
         function renderNFs() {
@@ -802,23 +847,31 @@
                     <button data-page="${nfCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${nfCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button>
                 </div>`;
         }
-
+        
+        // BUGFIX 3: Função revisada para usar a variável global `csvDataToUpload`.
         function handleCSVUpload() {
-            let csvDataToUpload = [];
+            csvDataToUpload = []; // Limpa dados anteriores
             const file = document.getElementById('csv-file-input').files[0]; if (!file) return;
             Papa.parse(file, { header: true, skipEmptyLines: true, complete: (results) => {
                 const required = ['Nome Fornecedor', 'TOMBAMENTO', 'Descrição', 'Valor NF', 'Data NF', 'NF'];
                 const missing = required.filter(h => !results.meta.fields.includes(h));
-                if (missing.length > 0) { document.getElementById('csv-upload-feedback').innerHTML = `<p class="text-red-600">Erro: Cabeçalhos ausentes: ${missing.join(', ')}</p>`; uploadCsvBtn.disabled = true; return; }
+                if (missing.length > 0) { 
+                    document.getElementById('csv-upload-feedback').innerHTML = `<p class="text-red-600">Erro: Cabeçalhos ausentes: ${missing.join(', ')}</p>`; 
+                    uploadCsvBtn.disabled = true; 
+                    return; 
+                }
                 csvDataToUpload = results.data;
-                document.getElementById('csv-upload-feedback').innerHTML = `<p class="text-green-600">${results.data.length} registros prontos.</p>`;
+                document.getElementById('csv-upload-feedback').innerHTML = `<p class="text-green-600">${results.data.length} registros prontos para envio.</p>`;
                 uploadCsvBtn.disabled = false;
             }});
         }
         
+        // BUGFIX 3: Função revisada para usar a variável global `csvDataToUpload`.
         async function saveCSVData() {
-            let csvDataToUpload = []; // Assume this is populated by handleCSVUpload
-            if (csvDataToUpload.length === 0) return;
+            if (csvDataToUpload.length === 0) {
+                alert('Nenhum dado de CSV para enviar. Selecione um arquivo válido primeiro.');
+                return;
+            }
             uploadCsvBtn.disabled = true; uploadCsvBtn.textContent = 'Enviando...';
             const maxBatch = 499; let processed = 0;
             try {
@@ -827,16 +880,32 @@
                     const batch = writeBatch(db);
                     chunk.forEach(row => {
                         const newDocRef = doc(collection(db, 'notas_fiscais'));
-                        const nfData = { 'Nome Fornecedor': row['Nome Fornecedor'], Cadastro: serverTimestamp(), items: [{ TOMBAMENTO: row.TOMBAMENTO, Descrição: row.Descrição, 'Valor NF': row['Valor NF'], 'Data NF': row['Data NF'], NF: row.NF }]};
+                        const nfData = { 
+                            'Nome Fornecedor': row['Nome Fornecedor'], 
+                            Cadastro: serverTimestamp(), 
+                            items: [{ 
+                                TOMBAMENTO: row.TOMBAMENTO, 
+                                Descrição: row.Descrição, 
+                                'Valor NF': row['Valor NF'], 
+                                'Data NF': row['Data NF'], 
+                                NF: row.NF 
+                            }]
+                        };
                         batch.set(newDocRef, nfData);
                     });
                     await batch.commit();
                     processed += chunk.length;
                     uploadCsvBtn.textContent = `Enviando... (${processed}/${csvDataToUpload.length})`;
                 }
-                closeModal(csvUploadModal); alert(`${csvDataToUpload.length} notas fiscais importadas!`);
+                closeModal(csvUploadModal); alert(`${processed} registros importados com sucesso!`);
             } catch (error) { console.error("Erro ao importar CSV:", error); alert("Ocorreu um erro na importação.");
-            } finally { csvDataToUpload = []; document.getElementById('csv-file-input').value = ''; uploadCsvBtn.disabled = true; uploadCsvBtn.textContent = 'Enviar para o Banco de Dados'; }
+            } finally { 
+                csvDataToUpload = []; 
+                document.getElementById('csv-file-input').value = ''; 
+                uploadCsvBtn.disabled = true; 
+                uploadCsvBtn.textContent = 'Enviar para o Banco de Dados'; 
+                document.getElementById('csv-upload-feedback').innerHTML = '';
+            }
         }
         
         function openRegisterTransferModal(nfId, itemIndex) {
@@ -886,7 +955,7 @@
             } finally { saveBtn.disabled = false; saveBtn.textContent = 'Confirmar e Criar no Patrimônio'; }
         }
         
-        // --- EVENT LISTENERS (CORRIGIDO) ---
+        // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
             const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
             
@@ -907,6 +976,12 @@
                 filtroLocalizacaoEl.addEventListener(evt, debouncedFilter);
             });
 
+            // BUGFIX 2: Adicionado evento de clique para o botão de filtros avançados.
+            toggleAdvancedFiltersBtn.addEventListener('click', () => {
+                const isHidden = advancedFiltersContainer.classList.toggle('hidden');
+                toggleAdvancedFiltersBtn.textContent = isHidden ? 'Filtros Avançados' : 'Ocultar Filtros';
+            });
+
             resetFiltersBtn.addEventListener('click', () => { 
                 patrimonioFiltersForm.reset(); 
                 filtroUnidadeEl.innerHTML = '<option value="">Selecione um Tipo</option>';
@@ -922,20 +997,21 @@
             tableBodyEl.addEventListener('click', (e) => {
                 const btn = e.target.closest('button'); if (!btn) return;
                 const id = btn.dataset.id;
+                if (!id) return;
                 const item = patrimonioFullList.find(i => i.id === id);
                 if (btn.classList.contains('edit-btn')) openItemModal(item);
                 if (btn.classList.contains('delete-btn')) openDeleteModal(id);
                 if (btn.classList.contains('transfer-btn')) openTransferModal(id);
             });
             
-            document.querySelectorAll('.modal .modal-overlay, .modal button[onclick*="closest"]').forEach(el => el.addEventListener('click', () => el.closest('.modal').classList.add('hidden')));
+            document.querySelectorAll('.modal .modal-overlay, .modal button[onclick*="closest"]').forEach(el => el.addEventListener('click', () => closeModal(el.closest('.modal'))));
 
             openAddModalBtn.addEventListener('click', () => openItemModal());
             itemForm.addEventListener('submit', handleFormSubmit);
             openLoginModalBtn.addEventListener('click', () => openModal(loginModal));
             loginForm.addEventListener('submit', handleLogin);
             logoutBtn.addEventListener('click', () => signOut(auth));
-            openExportModalBtn.addEventListener('click', () => openModal(exportPdfModal));
+            openExportModalBtn.addEventListener('click', () => openModal(document.getElementById('export-pdf-modal')));
             document.getElementById('confirm-export-btn').addEventListener('click', generatePdfReport);
             confirmDeleteBtn.addEventListener('click', handleDelete);
             transferTipoEl.addEventListener('change', () => updateUnidadeFilter(transferTipoEl, transferUnidadeEl));
@@ -960,4 +1036,3 @@
     </script>
 </body>
 </html>
-
