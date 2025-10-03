@@ -8,6 +8,9 @@
     <!-- Scripts e Links -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -44,10 +47,15 @@
         }
         .btn-primary { background-color: var(--primary-blue); color: white; }
         .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-success:hover { background-color: #059669; }
         .btn-danger { background-color: var(--error); color: white; }
         .btn-danger:hover { background-color: #dc2626; }
         .btn-secondary { background-color: #e2e8f0; color: #475569; }
         .btn-secondary:hover { background-color: #cbd5e1; }
+        .btn-link { color: var(--secondary-blue); font-weight: 600; }
+        .btn-link:hover { text-decoration: underline; }
+
 
         .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
         .badge-green { background: #d1fae5; color: #059669; }
@@ -74,8 +82,13 @@
         .nav-btn.active { color: var(--secondary-blue); border-bottom-color: var(--secondary-blue); }
         
         /* Modal */
-        .modal-overlay { transition: opacity 0.3s ease; }
-        .modal-container { transition: all 0.3s ease; max-height: 90vh; }
+        .modal {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-container {
+             transition: all 0.3s ease;
+             max-height: 90vh;
+        }
 
         /* Animações */
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
@@ -92,17 +105,42 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Estilos específicos da Aba NF */
+        .nf-group summary {
+            cursor: pointer;
+            padding: 1rem;
+            background-color: #f8fafc;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .nf-group[open] summary {
+            background-color: #eef2ff;
+        }
+        .nf-group summary:hover {
+            background-color: #f1f5f9;
+        }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
 
     <!-- Header -->
     <header class="header-banner sticky top-0 z-50 text-white p-4">
-        <div class="container mx-auto flex items-center gap-4">
-            <img src="https://www.saoluis.ma.gov.br/img/logo_mobile.png" alt="Logo Prefeitura" class="h-14 bg-white p-1 rounded-md shadow-md">
-            <div>
-                <h1 class="text-xl md:text-2xl font-bold leading-tight">Diretoria de Almoxarifado e Patrimônio</h1>
-                <p class="text-sm opacity-90">SEMCAS - São Luís</p>
+        <div class="container mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <img src="https://www.saoluis.ma.gov.br/img/logo_mobile.png" alt="Logo Prefeitura" class="h-14 bg-white p-1 rounded-md shadow-md">
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold leading-tight">Diretoria de Almoxarifado e Patrimônio</h1>
+                    <p class="text-sm opacity-90">SEMCAS - São Luís</p>
+                </div>
+            </div>
+            <!-- Auth Section -->
+            <div id="auth-section">
+                <div id="user-info" class="hidden items-center gap-4">
+                    <span id="user-email" class="text-sm font-medium hidden md:block"></span>
+                    <button id="logout-btn" class="btn bg-red-500 hover:bg-red-600 text-white text-sm">Sair</button>
+                </div>
+                <button id="open-login-modal-btn" class="btn bg-white/20 hover:bg-white/30 text-white text-sm">Login</button>
             </div>
         </div>
     </header>
@@ -110,7 +148,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.4.3 (Firebase)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.5.2 (Corrigido)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -118,9 +156,10 @@
     <!-- Navegação por Abas -->
     <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[92px] md:top-[88px]">
         <div class="container mx-auto px-4">
-            <div class="flex space-x-1 overflow-x-auto">
+            <div id="main-nav" class="flex space-x-1 overflow-x-auto">
                 <button class="nav-btn active" data-tab="dashboard">📊 Dashboard</button>
                 <button class="nav-btn" data-tab="patrimonio">💼 Patrimônio</button>
+                <button id="nav-nf" class="nav-btn" data-tab="notas-fiscais">🧾 Notas Fiscais</button>
             </div>
         </div>
     </nav>
@@ -145,18 +184,30 @@
         <!-- Patrimônio -->
         <div id="content-patrimonio" class="hidden fade-in">
              <div class="card mb-8">
+                <!-- Filtros Principais -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                     <div><label for="filtro-tipo-unidade" class="block text-sm font-medium mb-1">Tipo de Unidade</label><select id="filtro-tipo-unidade" class="w-full p-2 border rounded-lg bg-white"></select></div>
                     <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg bg-white" disabled></select></div>
                     <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg bg-white"></select></div>
-                    <div class="lg:col-span-3"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida</label><input type="text" id="filtro-busca" placeholder="Buscar por tombamento, descrição..." class="w-full p-2 border rounded-lg"></div>
                 </div>
+                <!-- Busca e Filtros Avançados -->
+                <div class="mt-4 border-t pt-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida (Descrição)</label><input type="text" id="filtro-busca" placeholder="Buscar por descrição..." class="w-full p-2 border rounded-lg"></div>
+                        <div><label class="block text-sm font-medium mb-1">&nbsp;</label><button id="toggle-advanced-filters-btn" class="w-full btn btn-secondary">Filtros Avançados</button></div>
+                    </div>
+                     <div id="advanced-filters-container" class="hidden mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label for="filtro-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="filtro-tombamento" placeholder="Buscar por n° de tombamento..." class="w-full p-2 border rounded-lg"></div>
+                        <div><label for="filtro-localizacao" class="block text-sm font-medium mb-1">Localização na Unidade</label><input type="text" id="filtro-localizacao" placeholder="Buscar por sala, setor..." class="w-full p-2 border rounded-lg"></div>
+                    </div>
+                </div>
+                <!-- Ações -->
                 <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <button id="ver-resumo-geral-btn" class="w-full sm:w-auto btn btn-secondary">Limpar Filtros</button>
-                    <button id="open-add-modal-btn" class="w-full sm:w-auto btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="inline-block -mt-1 mr-2" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
-                        Adicionar Item
-                    </button>
+                    <div id="admin-actions-patrimonio" class="hidden w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                        <button id="open-export-modal-btn" class="w-full sm:w-auto btn btn-success">Exportar PDF</button>
+                        <button id="open-add-modal-btn" class="w-full sm:w-auto btn btn-primary">Adicionar Item</button>
+                    </div>
                 </div>
             </div>
             
@@ -169,17 +220,29 @@
                                 <th class="p-3 text-left">Descrição</th>
                                 <th class="p-3 text-left">Unidade</th>
                                 <th class="p-3 text-left">Localização</th>
+                                <th class="p-3 text-left">Fornecedor</th>
                                 <th class="p-3 text-left">Estado</th>
-                                <th class="p-3 text-left">Ações</th>
+                                <th id="table-header-actions" class="p-3 text-left hidden">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="inventory-table-body">
-                           <tr><td colspan="6" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados do Firebase...</p></td></tr>
+                           <tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados do Firebase...</p></td></tr>
                         </tbody>
                     </table>
                 </div>
                 <div id="pagination-controls" class="flex items-center justify-between mt-6"></div>
             </main>
+        </div>
+
+        <!-- Notas Fiscais -->
+        <div id="content-notas-fiscais" class="hidden fade-in">
+            <div id="nf-admin-actions" class="card mb-8 hidden justify-between items-center">
+                <h2 class="text-2xl font-bold text-slate-800">Controle de Notas Fiscais</h2>
+                <button id="open-csv-upload-modal-btn" class="btn btn-primary">Importar CSV</button>
+            </div>
+            <div id="nf-list-container" class="space-y-4">
+                <!-- Conteúdo gerado dinamicamente -->
+            </div>
         </div>
     </main>
 
@@ -188,196 +251,262 @@
         <p>Painel desenvolvido por: Jurandy | SEMCAS | Firebase Edition</p>
     </footer>
 
-    <!-- Modal Adicionar/Editar Item -->
-    <div id="item-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <div id="modal-overlay" class="absolute inset-0 bg-black/60 opacity-0"></div>
-        <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
-            <form id="item-form">
+    <!-- MODAIS -->
+
+    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" id="close-login-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
+    <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" id="close-item-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</col-md-4><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" id="cancel-item-btn" class="btn btn-secondary">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
+    <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" id="close-transfer-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" id="cancel-transfer-btn" class="btn btn-secondary">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
+    <div id="export-pdf-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Exportar Relatório PDF</h3> <button type="button" id="close-export-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button> </div><div class="p-6"> <p class="mb-4 text-slate-600">Selecione as colunas que deseja incluir no relatório:</p> <div id="export-columns-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4"> <label class="flex items-center space-x-2"><input type="checkbox" value="Tombamento" data-name="Tomb." class="rounded" checked><span>Tomb.</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Descrição" data-name="Descrição" class="rounded" checked><span>Descrição</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Unidade" data-name="Unidade" class="rounded" checked><span>Unidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Localização" data-name="Localização" class="rounded" checked><span>Localização</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Fornecedor" data-name="Fornecedor" class="rounded" checked><span>Fornecedor</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Estado" data-name="Estado" class="rounded" checked><span>Estado</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Quantidade" data-name="Qtd." class="rounded"><span>Quantidade</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Origem da Doação" data-name="Doação" class="rounded"><span>Doação</span></label> <label class="flex items-center space-x-2"><input type="checkbox" value="Observação" data-name="Obs." class="rounded"><span>Observação</span></label> </div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" id="cancel-export-btn" class="btn btn-secondary">Cancelar</button> <button type="button" id="confirm-export-btn" class="btn btn-success">Exportar</button> </div></div></div>
+    <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button id="cancel-delete-btn" type="button" class="btn btn-secondary">Cancelar</button> </div></div></div>
+
+    <!-- Modal de Upload de CSV -->
+    <div id="csv-upload-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
+        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h3 class="text-xl font-semibold">Importar Notas Fiscais via CSV</h3>
+                <button type="button" id="close-csv-upload-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-slate-600 mb-4">Selecione um arquivo CSV com as colunas: <code class="text-xs bg-slate-100 p-1 rounded">Nome Fornecedor,TOMBAMENTO,Descrição,Valor NF,Data NF,NF</code>.</p>
+                <input type="file" id="csv-file-input" accept=".csv" class="w-full p-2 border rounded-lg">
+                <div id="csv-upload-feedback" class="mt-4 text-sm"></div>
+            </div>
+            <div class="flex justify-end p-4 border-t bg-slate-50">
+                <button id="upload-csv-btn" class="btn btn-primary" disabled>Enviar para o Banco de Dados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Registro de Entrega -->
+    <div id="delivery-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
+        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
+             <form id="delivery-form">
                 <div class="flex items-center justify-between p-4 border-b">
-                    <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3>
-                    <button type="button" id="close-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+                    <h3 class="text-xl font-semibold">Registrar Entrega</h3>
+                    <button type="button" id="close-delivery-modal-btn" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
                 </div>
-                <div class="p-6 overflow-y-auto" style="max-height: 70vh;">
-                    <input type="hidden" id="item-id">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div>
-                        <div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div>
-                        <div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div>
-                        <div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div>
-                         <div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div>
-                        <div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</col-md-4><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div>
-                        <div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div>
-                        <div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div>
-                        <div class="sm:col-span-2"><label for="item-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div>
-                        <div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div>
+                <div class="p-6 space-y-4">
+                    <input type="hidden" id="delivery-nf-id">
+                    <input type="hidden" id="delivery-item-index">
+                    <div>
+                        <p class="text-sm text-slate-500">Item</p>
+                        <p id="delivery-item-info" class="font-bold text-slate-800"></p>
+                    </div>
+                    <div><label for="delivery-person" class="block text-sm font-medium">Nome do Entregador</label><input type="text" id="delivery-person" class="w-full p-2 border rounded-lg mt-1" required></div>
+                    <div>
+                        <label class="block text-sm font-medium">Foto da Entrega</label>
+                        <input type="file" id="delivery-photo-input" accept="image/*" class="w-full p-2 border rounded-lg mt-1">
+                        <p class="text-xs text-center text-slate-500 my-2">OU</p>
+                        <button type="button" id="take-photo-btn" class="w-full btn btn-secondary">Tirar Foto com a Câmera</button>
+                    </div>
+                    <div id="photo-preview-container" class="hidden text-center">
+                        <img id="photo-preview" class="max-w-full max-h-48 mx-auto rounded-lg shadow-md">
+                        <p id="photo-feedback" class="text-xs text-green-600 mt-2"></p>
                     </div>
                 </div>
-                <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
-                    <button type="button" id="cancel-btn" class="btn btn-secondary">Cancelar</button>
-                    <button type="submit" id="save-btn" class="btn btn-primary">Salvar Item</button>
+                <div class="flex justify-end p-4 border-t bg-slate-50">
+                    <button type="submit" id="save-delivery-btn" class="btn btn-primary">Salvar Registro</button>
                 </div>
             </form>
         </div>
     </div>
     
-     <!-- Modal de Confirmação de Exclusão -->
-    <div id="delete-confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <div class="absolute inset-0 bg-black/60"></div>
-        <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95">
-            <div class="p-6 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3>
-                <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p>
-                <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button>
-                <button id="cancel-delete-btn" type="button" class="btn btn-secondary">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
-
     <script type="module">
         // Importações do SDK do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-        // Configuração do Firebase com suas credenciais
         const firebaseConfig = {
             apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
             authDomain: "controle-de-patrimonio-semcas.firebaseapp.com",
             projectId: "controle-de-patrimonio-semcas",
-            storageBucket: "controle-de-patrimonio-semcas.firebasestorage.app",
+            storageBucket: "controle-de-patrimonio-semcas.appspot.com",
             messagingSenderId: "438620819929",
-            appId: "1:438620819929:web:6fcbc12905a0c928e549c8"
+            appId: "1:438620819929:web:6fcbc1205a0c928e549c8"
         };
 
-        // Inicialização do Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const storage = getStorage(app);
         const auth = getAuth(app);
 
-        // --- VARIÁVEIS GLOBAIS E ESTADO DA APLICAÇÃO ---
-        let allItems = []; // Guarda todos os itens do Firebase
-        let filteredItems = []; // Guarda os itens após a filtragem
+        // --- ESTADO DA APLICAÇÃO ---
+        let allItems = [], allNFs = [];
+        let filteredItems = [];
         let currentPage = 1;
         const itemsPerPage = 15;
-        let unsubscribe; // Função para parar de ouvir as atualizações do Firebase
-
-        // Chart instances
+        let unsubscribePatrimonio, unsubscribeNFs; 
+        let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
+        let csvDataToUpload = [];
 
         // --- ELEMENTOS DO DOM ---
         const connectionStatusEl = document.getElementById('connectionStatus');
         const tableBodyEl = document.getElementById('inventory-table-body');
+        const tableHeaderActions = document.getElementById('table-header-actions');
         const paginationControlsEl = document.getElementById('pagination-controls');
-        
-        // Filtros
+        const navNf = document.getElementById('nav-nf');
         const filtroTipoUnidadeEl = document.getElementById('filtro-tipo-unidade');
         const filtroUnidadeEl = document.getElementById('filtro-unidade');
         const filtroEstadoEl = document.getElementById('filtro-estado');
         const filtroBuscaEl = document.getElementById('filtro-busca');
+        const filtroTombamentoEl = document.getElementById('filtro-tombamento');
+        const filtroLocalizacaoEl = document.getElementById('filtro-localizacao');
         const verResumoGeralBtn = document.getElementById('ver-resumo-geral-btn');
-        
-        // Modal de Item
+        const toggleAdvancedFiltersBtn = document.getElementById('toggle-advanced-filters-btn');
+        const advancedFiltersContainer = document.getElementById('advanced-filters-container');
         const itemModal = document.getElementById('item-modal');
-        const modalOverlay = document.getElementById('modal-overlay');
         const openAddModalBtn = document.getElementById('open-add-modal-btn');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const cancelBtn = document.getElementById('cancel-btn');
+        const closeItemModalBtn = document.getElementById('close-item-modal-btn');
+        const cancelItemBtn = document.getElementById('cancel-item-btn');
         const itemForm = document.getElementById('item-form');
         const modalTitle = document.getElementById('modal-title');
-        
-        // Modal de Exclusão
+        const loginModal = document.getElementById('login-modal');
+        const openLoginModalBtn = document.getElementById('open-login-modal-btn');
+        const closeLoginModalBtn = document.getElementById('close-login-modal-btn');
+        const loginForm = document.getElementById('login-form');
+        const loginErrorEl = document.getElementById('login-error');
+        const exportPdfModal = document.getElementById('export-pdf-modal');
+        const openExportModalBtn = document.getElementById('open-export-modal-btn');
+        const closeExportModalBtn = document.getElementById('close-export-modal-btn');
+        const cancelExportBtn = document.getElementById('cancel-export-btn');
+        const confirmExportBtn = document.getElementById('confirm-export-btn');
+        const transferModal = document.getElementById('transfer-modal');
+        const transferForm = document.getElementById('transfer-form');
+        const closeTransferModalBtn = document.getElementById('close-transfer-modal-btn');
+        const cancelTransferBtn = document.getElementById('cancel-transfer-btn');
+        const transferTipoEl = document.getElementById('transfer-tipo');
+        const transferUnidadeEl = document.getElementById('transfer-unidade');
+        const userInfoEl = document.getElementById('user-info');
+        const userEmailEl = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+        const adminActionsPatrimonio = document.getElementById('admin-actions-patrimonio');
         const deleteConfirmModal = document.getElementById('delete-confirm-modal');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
         const deleteItemInfoEl = document.getElementById('delete-item-info');
-
-        // Navegação
         const navButtons = document.querySelectorAll('.nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
-
-        // --- FUNÇÕES DE LÓGICA DE DADOS ---
+        const nfListContainer = document.getElementById('nf-list-container');
+        const nfAdminActions = document.getElementById('nf-admin-actions');
+        const openCsvUploadModalBtn = document.getElementById('open-csv-upload-modal-btn');
+        const csvUploadModal = document.getElementById('csv-upload-modal');
+        const closeCsvUploadModalBtn = document.getElementById('close-csv-upload-modal-btn');
+        const csvFileInput = document.getElementById('csv-file-input');
+        const csvUploadFeedback = document.getElementById('csv-upload-feedback');
+        const uploadCsvBtn = document.getElementById('upload-csv-btn');
+        const deliveryModal = document.getElementById('delivery-modal');
+        const closeDeliveryModalBtn = document.getElementById('close-delivery-modal-btn');
+        const deliveryForm = document.getElementById('delivery-form');
+        const takePhotoBtn = document.getElementById('take-photo-btn');
+        const deliveryPhotoInput = document.getElementById('delivery-photo-input');
+        const photoPreviewContainer = document.getElementById('photo-preview-container');
+        const photoPreview = document.getElementById('photo-preview');
+        const photoFeedback = document.getElementById('photo-feedback');
+        
+        // --- LÓGICA DE DADOS ---
         const normalizeStr = (str) => (str || '').trim().toLowerCase();
-
+        
         const getNormalizedEstado = (estadoStr) => {
             const normalized = normalizeStr(estadoStr);
             const avariadoKeywords = ['avariado', 'avariada', 'pessimo estado', 'péssimo estado', 'quebrado', 'quebrada', 'defeito', 'danificado', 'danificada', 'nao funciona', 'não funciona'];
-            
-            if (avariadoKeywords.some(keyword => normalized.includes(keyword))) {
-                return 'Avariado';
-            }
-            if (normalized === 'novo') {
-                return 'Novo';
-            }
-            if (normalized === 'bom' || normalized === 'otimo' || normalized === 'ótimo') {
-                return 'Bom';
-            }
-            // Qualquer outra coisa, incluindo 'regular' ou strings vazias, será 'Regular'
+            if (avariadoKeywords.some(keyword => normalized.includes(keyword))) return 'Avariado';
+            if (normalized === 'novo') return 'Novo';
+            if (normalized === 'bom' || normalized === 'otimo' || normalized === 'ótimo') return 'Bom';
             return 'Regular';
         };
 
+        function getStateColor(state) {
+            const normalizedEstado = getNormalizedEstado(state);
+            const stateColors = { 'Novo': 'badge-green', 'Bom': 'badge-blue', 'Regular': 'badge-yellow', 'Avariado': 'badge-red' };
+            return stateColors[normalizedEstado] || 'bg-slate-200';
+        }
+
         // --- FUNÇÕES PRINCIPAIS ---
-
-        // Conecta e busca os dados do Firebase em tempo real
-        async function connectToFirebase() {
+        function listenToData() {
             connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-yellow-400 rounded-full animate-pulse"></span> <span>Conectando...</span>`;
-            try {
-                await signInAnonymously(auth); // Autenticação anônima
-                
-                const patrimonioCollection = collection(db, 'patrimonio');
-                
-                unsubscribe = onSnapshot(patrimonioCollection, (snapshot) => {
-                    allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
-                    
-                    populateFilters();
-                    applyFiltersAndRender();
-                    switchTab('dashboard'); // Inicia na aba Dashboard
-                }, (error) => {
-                    console.error("Erro ao buscar dados: ", error);
-                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro de Conexão</span>`;
-                    tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10 text-red-600">Falha ao carregar os dados. Verifique o console para mais detalhes.</td></tr>`;
-                });
+            
+            // Listener para Patrimônio (público para leitura)
+            if (unsubscribePatrimonio) unsubscribePatrimonio();
+            unsubscribePatrimonio = onSnapshot(collection(db, 'patrimonio'), (snapshot) => {
+                allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                populateFilters();
+                applyFiltersAndRender();
+                if(!document.getElementById('content-dashboard').classList.contains('hidden')) renderDashboard();
+                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-green-500 rounded-full"></span> <span>Conectado</span>`;
+            }, (error) => {
+                console.error("Erro ao buscar dados de patrimônio: ", error);
+                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro Patrimônio</span>`;
+            });
 
-            } catch (error) {
-                console.error("Erro na autenticação: ", error);
-                connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Falha na Autenticação</span>`;
-                
-                if (error.code === 'auth/configuration-not-found') {
-                    document.getElementById('content-dashboard').innerHTML = `<div class="card text-center p-10 text-red-600">
-                        <strong class="text-lg">Erro de Configuração do Firebase</strong><br>
-                        O método de login "Anônimo" precisa ser ativado no seu projeto.<br><br>
-                        <strong class="text-left block">Como corrigir:</strong>
-                        <ol class="list-decimal list-inside text-left inline-block">
-                            <li>Vá para o <a href="https://console.firebase.google.com/" target="_blank" class="text-blue-600 underline">Console do Firebase</a>.</li>
-                            <li>Selecione seu projeto (controle-de-patrimonio-semcas).</li>
-                            <li>No menu à esquerda, vá para <strong>Authentication</strong>.</li>
-                            <li>Clique na aba <strong>Sign-in method</strong>.</li>
-                            <li>Encontre <strong>Anônimo</strong> na lista e ative-o.</li>
-                        </ol>
-                    </div>`;
-                }
-            }
+            // Listener para Notas Fiscais (só ativa se logado, mas prepara para todos)
+            if (unsubscribeNFs) unsubscribeNFs();
+            unsubscribeNFs = onSnapshot(collection(db, 'notas_fiscais'), (snapshot) => {
+                allNFs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (!document.getElementById('content-notas-fiscais').classList.contains('hidden')) renderNFs();
+            }, (error) => {
+                console.error("Erro ao buscar dados de NFs: ", error);
+                 // Não mostra erro de conexão se for apenas permissão
+                 if (error.code !== 'permission-denied') {
+                    connectionStatusEl.innerHTML = `<span class="h-3 w-3 bg-red-500 rounded-full"></span> <span class="text-red-500">Erro NFs</span>`;
+                 }
+            });
         }
         
-        // Popula os filtros com base nos dados carregados
+        onAuthStateChanged(auth, (user) => {
+            isLoggedIn = !!user;
+            if (user) {
+                userEmailEl.textContent = user.email;
+            } else {
+                userEmailEl.textContent = '';
+                if (document.querySelector('.nav-btn.active').dataset.tab === 'notas-fiscais'){
+                     switchTab('dashboard');
+                }
+            }
+            updateUIVisibility();
+        });
+
+        function updateUIVisibility() {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(closeModal);
+            
+            if (isLoggedIn) {
+                userInfoEl.classList.remove('hidden');
+                userInfoEl.classList.add('flex');
+                openLoginModalBtn.classList.add('hidden');
+                adminActionsPatrimonio.classList.remove('hidden');
+                adminActionsPatrimonio.classList.add('flex');
+                tableHeaderActions.classList.remove('hidden');
+                nfAdminActions.classList.remove('hidden');
+                nfAdminActions.classList.add('flex');
+            } else {
+                userInfoEl.classList.add('hidden');
+                userInfoEl.classList.remove('flex');
+                openLoginModalBtn.classList.remove('hidden');
+                adminActionsPatrimonio.classList.add('hidden');
+                adminActionsPatrimonio.classList.remove('flex');
+                tableHeaderActions.classList.add('hidden');
+                nfAdminActions.classList.add('hidden');
+                nfAdminActions.classList.remove('flex');
+            }
+            renderTable();
+            renderNFs();
+        }
+
         function populateFilters() {
-            // Popula filtro de Tipo de Unidade
             const tipos = [...new Set(allItems.map(item => item.Tipo).filter(Boolean))].sort();
             filtroTipoUnidadeEl.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-            
-            // Popula filtro de Estado
             const estados = [...new Set(allItems.map(item => getNormalizedEstado(item.Estado)))];
             filtroEstadoEl.innerHTML = '<option value="">TODOS OS ESTADOS</option>' + ['Novo', 'Bom', 'Regular', 'Avariado'].filter(e => estados.includes(e)).map(e => `<option value="${e}">${e}</option>`).join('');
         }
         
         function updateUnidadeFilter() {
             const selectedTipo = filtroTipoUnidadeEl.value;
-            filtroUnidadeEl.value = ''; // Reseta o filtro de unidade
-            
+            filtroUnidadeEl.value = '';
             if (selectedTipo) {
                 const unidades = [...new Set(allItems.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
                 filtroUnidadeEl.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
@@ -389,39 +518,47 @@
             applyFiltersAndRender();
         }
 
-        // Aplica os filtros e chama a renderização
         function applyFiltersAndRender() {
             const tipo = filtroTipoUnidadeEl.value;
             const unidade = filtroUnidadeEl.value;
             const estado = filtroEstadoEl.value;
-            const busca = filtroBuscaEl.value.toLowerCase();
+            const busca = normalizeStr(filtroBuscaEl.value);
+            const tombamento = normalizeStr(filtroTombamentoEl.value);
+            const localizacao = normalizeStr(filtroLocalizacaoEl.value);
 
-            filteredItems = allItems.filter(item => {
-                const searchMatch = !busca ||
-                    (item.Tombamento && item.Tombamento.toLowerCase().includes(busca)) ||
-                    (item.Descrição && item.Descrição.toLowerCase().includes(busca));
-                
-                return (!tipo || item.Tipo === tipo) &&
-                       (!unidade || item.Unidade === unidade) &&
-                       (!estado || getNormalizedEstado(item.Estado) === estado) &&
-                       searchMatch;
-            });
+            filteredItems = allItems.filter(item => 
+                (!tipo || item.Tipo === tipo) &&
+                (!unidade || item.Unidade === unidade) &&
+                (!estado || getNormalizedEstado(item.Estado) === estado) &&
+                (!busca || normalizeStr(item.Descrição).includes(busca)) &&
+                (!tombamento || normalizeStr(item.Tombamento).includes(tombamento)) &&
+                (!localizacao || normalizeStr(item.Localização).includes(localizacao))
+            );
             currentPage = 1;
             renderTable();
         }
 
-        // Renderiza a tabela de patrimônio
         function renderTable() {
             const startIndex = (currentPage - 1) * itemsPerPage;
             const endIndex = startIndex + itemsPerPage;
             const itemsToDisplay = filteredItems.slice(startIndex, endIndex);
 
+            const actionButtonsHTML = (itemId) => {
+                if (!isLoggedIn) return '';
+                return `
+                    <button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg>
+                    </button>
+                    <button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
+                    </button>
+                    <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>
+                    </button>`;
+            };
+
             if (itemsToDisplay.length === 0) {
-                 if (allItems.length > 0) {
-                     tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-500">Nenhum item encontrado com os filtros aplicados.</td></tr>`;
-                 } else if (!connectionStatusEl.textContent.includes('Erro')) {
-                    tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
-                 }
+                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-500">${allItems.length > 0 ? 'Nenhum item encontrado com os filtros atuais.' : 'Nenhum item cadastrado.'}</td></tr>`;
             } else {
                  tableBodyEl.innerHTML = itemsToDisplay.map(item => `
                     <tr class="border-b border-slate-200 hover:bg-slate-50">
@@ -429,42 +566,46 @@
                         <td class="px-3 py-2 font-medium text-slate-900">${item.Descrição || 'N/A'}</td>
                         <td class="px-3 py-2">${item.Unidade || 'N/A'}</td>
                         <td class="px-3 py-2">${item.Localização || 'N/A'}</td>
+                        <td class="px-3 py-2">${item.Fornecedor || 'N/A'}</td>
                         <td class="px-3 py-2"><span class="badge ${getStateColor(item.Estado)}">${item.Estado || 'N/A'}</span></td>
-                        <td class="px-3 py-2 space-x-2">
-                            <button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${item.id}" title="Editar Item">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
-                            </button>
-                            <button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${item.id}" title="Excluir Item">
-                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
+                        <td class="px-3 py-2 space-x-2">${actionButtonsHTML(item.id)}</td>
+                    </tr>`).join('');
             }
             renderPagination();
         }
         
-        // Renderiza os controles de paginação
         function renderPagination() {
             const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
             if (totalPages <= 1) {
-                paginationControlsEl.innerHTML = '';
-                return;
+                paginationControlsEl.innerHTML = ''; return;
             }
-            paginationControlsEl.innerHTML = `
-                <span class="text-sm text-slate-600">Página ${currentPage} de ${totalPages} (${filteredItems.length} itens)</span>
+            paginationControlsEl.innerHTML = `<span class="text-sm text-slate-600">Página ${currentPage} de ${totalPages} (${filteredItems.length} itens)</span>
                 <div class="inline-flex">
                     <button data-page="${currentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
                     <button data-page="${currentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg hover:bg-slate-100 disabled:opacity-50" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
-                </div>
-            `;
+                </div>`;
         }
         
-        // --- FUNÇÕES DO MODAL (ADICIONAR/EDITAR) ---
-        function openModal(item = null) {
+        // --- MODAL FUNCTIONS ---
+        const openModal = (modalEl) => {
+            modalEl.classList.remove('hidden');
+            setTimeout(() => {
+                const modalContainer = modalEl.querySelector('.modal-container');
+                modalContainer.classList.remove('scale-95');
+                modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0');
+            }, 10);
+        };
+        const closeModal = (modalEl) => {
+            if(!modalEl) return;
+            const modalContainer = modalEl.querySelector('.modal-container');
+            modalContainer.classList.add('scale-95');
+            modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0');
+            setTimeout(() => modalEl.classList.add('hidden'), 300);
+        };
+
+        function openItemModal(item = null) {
             itemForm.reset();
             if (item) {
-                // Modo Edição
                 modalTitle.textContent = 'Editar Item';
                 document.getElementById('item-id').value = item.id;
                 document.getElementById('item-tombamento').value = item.Tombamento || '';
@@ -478,26 +619,15 @@
                 document.getElementById('item-doacao').value = item['Origem da Doação'] || '';
                 document.getElementById('item-observacao').value = item.Observação || '';
             } else {
-                // Modo Adição
                 modalTitle.textContent = 'Adicionar Novo Item';
                 document.getElementById('item-id').value = '';
             }
-            
-            itemModal.classList.remove('hidden');
-            setTimeout(() => {
-                modalOverlay.classList.remove('opacity-0');
-                itemModal.querySelector('.modal-container').classList.remove('scale-95', 'opacity-0');
-            }, 10);
-        }
-
-        function closeModal() {
-            itemModal.querySelector('.modal-container').classList.add('scale-95', 'opacity-0');
-            modalOverlay.classList.add('opacity-0');
-            setTimeout(() => itemModal.classList.add('hidden'), 300);
+            openModal(itemModal);
         }
 
         async function handleFormSubmit(e) {
             e.preventDefault();
+            if(!isLoggedIn) { alert('Acesso negado.'); return; }
             const id = document.getElementById('item-id').value;
             const itemData = {
                 Tombamento: document.getElementById('item-tombamento').value.trim(),
@@ -512,180 +642,441 @@
                 Observação: document.getElementById('item-observacao').value.trim(),
                 updatedAt: serverTimestamp()
             };
-
             try {
-                if (id) {
-                    // Atualizar
-                    const itemRef = doc(db, 'patrimonio', id);
-                    await updateDoc(itemRef, itemData);
-                } else {
-                    // Adicionar
-                    itemData.createdAt = serverTimestamp();
-                    await addDoc(collection(db, 'patrimonio'), itemData);
-                }
-                closeModal();
-            } catch (error) {
-                console.error("Erro ao salvar o item: ", error);
-                alert("Ocorreu um erro ao salvar. Verifique o console.");
-            }
+                if (id) await updateDoc(doc(db, 'patrimonio', id), itemData);
+                else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
+                closeModal(itemModal);
+            } catch (error) { console.error("Erro ao salvar o item: ", error); alert("Ocorreu um erro ao salvar."); }
         }
         
-        // --- FUNÇÕES DE EXCLUSÃO ---
         function openDeleteModal(id) {
             const item = allItems.find(i => i.id === id);
             if (!item) return;
-            
             deleteItemInfoEl.textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
             confirmDeleteBtn.dataset.id = id;
-            
-            deleteConfirmModal.classList.remove('hidden');
-            setTimeout(() => {
-                deleteConfirmModal.querySelector('.modal-container').classList.remove('scale-95');
-            }, 10);
-        }
-        
-        function closeDeleteModal() {
-             deleteConfirmModal.querySelector('.modal-container').classList.add('scale-95');
-             setTimeout(() => deleteConfirmModal.classList.add('hidden'), 300);
+            openModal(deleteConfirmModal);
         }
         
         async function handleDelete() {
-            const id = confirmDeleteBtn.dataset.id;
+            if(!isLoggedIn) { alert('Acesso negado.'); return; }
             try {
-                await deleteDoc(doc(db, 'patrimonio', id));
-                closeDeleteModal();
-            } catch(error) {
-                console.error("Erro ao excluir item: ", error);
-                alert("Ocorreu um erro ao excluir. Verifique o console.");
+                await deleteDoc(doc(db, 'patrimonio', confirmDeleteBtn.dataset.id));
+                closeModal(deleteConfirmModal);
+            } catch(error) { console.error("Erro ao excluir item: ", error); alert("Ocorreu um erro ao excluir."); }
+        }
+
+        function openTransferModal(id) {
+            const item = allItems.find(i => i.id === id);
+            if (!item) return;
+
+            transferForm.reset();
+            document.getElementById('transfer-item-id').value = id;
+            document.getElementById('transfer-item-description').textContent = item.Descrição;
+            document.getElementById('transfer-item-current-unit').textContent = `${item.Unidade} (${item.Localização || 'N/D'})`;
+
+            const tipos = [...new Set(allItems.map(i => i.Tipo).filter(Boolean))].sort();
+            transferTipoEl.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            transferUnidadeEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
+            transferUnidadeEl.disabled = true;
+            
+            openModal(transferModal);
+        }
+
+        function updateTransferUnidadeSelect() {
+            const selectedTipo = transferTipoEl.value;
+            transferUnidadeEl.innerHTML = '';
+            if (selectedTipo) {
+                const unidades = [...new Set(allItems.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+                transferUnidadeEl.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                transferUnidadeEl.disabled = false;
+            } else {
+                transferUnidadeEl.innerHTML = '<option value="">Selecione um Tipo primeiro</option>';
+                transferUnidadeEl.disabled = true;
             }
         }
 
-        // --- FUNÇÕES AUXILIARES E DASHBOARD ---
-        function getStateColor(state) {
-            const normalizedEstado = getNormalizedEstado(state);
-            const stateColors = { 'Novo': 'badge-green', 'Bom': 'badge-blue', 'Regular': 'badge-yellow', 'Avariado': 'badge-red' };
-            return stateColors[normalizedEstado] || 'bg-slate-200';
-        }
+        async function handleTransferSubmit(e) {
+            e.preventDefault();
+            if(!isLoggedIn) { alert('Acesso negado.'); return; }
+            
+            const id = document.getElementById('transfer-item-id').value;
+            const newTipo = document.getElementById('transfer-tipo').value;
+            const newUnidade = document.getElementById('transfer-unidade').value;
+            const newLocalizacao = document.getElementById('transfer-localizacao').value.trim();
 
+            if (!id || !newTipo || !newUnidade || !newLocalizacao) {
+                alert('Por favor, preencha todos os campos de destino.');
+                return;
+            }
+
+            const originalItem = allItems.find(i => i.id === id);
+            const transferNote = `Transferido de ${originalItem.Unidade} (${originalItem.Localização || 'N/D'}) para ${newUnidade} em ${new Date().toLocaleDateString('pt-BR')}.`;
+            const updatedObservacao = originalItem.Observação ? `${originalItem.Observação}\n${transferNote}` : transferNote;
+
+            const updatedData = {
+                Tipo: newTipo,
+                Unidade: newUnidade,
+                Localização: newLocalizacao,
+                Observação: updatedObservacao,
+                updatedAt: serverTimestamp()
+            };
+
+            try {
+                await updateDoc(doc(db, 'patrimonio', id), updatedData);
+                closeModal(transferModal);
+            } catch (error) {
+                console.error("Erro ao transferir item:", error);
+                alert("Ocorreu um erro ao realizar a transferência.");
+            }
+        }
+        
         function switchTab(tabName) {
             navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
-            if (tabName === 'dashboard') {
-                renderDashboard();
-            }
+            if (tabName === 'dashboard') renderDashboard();
+            if (tabName === 'patrimonio') applyFiltersAndRender();
+            if (tabName === 'notas-fiscais') renderNFs();
         }
 
         function renderDashboard() {
             if (allItems.length === 0) return;
-
             const totalItens = allItems.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
             const totalUnidades = new Set(allItems.map(i => i.Unidade)).size;
-            
             const estadosCount = allItems.reduce((acc, item) => {
                 const normalizedEstado = getNormalizedEstado(item.Estado);
                 acc[normalizedEstado] = (acc[normalizedEstado] || 0) + (item.Quantidade || 1);
                 return acc;
             }, { 'Novo': 0, 'Bom': 0, 'Regular': 0, 'Avariado': 0 });
-
-            const totalAvariados = estadosCount['Avariado'];
-            const totalNovos = estadosCount['Novo'];
-            
             document.getElementById('kpi-total-itens').textContent = totalItens;
             document.getElementById('kpi-total-unidades').textContent = totalUnidades;
-            document.getElementById('kpi-total-avariados').textContent = totalAvariados;
-            document.getElementById('kpi-total-novos').textContent = totalNovos;
-            
-            // Gráfico de Estado
+            document.getElementById('kpi-total-avariados').textContent = estadosCount['Avariado'];
+            document.getElementById('kpi-total-novos').textContent = estadosCount['Novo'];
             const estadoLabels = ['Novo', 'Bom', 'Regular', 'Avariado'];
-            const estadoData = estadoLabels.map(label => estadosCount[label] || 0);
-            
             if (dashboardEstadoChart) dashboardEstadoChart.destroy();
-            dashboardEstadoChart = new Chart(document.getElementById('dashboardEstadoChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: estadoLabels,
-                    datasets: [{ data: estadoData, backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+            dashboardEstadoChart = new Chart(document.getElementById('dashboardEstadoChart'), { type: 'doughnut', data: { labels: estadoLabels, datasets: [{ data: estadoLabels.map(l => estadosCount[l]), backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+            const tiposCount = allItems.reduce((acc, item) => { acc[item.Tipo||'N/A'] = (acc[item.Tipo||'N/A']||0) + (item.Quantidade||1); return acc; }, {});
+            if (dashboardTipoChart) dashboardTipoChart.destroy();
+            dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), { type: 'bar', data: { labels: Object.keys(tiposCount), datasets: [{ label: 'Qtd. de Itens', data: Object.values(tiposCount), backgroundColor: '#60a5fa' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+        }
 
-            // Gráfico de Tipo de Unidade
-            const tiposCount = allItems.reduce((acc, item) => {
-                const tipo = item.Tipo || 'N/A';
-                acc[tipo] = (acc[tipo] || 0) + (item.Quantidade || 1);
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginErrorEl.classList.add('hidden');
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                closeModal(loginModal);
+            } catch (error) {
+                 loginErrorEl.textContent = "Email ou senha inválidos.";
+                 loginErrorEl.classList.remove('hidden');
+            }
+        }
+        
+        function generatePdfReport() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape' });
+
+            const selectedCols = Array.from(document.querySelectorAll('#export-columns-container input:checked'))
+                .map(cb => ({ key: cb.value, title: cb.dataset.name }));
+            
+            if (selectedCols.length === 0) { alert('Selecione ao menos uma coluna.'); return; }
+
+            const head = [selectedCols.map(c => c.title)];
+            const body = filteredItems.map(item => selectedCols.map(col => item[col.key] || 'N/A'));
+
+            doc.setFontSize(18);
+            doc.text(`Relatório de Patrimônio`, 14, 22);
+            doc.setFontSize(11);
+            doc.setTextColor(100);
+            doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 29);
+            
+            doc.autoTable({ head, body, startY: 35, theme: 'striped', headStyles: { fillColor: [22, 100, 74] } });
+            doc.save(`relatorio-patrimonio-${new Date().toISOString().slice(0,10)}.pdf`);
+            closeModal(exportPdfModal);
+        }
+        
+        function renderNFs() {
+            if (!isLoggedIn) {
+                nfListContainer.innerHTML = '<div class="card text-center"><h3 class="font-semibold">Acesso Restrito</h3><p class="text-sm text-slate-500 mt-2">Faça login para visualizar e gerenciar as notas fiscais.</p></div>';
+                return;
+            }
+            if(allNFs.length === 0){
+                nfListContainer.innerHTML = '<div class="card text-center"><p class="text-slate-500">Nenhuma nota fiscal encontrada.</p></div>';
+                return;
+            }
+
+            const groupedByFornecedor = allNFs.reduce((acc, nf) => {
+                const fornecedor = nf['Nome Fornecedor'] || 'Fornecedor Desconhecido';
+                if (!acc[fornecedor]) acc[fornecedor] = [];
+                acc[fornecedor].push(nf);
                 return acc;
             }, {});
 
-            if (dashboardTipoChart) dashboardTipoChart.destroy();
-            dashboardTipoChart = new Chart(document.getElementById('dashboardTipoChart'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(tiposCount),
-                    datasets: [{
-                        label: 'Qtd. de Itens',
-                        data: Object.values(tiposCount),
-                        backgroundColor: '#60a5fa'
+            let html = '';
+            for (const fornecedor in groupedByFornecedor) {
+                const groupedByDate = groupedByFornecedor[fornecedor].reduce((acc, nf) => {
+                    const date = nf.Cadastro?.toDate().toLocaleDateString('pt-BR') || 'Data Desconhecida';
+                    if(!acc[date]) acc[date] = [];
+                    acc[date].push(nf);
+                    return acc;
+                }, {});
+
+                html += `<details class="nf-group bg-white rounded-lg shadow-sm">
+                    <summary class="flex justify-between items-center">
+                        <span>${fornecedor}</span>
+                        <span class="text-sm font-normal text-slate-500">${groupedByFornecedor[fornecedor].length} itens</span>
+                    </summary>
+                    <div class="p-4 space-y-2 border-t">`;
+                
+                for(const date in groupedByDate) {
+                    html += `<h4 class="font-semibold text-sm text-slate-600 pt-2">Cadastrado em: ${date}</h4>`;
+                    groupedByDate[date].forEach((nf) => {
+                       nf.items.forEach((item, itemIndex) => {
+                           html += renderNFItem(nf, item, itemIndex);
+                       });
+                    });
+                }
+                html += `</div></details>`;
+            }
+            nfListContainer.innerHTML = html;
+        }
+
+        function renderNFItem(nf, item, itemIndex) {
+            const isDelivered = item.entrega && item.entrega.data;
+            return `<div class="border rounded-md p-3 flex justify-between items-center ${isDelivered ? 'bg-green-50' : ''}">
+                <div>
+                    <p class="font-semibold">${item.Descrição}</p>
+                    <p class="text-xs text-slate-500">NF: ${item.NF} | Tomb: ${item.TOMBAMENTO}</p>
+                </div>
+                <div>
+                    ${isDelivered ? 
+                    `<a href="${item.entrega.fotoURL}" target="_blank" class="btn btn-secondary text-xs">Ver Entrega</a>` : 
+                    `<button class="register-delivery-btn btn btn-primary text-xs" data-nf-id="${nf.id}" data-item-index="${itemIndex}">Registrar Entrega</button>`}
+                </div>
+            </div>`;
+        }
+
+        function handleCSVUpload() {
+            const file = csvFileInput.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    const requiredHeaders = ['Nome Fornecedor', 'TOMBAMENTO', 'Descrição', 'Valor NF', 'Data NF', 'NF'];
+                    const missingHeaders = requiredHeaders.filter(h => !results.meta.fields.includes(h));
+
+                    if (missingHeaders.length > 0) {
+                        csvUploadFeedback.innerHTML = `<p class="text-red-600">Erro: Cabeçalhos ausentes no arquivo: ${missingHeaders.join(', ')}</p>`;
+                        uploadCsvBtn.disabled = true;
+                        return;
+                    }
+                    csvDataToUpload = results.data;
+                    csvUploadFeedback.innerHTML = `<p class="text-green-600">${results.data.length} registros prontos para upload.</p>`;
+                    uploadCsvBtn.disabled = false;
+                }
+            });
+        }
+        
+        async function saveCSVData() {
+            if (csvDataToUpload.length === 0) return;
+            uploadCsvBtn.disabled = true;
+            uploadCsvBtn.textContent = 'Enviando...';
+
+            const batch = writeBatch(db);
+            csvDataToUpload.forEach(row => {
+                const newDocRef = doc(collection(db, 'notas_fiscais'));
+                const nfData = {
+                    'Nome Fornecedor': row['Nome Fornecedor'],
+                    Cadastro: serverTimestamp(),
+                    items: [{
+                        TOMBAMENTO: row.TOMBAMENTO,
+                        Descrição: row.Descrição,
+                        'Valor NF': row['Valor NF'],
+                        'Data NF': row['Data NF'],
+                        NF: row.NF
                     }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                };
+                batch.set(newDocRef, nfData);
+            });
+
+            try {
+                await batch.commit();
+                closeModal(csvUploadModal);
+                alert(`${csvDataToUpload.length} notas fiscais importadas com sucesso!`);
+            } catch (error) {
+                console.error("Erro ao importar CSV:", error);
+                alert("Ocorreu um erro na importação.");
+            } finally {
+                csvDataToUpload = [];
+                csvFileInput.value = '';
+                uploadCsvBtn.disabled = true;
+                uploadCsvBtn.textContent = 'Enviar para o Banco de Dados';
+            }
+        }
+        
+        function openDeliveryModal(nfId, itemIndex) {
+            const nf = allNFs.find(n => n.id === nfId);
+            if (!nf) return;
+            const item = nf.items[itemIndex];
+            
+            deliveryForm.reset();
+            photoPreviewContainer.classList.add('hidden');
+            document.getElementById('delivery-nf-id').value = nfId;
+            document.getElementById('delivery-item-index').value = itemIndex;
+            document.getElementById('delivery-item-info').textContent = `${item.Descrição} (Tomb: ${item.TOMBAMENTO})`;
+            
+            openModal(deliveryModal);
+        }
+
+        async function handlePhoto(file) {
+            if (!file) return;
+            photoFeedback.textContent = 'Otimizando imagem...';
+            photoPreview.src = URL.createObjectURL(file);
+            photoPreviewContainer.classList.remove('hidden');
+
+            const resizedFile = await resizeImage(file, 800, 0.8);
+            deliveryPhotoInput.filesData = [resizedFile]; 
+            photoFeedback.textContent = `Imagem pronta! (${(resizedFile.size / 1024).toFixed(1)} KB)`;
+        }
+
+        function resizeImage(file, maxSize, quality) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let { width, height } = img;
+                        if (width > height) {
+                            if (width > maxSize) { height *= maxSize / width; width = maxSize; }
+                        } else {
+                            if (height > maxSize) { width *= maxSize / height; height = maxSize; }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        canvas.toBlob((blob) => {
+                            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                        }, 'image/jpeg', quality);
+                    };
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
             });
         }
 
+        async function handleDeliverySubmit(e) {
+            e.preventDefault();
+            const nfId = document.getElementById('delivery-nf-id').value;
+            const itemIndex = parseInt(document.getElementById('delivery-item-index').value);
+            const person = document.getElementById('delivery-person').value;
+            const file = deliveryPhotoInput.filesData?.[0];
 
+            if (!person || !file) {
+                alert('Preencha o nome do entregador e adicione uma foto.');
+                return;
+            }
+
+            const saveBtn = document.getElementById('save-delivery-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Salvando...';
+
+            try {
+                const photoRef = ref(storage, `entregas/${nfId}_${Date.now()}.jpg`);
+                await uploadBytes(photoRef, file);
+                const photoURL = await getDownloadURL(photoRef);
+
+                const nfDocRef = doc(db, 'notas_fiscais', nfId);
+                const nfToUpdate = allNFs.find(n => n.id === nfId);
+                const updatedItems = JSON.parse(JSON.stringify(nfToUpdate.items)); // Deep copy
+                updatedItems[itemIndex].entrega = {
+                    data: serverTimestamp(),
+                    responsavel: person,
+                    fotoURL: photoURL
+                };
+
+                await updateDoc(nfDocRef, { items: updatedItems });
+                closeModal(deliveryModal);
+
+            } catch (error) {
+                console.error("Erro ao salvar entrega:", error);
+                alert('Ocorreu um erro ao salvar o registro de entrega.');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Salvar Registro';
+            }
+        }
+        
         // --- EVENT LISTENERS ---
-        document.addEventListener('DOMContentLoaded', connectToFirebase);
-        
-        // Filtros
-        filtroTipoUnidadeEl.addEventListener('change', updateUnidadeFilter);
-        filtroUnidadeEl.addEventListener('change', applyFiltersAndRender);
-        filtroEstadoEl.addEventListener('change', applyFiltersAndRender);
-        filtroBuscaEl.addEventListener('input', () => { setTimeout(applyFiltersAndRender, 300); });
-        
-        verResumoGeralBtn.addEventListener('click', () => {
-            filtroTipoUnidadeEl.value = '';
-            filtroEstadoEl.value = '';
-            filtroBuscaEl.value = '';
-            updateUnidadeFilter(); // Isso irá resetar e desabilitar o filtro de unidade também
+        document.addEventListener('DOMContentLoaded', () => {
+             const debounceFilter = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
+            
+            listenToData(); // **CORREÇÃO: Inicia a escuta de dados imediatamente**
+
+            filtroTipoUnidadeEl.addEventListener('change', updateUnidadeFilter);
+            filtroUnidadeEl.addEventListener('change', applyFiltersAndRender);
+            filtroEstadoEl.addEventListener('change', applyFiltersAndRender);
+            [filtroBuscaEl, filtroTombamentoEl, filtroLocalizacaoEl].forEach(el => el.addEventListener('input', debounceFilter(applyFiltersAndRender, 400)));
+            
+            verResumoGeralBtn.addEventListener('click', () => {
+                filtroTipoUnidadeEl.value = ''; filtroEstadoEl.value = ''; filtroBuscaEl.value = '';
+                filtroTombamentoEl.value = ''; filtroLocalizacaoEl.value = '';
+                updateUnidadeFilter();
+            });
+
+            toggleAdvancedFiltersBtn.addEventListener('click', () => advancedFiltersContainer.classList.toggle('hidden'));
+            paginationControlsEl.addEventListener('click', (e) => { if (e.target.dataset.page) { currentPage = parseInt(e.target.dataset.page); renderTable(); }});
+
+            tableBodyEl.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-btn'); if (editBtn) openItemModal(allItems.find(i => i.id === editBtn.dataset.id));
+                const deleteBtn = e.target.closest('.delete-btn'); if (deleteBtn) openDeleteModal(deleteBtn.dataset.id);
+                const transferBtn = e.target.closest('.transfer-btn'); if (transferBtn) openTransferModal(transferBtn.dataset.id);
+            });
+
+            openAddModalBtn.addEventListener('click', () => openItemModal());
+            closeItemModalBtn.addEventListener('click', () => closeModal(itemModal));
+            cancelItemBtn.addEventListener('click', () => closeModal(itemModal));
+            itemForm.addEventListener('submit', handleFormSubmit);
+
+            openLoginModalBtn.addEventListener('click', () => openModal(loginModal));
+            closeLoginModalBtn.addEventListener('click', () => closeModal(loginModal));
+            loginForm.addEventListener('submit', handleLogin);
+            logoutBtn.addEventListener('click', () => signOut(auth));
+
+            openExportModalBtn.addEventListener('click', () => openModal(exportPdfModal));
+            closeExportModalBtn.addEventListener('click', () => closeModal(exportPdfModal));
+            cancelExportBtn.addEventListener('click', () => closeModal(exportPdfModal));
+            confirmExportBtn.addEventListener('click', generatePdfReport);
+
+            confirmDeleteBtn.addEventListener('click', handleDelete);
+            cancelDeleteBtn.addEventListener('click', () => closeModal(deleteConfirmModal));
+            
+            closeTransferModalBtn.addEventListener('click', () => closeModal(transferModal));
+            cancelTransferBtn.addEventListener('click', () => closeModal(transferModal));
+            transferTipoEl.addEventListener('change', updateTransferUnidadeSelect);
+            transferForm.addEventListener('submit', handleTransferSubmit);
+            
+            navButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
+
+            openCsvUploadModalBtn.addEventListener('click', () => openModal(csvUploadModal));
+            closeCsvUploadModalBtn.addEventListener('click', () => closeModal(csvUploadModal));
+            csvFileInput.addEventListener('change', handleCSVUpload);
+            uploadCsvBtn.addEventListener('click', saveCSVData);
+
+            nfListContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.register-delivery-btn');
+                if(btn) openDeliveryModal(btn.dataset.nfId, parseInt(btn.dataset.itemIndex));
+            });
+            closeDeliveryModalBtn.addEventListener('click', () => closeModal(deliveryModal));
+            deliveryForm.addEventListener('submit', handleDeliverySubmit);
+            takePhotoBtn.addEventListener('click', () => deliveryPhotoInput.click());
+            deliveryPhotoInput.addEventListener('change', (e) => handlePhoto(e.target.files[0]));
         });
-
-        // Paginação
-        paginationControlsEl.addEventListener('click', (e) => {
-            if (e.target.dataset.page) {
-                currentPage = parseInt(e.target.dataset.page);
-                renderTable();
-            }
-        });
-
-        // Ações da tabela (Editar/Excluir)
-        tableBodyEl.addEventListener('click', (e) => {
-            const editBtn = e.target.closest('.edit-btn');
-            const deleteBtn = e.target.closest('.delete-btn');
-
-            if (editBtn) {
-                const item = allItems.find(i => i.id === editBtn.dataset.id);
-                openModal(item);
-            }
-            if (deleteBtn) {
-                openDeleteModal(deleteBtn.dataset.id);
-            }
-        });
-
-        // Modal de Item
-        openAddModalBtn.addEventListener('click', () => openModal());
-        closeModalBtn.addEventListener('click', closeModal);
-        cancelBtn.addEventListener('click', closeModal);
-        modalOverlay.addEventListener('click', closeModal);
-        itemForm.addEventListener('submit', handleFormSubmit);
-        
-        // Modal de Exclusão
-        confirmDeleteBtn.addEventListener('click', handleDelete);
-        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
-
-        // Navegação por abas
-        navButtons.forEach(button => {
-            button.addEventListener('click', () => switchTab(button.dataset.tab));
-        });
-
     </script>
 </body>
 </html>
