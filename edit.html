@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edição em Massa - Sistema de Patrimônio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .table-container { max-height: calc(100vh - 220px); }
+        .is-dirty { background-color: #fef9c3 !important; }
+        .saving-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .saving-spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3b82f6;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            animation: spin 1.5s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-slate-700 antialiased">
+    <div id="auth-gate" class="hidden">
+
+        <header class="bg-white shadow-md sticky top-0 z-50">
+            <div class="container mx-auto p-4 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800">Edição em Massa do Inventário</h1>
+                    <p class="text-sm text-slate-500">Faça alterações em vários itens e salve tudo de uma vez.</p>
+                </div>
+                <div id="user-info-edit" class="text-right">
+                    <p id="user-email-edit" class="font-semibold"></p>
+                    <p class="text-xs text-green-600 font-bold">Modo de Edição Ativado</p>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto p-4">
+            <div class="card">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                     <div>
+                        <label for="edit-search-input" class="block text-sm font-medium mb-1">Buscar Itens</label>
+                        <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo, unidade..." class="w-full p-2 border rounded-lg">
+                    </div>
+                     <div>
+                        <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
+                        <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mt-4 pt-4 border-t">
+                    <p id="changes-counter" class="text-lg font-semibold text-blue-600">Nenhuma alteração detectada.</p>
+                    <button id="save-changes-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Salvar Alterações
+                    </button>
+                </div>
+            </div>
+
+            <div class="card mt-6 p-0 overflow-hidden">
+                <div id="table-container" class="table-container overflow-y-auto">
+                    <table class="w-full text-sm min-w-[800px]">
+                        <thead class="bg-slate-100 sticky top-0">
+                            <tr>
+                                <th class="p-3 text-left font-semibold">Tombamento</th>
+                                <th class="p-3 text-left font-semibold">Descrição</th>
+                                <th class="p-3 text-left font-semibold">Unidade</th>
+                                <th class="p-3 text-left font-semibold">Localização</th>
+                                <th class="p-3 text-left font-semibold">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="edit-table-body">
+                            <!-- Conteúdo gerado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+    </div>
+    
+    <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
+        <!-- Será preenchido por JS -->
+    </div>
+    
+    <div id="saving-overlay" class="saving-overlay hidden">
+        <div class="text-center">
+            <div class="saving-spinner"></div>
+            <p id="saving-status" class="text-white text-xl font-bold mt-4">Salvando alterações...</p>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, query, orderBy, getDocs, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
+            authDomain: "controle-de-patrimonio-semcas.firebaseapp.com",
+            projectId: "controle-de-patrimonio-semcas",
+            storageBucket: "controle-de-patrimonio-semcas.firebasestorage.app",
+            messagingSenderId: "438620819929",
+            appId: "1:438620819929:web:6fcbc12905a0c928e549c8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let fullInventory = [];
+        let filteredInventory = [];
+        const changedItems = new Set();
+        
+        const loadingScreen = document.getElementById('loading-or-error-screen');
+        const authGate = document.getElementById('auth-gate');
+        const tableBody = document.getElementById('edit-table-body');
+        const saveBtn = document.getElementById('save-changes-btn');
+        const changesCounter = document.getElementById('changes-counter');
+        const searchInput = document.getElementById('edit-search-input');
+        const unidadeFilter = document.getElementById('edit-unidade-filter');
+        const savingOverlay = document.getElementById('saving-overlay');
+        const savingStatus = document.getElementById('saving-status');
+
+
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                document.getElementById('user-email-edit').textContent = user.email;
+                authGate.classList.remove('hidden');
+                loadData();
+            } else {
+                loadingScreen.innerHTML = `<div class="text-center">
+                    <h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2>
+                    <p class="text-slate-600 mt-2">Você precisa estar logado na página principal para acessar esta área.</p>
+                    <button onclick="window.close()" class="mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg">Fechar Aba</button>
+                </div>`;
+            }
+        });
+
+        async function loadData() {
+            loadingScreen.innerHTML = `<div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando inventário...</p></div>`;
+
+            const cacheKey = 'patrimonioCache_fullList';
+            const cachedData = localStorage.getItem(cacheKey);
+
+            if (cachedData) {
+                const data = JSON.parse(cachedData);
+                if (Date.now() - data.timestamp < 900000) { // Cache de 15 min
+                    fullInventory = data.items;
+                    initializePage();
+                    return;
+                }
+            }
+            
+            try {
+                const querySnapshot = await getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
+                fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Atualiza o cache para a página principal
+                localStorage.setItem(cacheKey, JSON.stringify({ items: fullInventory, timestamp: Date.now() }));
+                initializePage();
+            } catch (error) {
+                 console.error("Erro fatal ao carregar o patrimônio:", error);
+                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar</h2><p class="text-slate-600 mt-2">Não foi possível carregar os dados do Firebase.</p></div>`;
+            }
+        }
+        
+        function initializePage() {
+            loadingScreen.classList.add('hidden');
+            populateUnidadeFilter();
+            applyFiltersAndRender();
+        }
+
+        function populateUnidadeFilter() {
+            const unidades = [...new Set(fullInventory.map(item => item.Unidade).filter(Boolean))].sort();
+            unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+        }
+        
+        function applyFiltersAndRender() {
+            const searchTerm = (searchInput.value || '').toLowerCase().trim();
+            const selectedUnidade = unidadeFilter.value;
+            
+            filteredInventory = fullInventory.filter(item => {
+                const inUnidade = !selectedUnidade || item.Unidade === selectedUnidade;
+                const inSearch = !searchTerm || 
+                    (item.Descrição || '').toLowerCase().includes(searchTerm) ||
+                    (item.Tombamento || '').toLowerCase().includes(searchTerm) ||
+                    (item.Unidade || '').toLowerCase().includes(searchTerm);
+                return inUnidade && inSearch;
+            });
+            renderTable();
+        }
+
+        function renderTable() {
+            if (filteredInventory.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`;
+                return;
+            }
+            
+            const estados = ['Novo', 'Bom', 'Regular', 'Avariado'];
+
+            tableBody.innerHTML = filteredInventory.map(item => `
+                <tr id="row-${item.id}" data-doc-id="${item.id}" class="${changedItems.has(item.id) ? 'is-dirty' : ''}">
+                    <td class="p-2 border-b"><input type="text" data-field="Tombamento" class="w-full p-1 border rounded" value="${item.Tombamento || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Descrição" class="w-full p-1 border rounded" value="${item.Descrição || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Unidade" class="w-full p-1 border rounded" value="${item.Unidade || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Localização" class="w-full p-1 border rounded" value="${item.Localização || ''}"></td>
+                    <td class="p-2 border-b">
+                        <select data-field="Estado" class="w-full p-1 border rounded bg-white">
+                            ${estados.map(e => `<option value="${e}" ${item.Estado === e ? 'selected' : ''}>${e}</option>`).join('')}
+                        </select>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateChangesCounter() {
+            const count = changedItems.size;
+            if (count === 0) {
+                changesCounter.textContent = "Nenhuma alteração detectada.";
+                saveBtn.disabled = true;
+            } else {
+                changesCounter.textContent = `${count} item(ns) com alterações para salvar.`;
+                saveBtn.disabled = false;
+            }
+        }
+        
+        async function saveChanges() {
+            if (changedItems.size === 0) return;
+            
+            savingOverlay.classList.remove('hidden');
+            saveBtn.disabled = true;
+
+            const maxBatchSize = 499;
+            const changedIds = Array.from(changedItems);
+            let processedCount = 0;
+
+            for(let i = 0; i < changedIds.length; i += maxBatchSize) {
+                const chunk = changedIds.slice(i, i + maxBatchSize);
+                const batch = writeBatch(db);
+                
+                chunk.forEach(itemId => {
+                    const row = document.getElementById(`row-${itemId}`);
+                    const updatedData = {};
+                    row.querySelectorAll('input, select').forEach(input => {
+                        updatedData[input.dataset.field] = input.value;
+                    });
+                    
+                    const docRef = doc(db, 'patrimonio', itemId);
+                    batch.update(docRef, updatedData);
+                });
+                
+                try {
+                    await batch.commit();
+                    processedCount += chunk.length;
+                    savingStatus.textContent = `Salvando... (${processedCount}/${changedIds.length})`;
+                } catch(error) {
+                    console.error("Erro ao salvar lote:", error);
+                    alert("Ocorreu um erro ao salvar as alterações. Verifique o console para mais detalhes.");
+                    savingOverlay.classList.add('hidden');
+                    saveBtn.disabled = false;
+                    return;
+                }
+            }
+
+            // Sucesso!
+            savingStatus.textContent = 'Salvo com sucesso!';
+            // Limpa o cache para que a página principal recarregue os dados atualizados
+            localStorage.removeItem('patrimonioCache_fullList'); 
+            changedItems.clear();
+            document.querySelectorAll('.is-dirty').forEach(row => row.classList.remove('is-dirty'));
+            updateChangesCounter();
+            
+            setTimeout(() => {
+                savingOverlay.classList.add('hidden');
+                savingStatus.textContent = 'Salvando alterações...';
+            }, 2000);
+        }
+
+        // --- Event Listeners ---
+        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
+        searchInput.addEventListener('input', debounce(applyFiltersAndRender, 400));
+        unidadeFilter.addEventListener('change', applyFiltersAndRender);
+        saveBtn.addEventListener('click', saveChanges);
+        
+        tableBody.addEventListener('input', (e) => {
+            const target = e.target;
+            if (target.matches('input, select')) {
+                const row = target.closest('tr');
+                const docId = row.dataset.docId;
+                
+                row.classList.add('is-dirty');
+                changedItems.add(docId);
+                updateChangesCounter();
+            }
+        });
+
+    </script>
+</body>
+</html>
