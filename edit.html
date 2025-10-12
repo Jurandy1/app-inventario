@@ -10,24 +10,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .table-container { max-height: calc(100vh - 220px); }
-        .is-dirty { background-color: #fef9c3 !important; }
-        .saving-overlay {
-            position: fixed;
-            inset: 0;
-            background-color: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
+        .table-container { max-height: calc(100vh - 250px); }
+        .status-saving { color: #f59e0b; }
+        .status-saved { color: #10b981; }
+        .status-error { color: #ef4444; }
         .saving-spinner {
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid #3b82f6;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
             border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            animation: spin 1.5s linear infinite;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -39,7 +34,7 @@
             <div class="container mx-auto p-4 flex justify-between items-center">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-800">Edição em Massa do Inventário</h1>
-                    <p class="text-sm text-slate-500">Faça alterações em vários itens e salve tudo de uma vez.</p>
+                    <p id="auto-save-status" class="text-sm font-semibold status-saved">Pronto. As alterações serão salvas automaticamente.</p>
                 </div>
                 <div id="user-info-edit" class="text-right">
                     <p id="user-email-edit" class="font-semibold"></p>
@@ -50,34 +45,33 @@
 
         <main class="container mx-auto p-4">
             <div class="card">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                      <div>
                         <label for="edit-search-input" class="block text-sm font-medium mb-1">Buscar Itens</label>
                         <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo, unidade..." class="w-full p-2 border rounded-lg">
                     </div>
                      <div>
-                        <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
-                        <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
+                        <label for="edit-tipo-filter" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
+                        <select id="edit-tipo-filter" class="w-full p-2 border rounded-lg bg-white"></select>
                     </div>
-                </div>
-
-                <div class="flex justify-between items-center mt-4 pt-4 border-t">
-                    <p id="changes-counter" class="text-lg font-semibold text-blue-600">Nenhuma alteração detectada.</p>
-                    <button id="save-changes-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Salvar Alterações
-                    </button>
+                     <div>
+                        <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
+                        <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white" disabled></select>
+                    </div>
                 </div>
             </div>
 
             <div class="card mt-6 p-0 overflow-hidden">
                 <div id="table-container" class="table-container overflow-y-auto">
-                    <table class="w-full text-sm min-w-[800px]">
+                    <table class="w-full text-sm min-w-[1200px]">
                         <thead class="bg-slate-100 sticky top-0">
                             <tr>
                                 <th class="p-3 text-left font-semibold">Tombamento</th>
                                 <th class="p-3 text-left font-semibold">Descrição</th>
                                 <th class="p-3 text-left font-semibold">Unidade</th>
                                 <th class="p-3 text-left font-semibold">Localização</th>
+                                <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                <th class="p-3 text-left font-semibold">Origem da Doação</th>
                                 <th class="p-3 text-left font-semibold">Estado</th>
                             </tr>
                         </thead>
@@ -94,18 +88,10 @@
     <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
         <!-- Será preenchido por JS -->
     </div>
-    
-    <div id="saving-overlay" class="saving-overlay hidden">
-        <div class="text-center">
-            <div class="saving-spinner"></div>
-            <p id="saving-status" class="text-white text-xl font-bold mt-4">Salvando alterações...</p>
-        </div>
-    </div>
-
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, orderBy, getDocs, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -123,18 +109,50 @@
 
         let fullInventory = [];
         let filteredInventory = [];
-        const changedItems = new Set();
         
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
         const tableBody = document.getElementById('edit-table-body');
-        const saveBtn = document.getElementById('save-changes-btn');
-        const changesCounter = document.getElementById('changes-counter');
         const searchInput = document.getElementById('edit-search-input');
+        const tipoFilter = document.getElementById('edit-tipo-filter');
         const unidadeFilter = document.getElementById('edit-unidade-filter');
-        const savingOverlay = document.getElementById('saving-overlay');
-        const savingStatus = document.getElementById('saving-status');
+        const autoSaveStatus = document.getElementById('auto-save-status');
 
+        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
+
+        async function logAction(action, details) {
+            if (!auth.currentUser) return;
+            try {
+                await addDoc(collection(db, 'historico'), { ...details, action, user: auth.currentUser.email, timestamp: serverTimestamp() });
+            } catch (error) { console.error("Falha ao registrar ação no histórico:", error); }
+        }
+
+        const debouncedSave = debounce(async (itemId, field, value, oldValue) => {
+            autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando...`;
+            autoSaveStatus.className = 'text-sm font-semibold status-saving';
+            
+            try {
+                const docRef = doc(db, 'patrimonio', itemId);
+                await updateDoc(docRef, { [field]: value, updatedAt: serverTimestamp() });
+
+                const item = fullInventory.find(i => i.id === itemId);
+                if (item) item[field] = value; // Update local data
+
+                logAction('Edição em Massa', { 
+                    itemId, 
+                    itemDesc: item?.Descrição || 'N/A',
+                    details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.`
+                });
+
+                autoSaveStatus.textContent = 'Salvo com sucesso!';
+                autoSaveStatus.className = 'text-sm font-semibold status-saved';
+                localStorage.removeItem('patrimonioCache_fullList'); // Invalidate cache for main page
+            } catch (error) {
+                console.error("Erro no auto-save:", error);
+                autoSaveStatus.textContent = 'Erro ao salvar!';
+                autoSaveStatus.className = 'text-sm font-semibold status-error';
+            }
+        }, 1500); // 1.5 second delay
 
         onAuthStateChanged(auth, user => {
             if (user) {
@@ -142,23 +160,18 @@
                 authGate.classList.remove('hidden');
                 loadData();
             } else {
-                loadingScreen.innerHTML = `<div class="text-center">
-                    <h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2>
-                    <p class="text-slate-600 mt-2">Você precisa estar logado na página principal para acessar esta área.</p>
-                    <button onclick="window.close()" class="mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg">Fechar Aba</button>
-                </div>`;
+                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2>...</div>`;
             }
         });
 
         async function loadData() {
             loadingScreen.innerHTML = `<div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando inventário...</p></div>`;
-
             const cacheKey = 'patrimonioCache_fullList';
             const cachedData = localStorage.getItem(cacheKey);
 
             if (cachedData) {
                 const data = JSON.parse(cachedData);
-                if (Date.now() - data.timestamp < 900000) { // Cache de 15 min
+                if (Date.now() - data.timestamp < 28800000) { // Cache de 8 horas
                     fullInventory = data.items;
                     initializePage();
                     return;
@@ -168,142 +181,97 @@
             try {
                 const querySnapshot = await getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
                 fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Atualiza o cache para a página principal
                 localStorage.setItem(cacheKey, JSON.stringify({ items: fullInventory, timestamp: Date.now() }));
                 initializePage();
             } catch (error) {
                  console.error("Erro fatal ao carregar o patrimônio:", error);
-                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar</h2><p class="text-slate-600 mt-2">Não foi possível carregar os dados do Firebase.</p></div>`;
+                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar</h2>...</div>`;
             }
         }
         
         function initializePage() {
             loadingScreen.classList.add('hidden');
-            populateUnidadeFilter();
+            populateFilters();
             applyFiltersAndRender();
         }
 
-        function populateUnidadeFilter() {
-            const unidades = [...new Set(fullInventory.map(item => item.Unidade).filter(Boolean))].sort();
-            unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+        function populateFilters() {
+            const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
+            tipoFilter.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+        }
+
+        function updateUnidadeFilter() {
+            const selectedTipo = tipoFilter.value;
+            if(selectedTipo) {
+                const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+                unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                unidadeFilter.disabled = false;
+            } else {
+                unidadeFilter.innerHTML = '<option value="">Selecione um Tipo</option>';
+                unidadeFilter.disabled = true;
+            }
         }
         
         function applyFiltersAndRender() {
             const searchTerm = (searchInput.value || '').toLowerCase().trim();
+            const selectedTipo = tipoFilter.value;
             const selectedUnidade = unidadeFilter.value;
             
             filteredInventory = fullInventory.filter(item => {
-                const inUnidade = !selectedUnidade || item.Unidade === selectedUnidade;
-                const inSearch = !searchTerm || 
-                    (item.Descrição || '').toLowerCase().includes(searchTerm) ||
-                    (item.Tombamento || '').toLowerCase().includes(searchTerm) ||
-                    (item.Unidade || '').toLowerCase().includes(searchTerm);
-                return inUnidade && inSearch;
+                return (!selectedTipo || item.Tipo === selectedTipo) &&
+                       (!selectedUnidade || item.Unidade === selectedUnidade) &&
+                       (!searchTerm || 
+                        (item.Descrição || '').toLowerCase().includes(searchTerm) ||
+                        (item.Tombamento || '').toLowerCase().includes(searchTerm) ||
+                        (item.Unidade || '').toLowerCase().includes(searchTerm));
             });
             renderTable();
         }
 
         function renderTable() {
             if (filteredInventory.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-slate-500">Nenhum item encontrado.</td></tr>`;
                 return;
             }
-            
             const estados = ['Novo', 'Bom', 'Regular', 'Avariado'];
 
             tableBody.innerHTML = filteredInventory.map(item => `
-                <tr id="row-${item.id}" data-doc-id="${item.id}" class="${changedItems.has(item.id) ? 'is-dirty' : ''}">
-                    <td class="p-2 border-b"><input type="text" data-field="Tombamento" class="w-full p-1 border rounded" value="${item.Tombamento || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Descrição" class="w-full p-1 border rounded" value="${item.Descrição || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Unidade" class="w-full p-1 border rounded" value="${item.Unidade || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Localização" class="w-full p-1 border rounded" value="${item.Localização || ''}"></td>
+                <tr id="row-${item.id}" data-doc-id="${item.id}">
+                    <td class="p-2 border-b"><input type="text" data-field="Tombamento" class="w-full p-1 border rounded" value="${item.Tombamento || ''}" data-old-value="${item.Tombamento || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Descrição" class="w-full p-1 border rounded" value="${item.Descrição || ''}" data-old-value="${item.Descrição || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Unidade" class="w-full p-1 border rounded" value="${item.Unidade || ''}" data-old-value="${item.Unidade || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Localização" class="w-full p-1 border rounded" value="${item.Localização || ''}" data-old-value="${item.Localização || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Fornecedor" class="w-full p-1 border rounded" value="${item.Fornecedor || ''}" data-old-value="${item.Fornecedor || ''}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Origem da Doação" class="w-full p-1 border rounded" value="${item['Origem da Doação'] || ''}" data-old-value="${item['Origem da Doação'] || ''}"></td>
                     <td class="p-2 border-b">
-                        <select data-field="Estado" class="w-full p-1 border rounded bg-white">
+                        <select data-field="Estado" class="w-full p-1 border rounded bg-white" data-old-value="${item.Estado || ''}">
                             ${estados.map(e => `<option value="${e}" ${item.Estado === e ? 'selected' : ''}>${e}</option>`).join('')}
                         </select>
                     </td>
                 </tr>
             `).join('');
         }
-
-        function updateChangesCounter() {
-            const count = changedItems.size;
-            if (count === 0) {
-                changesCounter.textContent = "Nenhuma alteração detectada.";
-                saveBtn.disabled = true;
-            } else {
-                changesCounter.textContent = `${count} item(ns) com alterações para salvar.`;
-                saveBtn.disabled = false;
-            }
-        }
         
-        async function saveChanges() {
-            if (changedItems.size === 0) return;
-            
-            savingOverlay.classList.remove('hidden');
-            saveBtn.disabled = true;
-
-            const maxBatchSize = 499;
-            const changedIds = Array.from(changedItems);
-            let processedCount = 0;
-
-            for(let i = 0; i < changedIds.length; i += maxBatchSize) {
-                const chunk = changedIds.slice(i, i + maxBatchSize);
-                const batch = writeBatch(db);
-                
-                chunk.forEach(itemId => {
-                    const row = document.getElementById(`row-${itemId}`);
-                    const updatedData = {};
-                    row.querySelectorAll('input, select').forEach(input => {
-                        updatedData[input.dataset.field] = input.value;
-                    });
-                    
-                    const docRef = doc(db, 'patrimonio', itemId);
-                    batch.update(docRef, updatedData);
-                });
-                
-                try {
-                    await batch.commit();
-                    processedCount += chunk.length;
-                    savingStatus.textContent = `Salvando... (${processedCount}/${changedIds.length})`;
-                } catch(error) {
-                    console.error("Erro ao salvar lote:", error);
-                    alert("Ocorreu um erro ao salvar as alterações. Verifique o console para mais detalhes.");
-                    savingOverlay.classList.add('hidden');
-                    saveBtn.disabled = false;
-                    return;
-                }
-            }
-
-            // Sucesso!
-            savingStatus.textContent = 'Salvo com sucesso!';
-            // Limpa o cache para que a página principal recarregue os dados atualizados
-            localStorage.removeItem('patrimonioCache_fullList'); 
-            changedItems.clear();
-            document.querySelectorAll('.is-dirty').forEach(row => row.classList.remove('is-dirty'));
-            updateChangesCounter();
-            
-            setTimeout(() => {
-                savingOverlay.classList.add('hidden');
-                savingStatus.textContent = 'Salvando alterações...';
-            }, 2000);
-        }
-
         // --- Event Listeners ---
-        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
         searchInput.addEventListener('input', debounce(applyFiltersAndRender, 400));
+        tipoFilter.addEventListener('change', () => {
+            updateUnidadeFilter();
+            applyFiltersAndRender();
+        });
         unidadeFilter.addEventListener('change', applyFiltersAndRender);
-        saveBtn.addEventListener('click', saveChanges);
         
-        tableBody.addEventListener('input', (e) => {
+        tableBody.addEventListener('change', (e) => {
             const target = e.target;
             if (target.matches('input, select')) {
-                const row = target.closest('tr');
-                const docId = row.dataset.docId;
-                
-                row.classList.add('is-dirty');
-                changedItems.add(docId);
-                updateChangesCounter();
+                const docId = target.closest('tr').dataset.docId;
+                const field = target.dataset.field;
+                const newValue = target.value;
+                const oldValue = target.dataset.oldValue;
+
+                if (newValue !== oldValue) {
+                    debouncedSave(docId, field, newValue, oldValue);
+                    target.dataset.oldValue = newValue; // Update old value for next change
+                }
             }
         });
 
