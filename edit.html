@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .table-container { max-height: calc(100vh - 350px); }
+        .table-container { max-height: calc(100vh - 420px); }
         .reconciliation-container { max-height: calc(100vh - 350px); }
         .status-feedback { color: #475569; }
         .nav-btn {
@@ -93,7 +93,18 @@
             <div id="content-edicao" class="hidden fade-in">
                  <div class="card">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <!-- Filtros aqui -->
+                        <div>
+                            <label for="edit-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
+                            <select id="edit-filter-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
+                        </div>
+                        <div>
+                            <label for="edit-filter-unidade" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
+                            <select id="edit-filter-unidade" class="w-full p-2 border rounded-lg bg-white"></select>
+                        </div>
+                        <div>
+                            <label for="edit-filter-descricao" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
+                            <input type="text" id="edit-filter-descricao" class="w-full p-2 border rounded-lg" placeholder="Digite para buscar...">
+                        </div>
                     </div>
                     <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Salvar Alterações</button>
                 </div>
@@ -357,19 +368,51 @@
         }
 
         function populateEditableInventoryTab() {
-            const tableBody = document.getElementById('edit-table-body');
-            const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
-            const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
-            tableBody.innerHTML = fullInventory.map(item => {
-                const itemData = dirtyItems.get(item.id) || item;
-                const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
-                return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${dirtyItems.has(item.id) ? 'is-dirty' : ''}">${headers.map(h => {
-                    if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
-                    const value = escapeHtml(itemData[h]);
-                    const inputType = (h === 'Quantidade') ? 'number' : 'text';
-                    return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
-                }).join('')}</tr>`;
-            }).join('');
+            const editFilterTipo = document.getElementById('edit-filter-tipo');
+            const editFilterUnidade = document.getElementById('edit-filter-unidade');
+            const editFilterDescricao = document.getElementById('edit-filter-descricao');
+
+            const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
+            editFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+            
+            const updateUnidades = () => {
+                const selectedTipo = editFilterTipo.value;
+                const unidades = [...new Set(fullInventory.filter(i => !selectedTipo || i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
+                editFilterUnidade.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+            };
+            
+            const renderTable = () => {
+                const tipo = editFilterTipo.value;
+                const unidade = editFilterUnidade.value;
+                const desc = editFilterDescricao.value.toLowerCase();
+                
+                const filtered = fullInventory.filter(item => 
+                    (!tipo || item.Tipo === tipo) &&
+                    (!unidade || item.Unidade === unidade) &&
+                    (!desc || (item.Descrição || '').toLowerCase().includes(desc))
+                );
+
+                const tableBody = document.getElementById('edit-table-body');
+                const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+                const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
+                tableBody.innerHTML = filtered.map(item => {
+                    const itemData = dirtyItems.get(item.id) || item;
+                    const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
+                    return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${dirtyItems.has(item.id) ? 'is-dirty' : ''}">${headers.map(h => {
+                        if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
+                        const value = escapeHtml(itemData[h]);
+                        const inputType = (h === 'Quantidade') ? 'number' : 'text';
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
+                    }).join('')}</tr>`;
+                }).join('');
+            };
+
+            editFilterTipo.onchange = () => { updateUnidades(); renderTable(); };
+            editFilterUnidade.onchange = renderTable;
+            editFilterDescricao.oninput = renderTable; // Simple debounce would be better, but this works
+
+            updateUnidades();
+            renderTable();
         }
         
         function populateUnitMappingTab() {
