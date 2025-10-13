@@ -113,7 +113,7 @@
 
                 <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1600px]">
+                        <table class="w-full text-sm min-w-[1700px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
                                     <th class="p-3 text-left font-semibold">Tombamento</th>
@@ -122,6 +122,7 @@
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Localização</th>
                                     <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
                                     <th class="p-3 text-left font-semibold">Origem da Doação</th>
                                     <th class="p-3 text-left font-semibold">Estado</th>
                                     <th class="p-3 text-left font-semibold">Quantidade</th>
@@ -390,7 +391,7 @@
         }
 
         function hasDifferences(systemItem, giapItem) {
-            const mapping = { 'Descrição': 'Descrição', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
+            const mapping = { 'Descrição': 'Descrição', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo', 'NF': 'NF' };
             return Object.keys(mapping).some(systemKey => {
                 const giapKey = mapping[systemKey];
                 return (systemItem[systemKey] || '').trim() !== (giapItem[giapKey] || '').trim();
@@ -399,10 +400,10 @@
 
         function renderEditTable() {
             if (filteredInventory.length === 0) {
-                editTableBody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-slate-500">Nenhum item encontrado no sistema com os filtros atuais.</td></tr>`;
+                editTableBody.innerHTML = `<tr><td colspan="12" class="text-center p-8 text-slate-500">Nenhum item encontrado no sistema com os filtros atuais.</td></tr>`;
                 return;
             }
-            const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+            const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
             editTableBody.innerHTML = filteredInventory.map(item => {
                 const tombo = item['Tombamento']?.trim();
                 const giapItem = giapMap.get(tombo);
@@ -480,8 +481,8 @@
             }
             const newItem = {
                 'Tombamento': tombo, 'Descrição': itemFromGiap['Descrição'] || '', 'Tipo': itemFromGiap['Tipo'] || '',
-                'Unidade': itemFromGiap['Unidade'] || '', 'Localização': '', 'Fornecedor': itemFromGiap['Nome Fornecedor'] || '', 'Origem da Doação': '',
-                'Estado': 'Novo', 'Quantidade': 1, 'Observação': ''
+                'Unidade': itemFromGiap['Unidade'] || '', 'Localização': '', 'Fornecedor': itemFromGiap['Nome Fornecedor'] || '', 'NF': itemFromGiap['NF'] || '', 
+                'Origem da Doação': '', 'Estado': 'Novo', 'Quantidade': 1, 'Observação': ''
             };
             try {
                 await addDoc(collection(db, 'patrimonio'), { ...newItem, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
@@ -500,7 +501,7 @@
             if (!giapItem) { alert("Item correspondente não encontrado na planilha GIAP."); return; }
             
             const updates = {};
-            const mapping = { 'Descrição': 'Descrição', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
+            const mapping = { 'Descrição': 'Descrição', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo', 'NF': 'NF' };
             Object.keys(mapping).forEach(systemKey => {
                 const giapKey = mapping[systemKey];
                 const giapValue = giapItem[giapKey] || '';
@@ -549,10 +550,11 @@
                 if (target.dataset.field === 'Tombamento' && target.value.trim()) {
                     const giapItem = giapMap.get(target.value.trim());
                     if (giapItem) {
-                        if (confirm(`Encontramos o item "${giapItem['Descrição']}" na planilha GIAP. Deseja preencher os campos automaticamente? (O 'Estado' não será alterado)`)) {
+                        if (confirm(`Encontramos o item "${giapItem['Descrição']}" na planilha GIAP. Deseja preencher a Descrição, Fornecedor e NF automaticamente?`)) {
                              const updates = {
-                                'Tombamento': giapItem['TOMBAMENTO'] || '', 'Descrição': giapItem['Descrição'] || '', 'Tipo': giapItem['Tipo'] || '',
-                                'Unidade': giapItem['Unidade'] || '', 'Fornecedor': giapItem['Nome Fornecedor'] || '',
+                                'Descrição': giapItem['Descrição'] || '',
+                                'Fornecedor': giapItem['Nome Fornecedor'] || '',
+                                'NF': giapItem['NF'] || ''
                             };
                             for (const [field, value] of Object.entries(updates)) {
                                 const input = row.querySelector(`[data-field="${field}"]`);
@@ -640,8 +642,8 @@
                     const newItemRef = doc(collection(db, 'patrimonio'));
                     const newItem = {
                         'Tombamento': item['TOMBAMENTO'] || '', 'Descrição': item['Descrição'] || '', 'Tipo': item['Tipo'] || '',
-                        'Unidade': item['Unidade'] || '', 'Localização': '', 'Fornecedor': item['Nome Fornecedor'] || '', 'Origem da Doação': '',
-                        'Estado': 'Novo', 'Quantidade': 1, 'Observação': '',
+                        'Unidade': item['Unidade'] || '', 'Localização': '', 'Fornecedor': item['Nome Fornecedor'] || '', 'NF': item['NF'] || '',
+                        'Origem da Doação': '', 'Estado': 'Novo', 'Quantidade': 1, 'Observação': '',
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItem);
@@ -703,7 +705,7 @@
                 if (docId && item && giapItem) {
                     const docRef = doc(db, 'patrimonio', docId);
                     const updates = {};
-                    const mapping = { 'Descrição': 'Descrição', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
+                    const mapping = { 'Descrição': 'Descrição', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo', 'NF': 'NF' };
                     Object.keys(mapping).forEach(systemKey => {
                         updates[systemKey] = giapItem[mapping[systemKey]] || '';
                     });
