@@ -125,7 +125,7 @@
             <div id="content-unidades" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">Mapeamento de Unidades</h2>
-                    <p class="text-sm text-slate-600 mb-4">Ligue cada 'Unidade do Sistema' a uma ou mais 'Unidades da Planilha'. As ligações são salvas no seu navegador.</p>
+                    <p class="text-sm text-slate-600 mb-4">Ligue cada 'Unidade do Sistema' a uma ou mais 'Unidades da Planilha'. As ligações são salvas permanentemente na nuvem.</p>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label for="map-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo (Sistema)</label>
@@ -249,7 +249,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -269,7 +269,7 @@
 
         const idb = new Dexie('InventoryDB');
         idb.version(2).stores({
-            patrimonio: 'id', giap: '++_id', metadata: 'key', unitMapping: 'systemUnit'
+            patrimonio: 'id', giap: '++_id', metadata: 'key'
         });
         const CACHE_DURATION_MS = 4 * 60 * 60 * 1000;
 
@@ -303,13 +303,13 @@
             const metadata = await idb.metadata.get('lastFetch');
             const isCacheStale = !metadata || (Date.now() - metadata.timestamp > CACHE_DURATION_MS);
             if (!forceRefresh && !isCacheStale) {
-                [fullInventory, giapInventory, unitMapping] = await Promise.all([
-                    idb.patrimonio.toArray(), idb.giap.toArray(), loadUnitMappingFromDB()
+                [fullInventory, giapInventory] = await Promise.all([
+                    idb.patrimonio.toArray(), idb.giap.toArray()
                 ]);
+                unitMapping = await loadUnitMappingFromFirestore();
             } else {
                 try {
-                    [fullInventory, giapInventory] = await Promise.all([loadFirebaseInventory(), loadGiapInventory()]);
-                    unitMapping = await loadUnitMappingFromDB();
+                    [fullInventory, giapInventory, unitMapping] = await Promise.all([loadFirebaseInventory(), loadGiapInventory(), loadUnitMappingFromFirestore()]);
                     await idb.transaction('rw', idb.patrimonio, idb.giap, idb.metadata, async () => {
                         await idb.patrimonio.clear(); await idb.patrimonio.bulkAdd(fullInventory);
                         await idb.giap.clear(); await idb.giap.bulkAdd(giapInventory);
@@ -324,6 +324,17 @@
             initializeUI();
             loadingScreen.classList.add('hidden');
         }
+        
+        async function loadUnitMappingFromFirestore() {
+            try {
+                const docRef = doc(db, 'config', 'unitMapping');
+                const docSnap = await getDoc(docRef);
+                return docSnap.exists() ? docSnap.data().mappings || {} : {};
+            } catch (error) {
+                console.error("Error loading unit mapping from Firestore:", error);
+                return {};
+            }
+        }
 
         async function loadFirebaseInventory() {
             const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
@@ -336,11 +347,6 @@
             });
         }
         
-        async function loadUnitMappingFromDB() {
-            const mappingArray = await idb.unitMapping.toArray();
-            return mappingArray.reduce((acc, curr) => { acc[curr.systemUnit] = curr.giapUnits; return acc; }, {});
-        }
-
         function initializeUI() {
             populateEditableInventoryTab();
             populateUnitMappingTab();
@@ -368,21 +374,36 @@
         
         function populateUnitMappingTab() {
             const systemTypes = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
-            const giapUnits = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
             const filterTipoSelect = document.getElementById('map-filter-tipo');
-            const giapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
             
             filterTipoSelect.innerHTML = '<option value="">Todos os Tipos</option>' + systemTypes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-            giapUnitMultiselect.innerHTML = giapUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
             
             updateSystemUnitOptions();
             renderSavedMappings();
+            updateGiapUnitOptions();
         }
 
         function updateSystemUnitOptions() {
             const selectedType = document.getElementById('map-filter-tipo').value;
             const systemUnits = [...new Set(fullInventory.filter(i => !selectedType || i.Tipo === selectedType).map(i => i.Unidade).filter(Boolean))].sort();
             document.getElementById('map-system-unit-select').innerHTML = '<option value="">Selecione uma Unidade</option>' + systemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        }
+
+        function updateGiapUnitOptions() {
+            const giapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
+            const allGiapUnits = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
+            const linkedGiapUnits = new Set(Object.values(unitMapping).flat());
+            
+            const selectedSystemUnit = document.getElementById('map-system-unit-select').value;
+            const currentlyMappedToThis = unitMapping[selectedSystemUnit] || [];
+
+            const availableGiapUnits = allGiapUnits.filter(unit => !linkedGiapUnits.has(unit) || currentlyMappedToThis.includes(unit));
+            
+            giapUnitMultiselect.innerHTML = availableGiapUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+            
+            Array.from(giapUnitMultiselect.options).forEach(opt => {
+                opt.selected = currentlyMappedToThis.includes(opt.value);
+            });
         }
 
         function renderSavedMappings() {
@@ -501,19 +522,23 @@
 
         document.getElementById('map-filter-tipo').addEventListener('change', updateSystemUnitOptions);
         document.getElementById('map-system-unit-select').addEventListener('change', (e) => {
-            const selectedUnit = e.target.value;
-            const mappedGiap = unitMapping[selectedUnit] || [];
-            Array.from(document.getElementById('map-giap-unit-multiselect').options).forEach(opt => opt.selected = mappedGiap.includes(opt.value));
+            updateGiapUnitOptions();
         });
         document.getElementById('save-mapping-btn').addEventListener('click', async () => {
             const systemUnit = document.getElementById('map-system-unit-select').value;
             if (!systemUnit) return alert("Selecione uma Unidade do Sistema primeiro.");
             const giapUnits = Array.from(document.getElementById('map-giap-unit-multiselect').selectedOptions).map(opt => opt.value);
             unitMapping[systemUnit] = giapUnits;
-            await idb.unitMapping.put({ systemUnit, giapUnits });
-            feedbackStatus.textContent = `Mapeamento para '${systemUnit}' salvo!`;
-            populateReconciliationTab();
-            renderSavedMappings();
+            try {
+                feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Salvando ligação...`;
+                await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
+                feedbackStatus.textContent = `Mapeamento para '${systemUnit}' salvo permanentemente!`;
+                populateUnitMappingTab();
+                populateReconciliationTab();
+            } catch (error) {
+                feedbackStatus.textContent = `Erro ao salvar mapeamento.`;
+                console.error(error);
+            }
         });
         document.getElementById('saved-mappings-container').addEventListener('click', async (e) => {
             const deleteBtn = e.target.closest('.delete-mapping-btn');
@@ -521,12 +546,15 @@
                 const systemUnit = deleteBtn.dataset.systemUnit;
                 if (confirm(`Tem certeza que deseja deletar a ligação para "${systemUnit}"?`)) {
                     delete unitMapping[systemUnit];
-                    await idb.unitMapping.delete(systemUnit);
-                    feedbackStatus.textContent = `Ligação para '${systemUnit}' removida.`;
-                    renderSavedMappings();
-                    populateReconciliationTab();
-                    if (document.getElementById('map-system-unit-select').value === systemUnit) {
-                        Array.from(document.getElementById('map-giap-unit-multiselect').options).forEach(opt => opt.selected = false);
+                    try {
+                        feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Removendo ligação...`;
+                        await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
+                        feedbackStatus.textContent = `Ligação para '${systemUnit}' removida.`;
+                        populateUnitMappingTab();
+                        populateReconciliationTab();
+                    } catch (error) {
+                         feedbackStatus.textContent = `Erro ao remover ligação.`;
+                         console.error(error);
                     }
                 }
             }
@@ -566,7 +594,7 @@
                         <p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado || 'N/A')}</p>
                         <p class="text-xs text-slate-500">Localização: ${escapeHtml(item.Localização || 'N/A')}</p>
                     </div>`;
-                } else { // type === 'giap'
+                } else {
                     return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}">
                         <strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong>
                         <p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p>
