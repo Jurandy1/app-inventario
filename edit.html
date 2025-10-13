@@ -711,7 +711,7 @@
             });
 
             systemItems.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
-            giapItems.sort((a, b) => (a.Descrição || i.Espécie || '').localeCompare(b.Descrição || b.Espécie || ''));
+            giapItems.sort((a, b) => (a.Descrição || a.Espécie || '').localeCompare(b.Descrição || b.Espécie || ''));
 
             const renderItem = (item, type) => {
                 if (type === 'system') {
