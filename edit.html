@@ -34,6 +34,11 @@
             margin-right: 8px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        table { table-layout: fixed; }
+        th, td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -48,6 +53,7 @@
                 <div id="user-info-edit" class="text-right">
                     <p id="user-email-edit" class="font-semibold"></p>
                     <p class="text-xs text-green-600 font-bold">Modo de Edição Ativado</p>
+                    <button id="logout-btn" class="text-sm text-red-600 hover:underline">Sair</button>
                 </div>
             </div>
         </header>
@@ -68,15 +74,16 @@
             <div id="content-edicao" class="fade-in">
                 <div class="card">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                         <div>
+                        <div>
                             <label for="edit-search-input" class="block text-sm font-medium mb-1">Buscar Itens</label>
                             <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo, unidade, fornecedor..." class="w-full p-2 border rounded-lg">
                         </div>
-                         <div>
+                        <div>
                             <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
                             <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
                         </div>
                     </div>
+                    <button id="export-edit-csv" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Exportar como CSV</button>
                 </div>
 
                 <div class="card mt-6 p-0 overflow-hidden">
@@ -94,6 +101,7 @@
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Valor NF</th>
                                     <th class="p-3 text-left font-semibold">Espécie</th>
+                                    <th class="p-3 text-left font-semibold">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="edit-table-body"></tbody>
@@ -104,7 +112,7 @@
 
             <!-- ABA: Tombamentos Restantes -->
             <div id="content-restantes" class="hidden fade-in">
-                 <div class="card">
+                <div class="card">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label for="restantes-search-input" class="block text-sm font-medium mb-1">Buscar Tombamento</label>
@@ -115,8 +123,10 @@
                             <p id="restantes-count" class="text-2xl font-bold text-blue-600">0</p>
                         </div>
                     </div>
+                    <button id="export-restantes-csv" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Exportar como CSV</button>
+                    <button id="add-all-restantes" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 ml-2">Adicionar Todos os Restantes ao Sistema</button>
                 </div>
-                 <div class="card mt-6 p-0 overflow-hidden">
+                <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
                         <table class="w-full text-sm min-w-[1200px]">
                             <thead class="bg-slate-100 sticky top-0">
@@ -131,6 +141,7 @@
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Valor NF</th>
                                     <th class="p-3 text-left font-semibold">Espécie</th>
+                                    <th class="p-3 text-left font-semibold">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="restantes-table-body"></tbody>
@@ -148,7 +159,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBq9vMW3Aba8fqgXfRNtxqOltnTiaKjnU",
@@ -167,6 +178,7 @@
 
         let fullInventory = [], giapInventory = [], remainingTombamentos = [];
         let filteredInventory = [], filteredRestantes = [];
+        let giapMap = new Map();
         
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
@@ -179,6 +191,10 @@
         const restantesCountEl = document.getElementById('restantes-count');
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
+        const logoutBtn = document.getElementById('logout-btn');
+        const exportEditCsvBtn = document.getElementById('export-edit-csv');
+        const exportRestantesCsvBtn = document.getElementById('export-restantes-csv');
+        const addAllRestantesBtn = document.getElementById('add-all-restantes');
 
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
 
@@ -190,7 +206,7 @@
                 await updateDoc(docRef, { [field]: value, updatedAt: serverTimestamp() });
                 const item = fullInventory.find(i => i.id === itemId);
                 if (item) item[field] = value; 
-                logAction('Edição em Massa', { itemId, details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.` });
+                await logAction('Edição em Massa', { itemId, details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.` });
                 autoSaveStatus.textContent = 'Salvo com sucesso!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
                 localStorage.removeItem('patrimonioCache_fullList');
@@ -201,6 +217,19 @@
             }
         }, 1500);
 
+        async function logAction(type, details) {
+            try {
+                await addDoc(collection(db, 'logs'), {
+                    type,
+                    user: auth.currentUser.email,
+                    timestamp: serverTimestamp(),
+                    details
+                });
+            } catch (error) {
+                console.error("Erro ao registrar log:", error);
+            }
+        }
+
         onAuthStateChanged(auth, user => {
             if (user) {
                 document.getElementById('user-email-edit').textContent = user.email;
@@ -208,6 +237,15 @@
                 loadAllData();
             } else {
                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2><p class="text-slate-600 mt-2">Você precisa estar logado para acessar esta página.</p></div>`;
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                window.location.reload();
+            } catch (error) {
+                console.error("Erro ao sair:", error);
             }
         });
 
@@ -245,6 +283,7 @@
                 const giapTombo = item['TOMBAMENTO (A1)']?.trim();
                 return giapTombo && !systemTombamentos.has(giapTombo);
             });
+            giapMap = new Map(giapInventory.map(item => [item['TOMBAMENTO (A1)']?.trim(), item]));
             
             initializePage();
         }
@@ -286,31 +325,61 @@
             renderRestantesTable();
         }
 
+        function hasDifferences(systemItem, giapItem) {
+            const headers = ['Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            return headers.some(h => (systemItem[h] || '') !== (giapItem[h] || ''));
+        }
+
         function renderEditTable() {
             if (filteredInventory.length === 0) {
-                editTableBody.innerHTML = `<tr><td colspan="10" class="text-center p-8 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`;
+                editTableBody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`;
                 return;
             }
             const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
-            editTableBody.innerHTML = filteredInventory.map(item => `
+            editTableBody.innerHTML = filteredInventory.map(item => {
+                const tombo = item['TOMBAMENTO (A1)']?.trim();
+                const giapItem = giapMap.get(tombo);
+                const showSync = giapItem && hasDifferences(item, giapItem);
+                return `
                 <tr id="row-${item.id}" data-doc-id="${item.id}" class="hover:bg-slate-50">
-                    ${headers.map(h => `<td class="p-2 border-b"><input type="text" data-field="${h}" class="w-full p-1 border rounded" value="${item[h] || ''}" data-old-value="${item[h] || ''}"></td>`).join('')}
+                    ${headers.map(h => {
+                        let inputType = 'text';
+                        if (h === 'Valor NF') inputType = 'number';
+                        if (h === 'Cadastro' || h === 'Entrada') inputType = 'date';
+                        let value = escapeHtml(item[h] || '');
+                        if (inputType === 'date' && value) {
+                            // Assume value is in DD/MM/YYYY, convert to YYYY-MM-DD
+                            const parts = value.split('/');
+                            if (parts.length === 3) value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        }
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}" data-old-value="${value}"></td>`;
+                    }).join('')}
+                    <td class="p-2 border-b">
+                        ${showSync ? `<button class="sync-with-giap bg-yellow-500 text-white px-2 py-1 rounded" data-doc-id="${item.id}">Sincronizar com GIAP</button>` : ''}
+                    </td>
                 </tr>
-            `).join('');
+            `;}).join('');
+            attachSyncButtons();
         }
         
         function renderRestantesTable() {
             restantesCountEl.textContent = filteredRestantes.length;
              if (filteredRestantes.length === 0) {
-                restantesTableBody.innerHTML = `<tr><td colspan="10" class="text-center p-8 text-slate-500">Nenhum tombamento restante encontrado. Todos os itens do GIAP parecem estar no sistema!</td></tr>`;
+                restantesTableBody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-slate-500">Nenhum tombamento restante encontrado. Todos os itens do GIAP parecem estar no sistema!</td></tr>`;
                 return;
             }
             const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
              restantesTableBody.innerHTML = filteredRestantes.map(item => `
                 <tr class="border-b">
-                     ${headers.map(h => `<td class="p-2 bg-slate-50 text-slate-700">${item[h] || ''}</td>`).join('')}
+                     ${headers.map(h => `<td class="p-2 bg-slate-50 text-slate-700">${escapeHtml(item[h] || '')}</td>`).join('')}
+                     <td class="p-2 bg-slate-50 text-slate-700"><button class="add-to-system bg-green-500 text-white px-2 py-1 rounded" data-tombo="${escapeHtml(item['TOMBAMENTO (A1)'] || '')}">Adicionar ao Sistema</button></td>
                 </tr>
             `).join('');
+            attachAddButtons();
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
         
         // --- Event Listeners ---
@@ -324,10 +393,20 @@
             if (target.matches('input')) {
                 const docId = target.closest('tr').dataset.docId;
                 const field = target.dataset.field;
-                const newValue = target.value;
+                let newValue = target.value;
                 const oldValue = target.dataset.oldValue;
 
+                if (field === 'Cadastro' || field === 'Entrada') {
+                    // Convert back to DD/MM/YYYY if needed, but store as is
+                }
+
                 if (newValue !== oldValue) {
+                    // Validação básica
+                    if (field === 'Valor NF' && isNaN(newValue)) {
+                        alert('Valor NF deve ser um número válido.');
+                        target.value = oldValue;
+                        return;
+                    }
                     debouncedSave(docId, field, newValue, oldValue);
                     target.dataset.oldValue = newValue;
                 }
@@ -342,7 +421,105 @@
             });
         });
 
+        // Exportar CSV
+        function exportToCsv(data, filename) {
+            const csv = Papa.unparse(data);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        exportEditCsvBtn.addEventListener('click', () => {
+            exportToCsv(filteredInventory, 'inventario_editado.csv');
+        });
+
+        exportRestantesCsvBtn.addEventListener('click', () => {
+            exportToCsv(filteredRestantes, 'tombamentos_restantes.csv');
+        });
+
+        // Adicionar itens restantes
+        async function addItemToSystem(item) {
+            try {
+                const newDocRef = await addDoc(collection(db, 'patrimonio'), {
+                    ...item,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+                fullInventory.push({ id: newDocRef.id, ...item });
+                remainingTombamentos = remainingTombamentos.filter(i => i['TOMBAMENTO (A1)'] !== item['TOMBAMENTO (A1)']);
+                await logAction('Adição de Item', { details: `Item com TOMBAMENTO ${item['TOMBAMENTO (A1)']} adicionado do GIAP.` });
+                applyAllFiltersAndRender();
+            } catch (error) {
+                console.error("Erro ao adicionar item:", error);
+                alert('Erro ao adicionar item ao sistema.');
+            }
+        }
+
+        function attachAddButtons() {
+            document.querySelectorAll('.add-to-system').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tombo = btn.dataset.tombo;
+                    const item = remainingTombamentos.find(i => i['TOMBAMENTO (A1)'] === tombo);
+                    if (item) addItemToSystem(item);
+                });
+            });
+        }
+
+        addAllRestantesBtn.addEventListener('click', async () => {
+            if (confirm('Tem certeza que deseja adicionar todos os itens restantes ao sistema?')) {
+                for (const item of [...filteredRestantes]) {  // Copy to avoid modification issues
+                    await addItemToSystem(item);
+                }
+            }
+        });
+
+        // Sincronização com GIAP
+        async function syncWithGiap(docId) {
+            const item = fullInventory.find(i => i.id === docId);
+            if (!item) return;
+            const tombo = item['TOMBAMENTO (A1)']?.trim();
+            const giapItem = giapMap.get(tombo);
+            if (!giapItem) return;
+
+            const updates = {};
+            const headers = ['Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            headers.forEach(h => {
+                const newValue = giapItem[h] || '';
+                if (newValue !== (item[h] || '')) {
+                    updates[h] = newValue;
+                    item[h] = newValue;
+                }
+            });
+
+            if (Object.keys(updates).length > 0) {
+                try {
+                    const docRef = doc(db, 'patrimonio', docId);
+                    await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
+                    await logAction('Sincronização com GIAP', { itemId: docId, details: `Campos atualizados: ${Object.keys(updates).join(', ')}` });
+                    applyAllFiltersAndRender();
+                    autoSaveStatus.textContent = 'Sincronizado com sucesso!';
+                    autoSaveStatus.className = 'text-sm font-semibold status-saved';
+                } catch (error) {
+                    console.error("Erro na sincronização:", error);
+                    autoSaveStatus.textContent = 'Erro na sincronização!';
+                    autoSaveStatus.className = 'text-sm font-semibold status-error';
+                }
+            }
+        }
+
+        function attachSyncButtons() {
+            document.querySelectorAll('.sync-with-giap').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const docId = btn.dataset.docId;
+                    if (confirm('Tem certeza que deseja sincronizar este item com os dados do GIAP? Isso substituirá os campos diferentes.')) {
+                        syncWithGiap(docId);
+                    }
+                });
+            });
+        }
+
     </script>
 </body>
 </html>
-
