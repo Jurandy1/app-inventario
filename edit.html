@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,7 +72,7 @@
         </nav>
 
         <main class="container mx-auto p-4">
-            <!-- Conteúdo da aba GIAP -->
+            <!-- Aba GIAP -->
             <div id="content-giap" class="fade-in">
                 <div class="card">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -124,7 +125,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -139,7 +140,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-
         const GIAP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaVN5Oiv5eDmdJpsCCys-0TQb9q-QaOeTqakTE6wBYup2sJYnPf2_uNIYkmrI7FIvis1aUxv21vB_k/pub?output=csv';
 
         let fullInventory = [], giapInventory = [];
@@ -205,10 +205,10 @@
             });
         }
 
-        // 🟢 CORRIGIDO: agora lê "Tombamento" e "Descrição" reais
+        // ✅ Corrigido para "TOMBAMENTO"
         function compareAndInitialize() {
             systemTombamentos = new Set(fullInventory.map(i => i['Tombamento']?.trim()).filter(Boolean));
-            giapMap = new Map(giapInventory.map(i => [i['Tombamento']?.trim(), i]));
+            giapMap = new Map(giapInventory.map(i => [i['TOMBAMENTO']?.trim(), i]));
             initializePage();
         }
 
@@ -226,16 +226,16 @@
             const giapSearchTerm = (giapSearchInput.value || '').toLowerCase().trim();
             const giapSelectedUnidade = giapUnidadeFilter.value;
             filteredGiap = giapInventory.filter(i => {
-                const searchMatch = !giapSearchTerm || (i['Descrição'] || '').toLowerCase().includes(giapSearchTerm) || (i['Tombamento'] || '').toLowerCase().includes(giapSearchTerm);
+                const searchMatch = !giapSearchTerm || (i['Descrição'] || '').toLowerCase().includes(giapSearchTerm) || (i['TOMBAMENTO'] || '').toLowerCase().includes(giapSearchTerm);
                 const unidadeMatch = !giapSelectedUnidade || i.Unidade === giapSelectedUnidade;
                 return searchMatch && unidadeMatch;
             });
             renderGiapTable();
         }
 
-        // 🟢 CORRIGIDO: colunas simplificadas
+        // ✅ Corrigido para exibir números de "TOMBAMENTO"
         function renderGiapTable() {
-            const itemsNaoCadastrados = giapInventory.filter(i => !systemTombamentos.has(i['Tombamento']?.trim())).length;
+            const itemsNaoCadastrados = giapInventory.filter(i => !systemTombamentos.has(i['TOMBAMENTO']?.trim())).length;
             giapCountEl.textContent = `${giapInventory.length} itens totais`;
             giapSummaryEl.textContent = `${itemsNaoCadastrados} itens ainda não cadastrados.`;
 
@@ -244,9 +244,9 @@
                 return;
             }
 
-            const headers = ['Tombamento', 'Descrição', 'Cadastro', 'NF', 'Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
             giapTableBody.innerHTML = filteredGiap.map(item => {
-                const tombo = item['Tombamento']?.trim();
+                const tombo = item['TOMBAMENTO']?.trim();
                 const isCadastrado = systemTombamentos.has(tombo);
                 const statusHtml = isCadastrado 
                     ? `<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">Cadastrado</span>` 
@@ -254,21 +254,21 @@
                 const actionHtml = isCadastrado ? '' : `<button class="add-to-system bg-green-500 text-white px-2 py-1 text-xs rounded" data-tombo="${tombo}">Adicionar</button>`;
                 return `<tr class="border-b ${isCadastrado ? 'bg-slate-50' : 'bg-white'}">
                     <td class="p-2">${statusHtml}</td>
-                    ${headers.map(h => `<td class="p-2 text-slate-700">${item[h] || ''}</td>`).join('')}
+                    <td class="p-2 text-slate-700">${tombo}</td>
+                    ${headers.slice(1).map(h => `<td class="p-2 text-slate-700">${item[h] || ''}</td>`).join('')}
                     <td class="p-2">${actionHtml}</td>
                 </tr>`;
             }).join('');
         }
 
-        // 🟢 CORRIGIDO: criação de item com colunas simples
         async function addItemToSystem(itemFromGiap) {
-            const tombo = itemFromGiap['Tombamento']?.trim();
+            const tombo = itemFromGiap['TOMBAMENTO']?.trim();
             if (!tombo || systemTombamentos.has(tombo)) {
                 alert(`O item com tombamento ${tombo} já está cadastrado.`);
                 return;
             }
             const newItem = {
-                'Tombamento': itemFromGiap['Tombamento'] || '',
+                'Tombamento': itemFromGiap['TOMBAMENTO'] || '',
                 'Descrição': itemFromGiap['Descrição'] || '',
                 'Tipo': itemFromGiap['Tipo'] || '',
                 'Unidade': itemFromGiap['Unidade'] || '',
