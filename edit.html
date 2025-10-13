@@ -14,7 +14,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 350px); }
-        .reconciliation-container { max-height: calc(100vh - 300px); }
+        .reconciliation-container { max-height: calc(100vh - 350px); }
         .status-feedback { color: #475569; }
         .nav-btn {
             padding: 0.75rem 1rem;
@@ -128,7 +128,7 @@
                     <p class="text-sm text-slate-600 mb-4">Ligue cada 'Unidade do Sistema' a uma ou mais 'Unidades da Planilha'. As ligações são salvas no seu navegador.</p>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                             <label for="map-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo (Sistema)</label>
+                            <label for="map-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo (Sistema)</label>
                             <select id="map-filter-tipo" class="w-full p-2 border rounded-lg bg-white mb-4"></select>
                             <label for="map-system-unit-select" class="block text-sm font-medium mb-1">Unidade do Sistema</label>
                             <select id="map-system-unit-select" class="w-full p-2 border rounded-lg bg-white"></select>
@@ -136,6 +136,15 @@
                         <div class="md:col-span-2">
                             <label for="map-giap-unit-multiselect" class="block text-sm font-medium mb-1">Unidades da Planilha GIAP (Use Ctrl/Shift+Click)</label>
                             <select id="map-giap-unit-multiselect" multiple class="w-full p-2 border rounded-lg bg-white"></select>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button id="save-mapping-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Salvar Ligação</button>
+                    </div>
+                    <div class="mt-6 border-t pt-4">
+                        <h3 class="font-bold text-slate-700 mb-2">Ligações Salvas</h3>
+                        <div id="saved-mappings-container" class="space-y-2 max-h-60 overflow-y-auto">
+                            <!-- Saved mappings will be rendered here -->
                         </div>
                     </div>
                 </div>
@@ -157,10 +166,12 @@
                          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <h3 class="font-bold mb-2">Itens sem Tombamento no Sistema (<span id="recon-system-count">0</span>)</h3>
+                                <input type="text" id="recon-system-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
                                 <div id="recon-system-items-list" class="reconciliation-container overflow-y-auto border rounded-lg bg-slate-50"></div>
                             </div>
                             <div>
                                 <h3 class="font-bold mb-2">Tombamentos Disponíveis na Planilha (<span id="recon-giap-count">0</span>)</h3>
+                                <input type="text" id="recon-giap-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
                                 <div id="recon-giap-items-list" class="reconciliation-container overflow-y-auto border rounded-lg bg-slate-50"></div>
                             </div>
                          </div>
@@ -339,7 +350,6 @@
             populateGiapTab();
         }
 
-        // --- UI POPULATION FUNCTIONS ---
         function populateEditableInventoryTab() {
             const tableBody = document.getElementById('edit-table-body');
             const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
@@ -360,19 +370,39 @@
             const systemTypes = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             const giapUnits = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
             const filterTipoSelect = document.getElementById('map-filter-tipo');
-            const systemUnitSelect = document.getElementById('map-system-unit-select');
             const giapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
             
             filterTipoSelect.innerHTML = '<option value="">Todos os Tipos</option>' + systemTypes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
             giapUnitMultiselect.innerHTML = giapUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
             
             updateSystemUnitOptions();
+            renderSavedMappings();
         }
 
         function updateSystemUnitOptions() {
             const selectedType = document.getElementById('map-filter-tipo').value;
             const systemUnits = [...new Set(fullInventory.filter(i => !selectedType || i.Tipo === selectedType).map(i => i.Unidade).filter(Boolean))].sort();
             document.getElementById('map-system-unit-select').innerHTML = '<option value="">Selecione uma Unidade</option>' + systemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        }
+
+        function renderSavedMappings() {
+            const container = document.getElementById('saved-mappings-container');
+            const mappedUnits = Object.keys(unitMapping).filter(key => unitMapping[key]?.length > 0).sort();
+            if (mappedUnits.length === 0) {
+                container.innerHTML = `<p class="text-sm text-slate-500">Nenhuma ligação salva ainda.</p>`;
+                return;
+            }
+            container.innerHTML = mappedUnits.map(systemUnit => `
+                <div class="p-2 border rounded-md bg-slate-50 flex justify-between items-center">
+                    <div>
+                        <strong class="text-sm">${escapeHtml(systemUnit)}</strong>
+                        <p class="text-xs text-slate-600">→ ${unitMapping[systemUnit].join(', ')}</p>
+                    </div>
+                    <button class="delete-mapping-btn text-red-500 hover:text-red-700 p-1" data-system-unit="${escapeHtml(systemUnit)}">
+                        <svg class="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg>
+                    </button>
+                </div>
+            `).join('');
         }
 
         function populateReconciliationTab() {
@@ -385,28 +415,21 @@
             const leftoverTombosContainer = document.getElementById('leftover-tombos-container');
             const descFilter = document.getElementById('leftover-filter-desc').value.toLowerCase();
             const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-            
             const leftoverItems = giapInventory.filter(item => {
                 const tombo = (item.TOMBAMENTO || '').trim();
                 const desc = (item.Descrição || '').toLowerCase();
                 const isPermuta = tombo.toLowerCase().includes('permuta');
                 return tombo && !usedTombamentos.has(tombo) && !isPermuta && (!descFilter || desc.includes(descFilter));
             });
-
-            leftoverTombosContainer.innerHTML = leftoverItems.length > 0
-                ? leftoverItems.map(item => `
-                    <div class="p-3 border rounded-md bg-white flex justify-between items-center gap-4">
-                        <div>
-                            <strong class="font-mono">${escapeHtml(item.TOMBAMENTO)}</strong>
-                            <p class="text-sm text-slate-600">${escapeHtml(item.Descrição)}</p>
-                            <p class="text-xs text-slate-400">Unidade GIAP: ${escapeHtml(item.Unidade)} | Valor: ${escapeHtml(item['Valor NF'])} | Cadastro: ${escapeHtml(item.Cadastro)}</p>
-                        </div>
-                        <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}" data-desc="${escapeHtml(item.Descrição)}">
-                            Sugerir Vínculo
-                        </button>
+            leftoverTombosContainer.innerHTML = leftoverItems.length > 0 ? leftoverItems.map(item => `
+                <div class="p-3 border rounded-md bg-white flex justify-between items-center gap-4">
+                    <div>
+                        <strong class="font-mono">${escapeHtml(item.TOMBAMENTO)}</strong>
+                        <p class="text-sm text-slate-600">${escapeHtml(item.Descrição)}</p>
+                        <p class="text-xs text-slate-400">Unidade GIAP: ${escapeHtml(item.Unidade)} | Valor: ${escapeHtml(item['Valor NF'])} | Cadastro: ${escapeHtml(item.Cadastro)}</p>
                     </div>
-                `).join('')
-                : `<p class="text-slate-500 text-center p-4">Nenhum tombamento sobrando com o filtro atual.</p>`;
+                    <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}" data-desc="${escapeHtml(item.Descrição)}">Sugerir Vínculo</button>
+                </div>`).join('') : `<p class="text-slate-500 text-center p-4">Nenhum tombamento sobrando com o filtro atual.</p>`;
         }
         
         function populatePendingTransfersTab() {
@@ -416,28 +439,22 @@
                 const giapItem = giapMap.get(tombo);
                 return giapItem && item.Unidade !== giapItem.Unidade;
             });
-
-            pendingTransfersContainer.innerHTML = pendingTransfers.length > 0
-                ? pendingTransfers.map(item => `
-                    <div class="p-3 border rounded-md bg-red-50 text-red-800">
-                        <strong>${escapeHtml(item.Descrição)}</strong> (T: ${escapeHtml(item.Tombamento)})
-                        <p class="text-sm">Está em <strong>${escapeHtml(item.Unidade)}</strong> mas na planilha consta em <strong>${escapeHtml(giapMap.get(item.Tombamento.trim()).Unidade)}</strong>.</p>
-                    </div>
-                `).join('')
-                : `<p class="text-slate-500 text-center p-4">Nenhuma transferência pendente identificada.</p>`;
+            pendingTransfersContainer.innerHTML = pendingTransfers.length > 0 ? pendingTransfers.map(item => `
+                <div class="p-3 border rounded-md bg-red-50 text-red-800">
+                    <strong>${escapeHtml(item.Descrição)}</strong> (T: ${escapeHtml(item.Tombamento)})
+                    <p class="text-sm">Está em <strong>${escapeHtml(item.Unidade)}</strong> mas na planilha consta em <strong>${escapeHtml(giapMap.get(item.Tombamento.trim()).Unidade)}</strong>.</p>
+                </div>`).join('') : `<p class="text-slate-500 text-center p-4">Nenhuma transferência pendente identificada.</p>`;
         }
 
         function populateGiapTab() {
             const giapTableBody = document.getElementById('giap-table-body');
             const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
-             giapTableBody.innerHTML = giapInventory.map(item => `
+            giapTableBody.innerHTML = giapInventory.map(item => `
                 <tr class="border-b">
                     ${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}
-                </tr>
-            `).join('');
+                </tr>`).join('');
         }
         
-        // --- EVENT LISTENERS ---
         forceRefreshBtn.addEventListener('click', () => { if (confirm("Forçar a atualização?")) loadData(true); });
         logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
         navButtons.forEach(button => {
@@ -488,7 +505,7 @@
             const mappedGiap = unitMapping[selectedUnit] || [];
             Array.from(document.getElementById('map-giap-unit-multiselect').options).forEach(opt => opt.selected = mappedGiap.includes(opt.value));
         });
-        document.getElementById('map-giap-unit-multiselect').addEventListener('change', async () => {
+        document.getElementById('save-mapping-btn').addEventListener('click', async () => {
             const systemUnit = document.getElementById('map-system-unit-select').value;
             if (!systemUnit) return alert("Selecione uma Unidade do Sistema primeiro.");
             const giapUnits = Array.from(document.getElementById('map-giap-unit-multiselect').selectedOptions).map(opt => opt.value);
@@ -496,49 +513,83 @@
             await idb.unitMapping.put({ systemUnit, giapUnits });
             feedbackStatus.textContent = `Mapeamento para '${systemUnit}' salvo!`;
             populateReconciliationTab();
+            renderSavedMappings();
+        });
+        document.getElementById('saved-mappings-container').addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.delete-mapping-btn');
+            if (deleteBtn) {
+                const systemUnit = deleteBtn.dataset.systemUnit;
+                if (confirm(`Tem certeza que deseja deletar a ligação para "${systemUnit}"?`)) {
+                    delete unitMapping[systemUnit];
+                    await idb.unitMapping.delete(systemUnit);
+                    feedbackStatus.textContent = `Ligação para '${systemUnit}' removida.`;
+                    renderSavedMappings();
+                    populateReconciliationTab();
+                    if (document.getElementById('map-system-unit-select').value === systemUnit) {
+                        Array.from(document.getElementById('map-giap-unit-multiselect').options).forEach(opt => opt.selected = false);
+                    }
+                }
+            }
         });
 
-        document.getElementById('recon-unit-select').addEventListener('change', (e) => {
-            const systemUnit = e.target.value;
+        const reconUnitSelect = document.getElementById('recon-unit-select');
+        const reconSystemFilter = document.getElementById('recon-system-filter');
+        const reconGiapFilter = document.getElementById('recon-giap-filter');
+        reconUnitSelect.addEventListener('change', renderReconciliationWorkspace);
+        reconSystemFilter.addEventListener('input', renderReconciliationWorkspace);
+        reconGiapFilter.addEventListener('input', renderReconciliationWorkspace);
+
+        function renderReconciliationWorkspace() {
+            const systemUnit = reconUnitSelect.value;
             const workspace = document.getElementById('reconciliation-workspace');
             if (!systemUnit) { workspace.classList.add('hidden'); return; }
             
             const mappedGiapUnits = unitMapping[systemUnit] || [];
-            const systemItems = fullInventory.filter(i => i.Unidade === systemUnit && !i.Tombamento?.trim());
+            const systemFilterText = reconSystemFilter.value.toLowerCase();
+            const giapFilterText = reconGiapFilter.value.toLowerCase();
             const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-            const giapItems = giapInventory.filter(i => {
+
+            let systemItems = fullInventory.filter(i => i.Unidade === systemUnit && !i.Tombamento?.trim() && (i.Descrição || '').toLowerCase().includes(systemFilterText));
+            let giapItems = giapInventory.filter(i => {
                 const tombo = i.TOMBAMENTO?.trim();
-                return mappedGiapUnits.includes(i.Unidade) && tombo && !usedTombamentos.has(tombo);
+                const desc = (i.Descrição || '').toLowerCase();
+                return mappedGiapUnits.includes(i.Unidade) && tombo && !usedTombamentos.has(tombo) && desc.includes(giapFilterText);
             });
 
-            const renderItem = (item, type) => {
-                return `<div class="reconciliation-list-item p-3 border-b" data-id="${type === 'system' ? item.id : escapeHtml(item.TOMBAMENTO)}">
-                    <strong>${escapeHtml(item.Descrição)}</strong>
-                    <p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p>
-                    <p class="text-xs text-slate-500">Estado: ${escapeHtml(item.Estado || 'N/A')} | Localização: ${escapeHtml(item.Localização || 'N/A')}</p>
-                </div>`;
-            };
+            systemItems.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
+            giapItems.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
 
+            const renderItem = (item, type) => {
+                if (type === 'system') {
+                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${item.id}">
+                        <strong>${escapeHtml(item.Descrição)}</strong>
+                        <p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado || 'N/A')}</p>
+                        <p class="text-xs text-slate-500">Localização: ${escapeHtml(item.Localização || 'N/A')}</p>
+                    </div>`;
+                } else { // type === 'giap'
+                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}">
+                        <strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong>
+                        <p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p>
+                        <p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p>
+                    </div>`;
+                }
+            };
             document.getElementById('recon-system-items-list').innerHTML = systemItems.map(item => renderItem(item, 'system')).join('') || `<p class="p-4 text-slate-500">Nenhum item sem tombo.</p>`;
             document.getElementById('recon-giap-items-list').innerHTML = giapItems.map(item => renderItem(item, 'giap')).join('') || `<p class="p-4 text-slate-500">Nenhum tombo disponível.</p>`;
-            
             document.getElementById('recon-system-count').textContent = '0';
             document.getElementById('recon-giap-count').textContent = '0';
             document.getElementById('link-selected-btn').disabled = true;
             workspace.classList.remove('hidden');
-        });
+        }
 
         function handleReconSelection(e) {
             const itemEl = e.target.closest('.reconciliation-list-item');
             if (!itemEl) return;
             itemEl.classList.toggle('selected');
-            
             const systemSelected = document.querySelectorAll('#recon-system-items-list .selected').length;
             const giapSelected = document.querySelectorAll('#recon-giap-items-list .selected').length;
-
             document.getElementById('recon-system-count').textContent = systemSelected;
             document.getElementById('recon-giap-count').textContent = giapSelected;
-
             document.getElementById('link-selected-btn').disabled = !(systemSelected > 0 && systemSelected === giapSelected);
         }
 
@@ -564,20 +615,16 @@
                     updatedItem.NF = giapItem.NF;
                     updatedItem.Tipo = giapItem.Tipo;
                     updatedItem.Estado = systemItem.Estado || 'Bom';
-                    
                     dirtyItems.set(systemId, updatedItem);
-                    
                     const itemIndex = fullInventory.findIndex(i => i.id === systemId);
                     if (itemIndex !== -1) fullInventory[itemIndex] = updatedItem;
-
                     systemNode.classList.add('linked');
                     giapNode.classList.add('linked');
                 }
             });
-            
             document.getElementById('save-all-changes-btn').disabled = false;
-            feedbackStatus.textContent = `${selectedSystemNodes.length} item(s) vinculado(s)! Salve as alterações na aba 'Inventário Editável'.`;
-            document.getElementById('recon-unit-select').dispatchEvent(new Event('change'));
+            feedbackStatus.textContent = `${selectedSystemNodes.length} item(s) vinculado(s)! Salve as alterações.`;
+            renderReconciliationWorkspace();
         });
         
         document.getElementById('leftover-filter-desc').addEventListener('input', populateLeftoverTombosTab);
