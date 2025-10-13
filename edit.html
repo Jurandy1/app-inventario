@@ -211,12 +211,6 @@
 
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
 
-        function invalidateCache() {
-            console.log("Cache invalidado devido a uma alteração nos dados.");
-            localStorage.removeItem('patrimonioEditCache');
-            localStorage.removeItem('patrimonioCache_fullList'); // Invalida o cache da página principal também
-        }
-
         const debouncedSave = debounce(async (itemId, field, value, oldValue) => {
             autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando...`;
             autoSaveStatus.className = 'text-sm font-semibold status-saving';
@@ -225,7 +219,6 @@
                 await updateDoc(docRef, { [field]: value, updatedAt: serverTimestamp() });
                 const item = fullInventory.find(i => i.id === itemId);
                 if (item) item[field] = value; 
-                invalidateCache();
                 await logAction('Edição em Massa', { itemId, details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.` });
                 autoSaveStatus.textContent = 'Salvo com sucesso!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
@@ -269,38 +262,42 @@
 
         async function loadAllData() {
             try {
-                await loadFirebaseInventory();
-                const giapData = await loadGiapInventory();
+                // Now load both in parallel
+                const [_, giapData] = await Promise.all([
+                    loadFirebaseInventory(),
+                    loadGiapInventory()
+                ]);
                 giapInventory = giapData;
                 compareAndInitialize();
             } catch (error) {
                 console.error("Erro fatal ao carregar dados:", error);
-                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar Dados</h2><p class="text-slate-600 mt-2">Não foi possível carregar os dados. Verifique a conexão e o link da planilha.</p><p class="text-xs text-slate-400 mt-4">${error.message}</p></div>`;
+                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar Dados</h2><p class="text-slate-600 mt-2">${error.message}</p></div>`;
             }
         }
 
         async function loadFirebaseInventory() {
-            const cacheKey = 'patrimonioEditCache';
-            const cachedData = localStorage.getItem(cacheKey);
-
-            if (cachedData) {
-                const { timestamp, items } = JSON.parse(cachedData);
-                if (Date.now() - timestamp < 4 * 60 * 60 * 1000) { // Cache de 4 horas
-                    console.log("Carregando inventário do cache local.");
-                    fullInventory = items;
-                    return;
-                }
+            console.log("Buscando inventário do Firestore.");
+            try {
+                const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
+                fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+                console.error("Erro ao buscar inventário do Firebase:", error);
+                throw new Error("Falha ao comunicar com o banco de dados. Verifique sua conexão.");
             }
-            
-            console.log("Buscando inventário do Firestore (sem cache ou cache expirado).");
-            const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
-            fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: fullInventory }));
         }
 
         function loadGiapInventory() {
             return new Promise((resolve, reject) => {
-                Papa.parse(GIAP_SHEET_URL, { download: true, header: true, skipEmptyLines: true, complete: (results) => resolve(results.data), error: (err) => reject(err) });
+                Papa.parse(GIAP_SHEET_URL, { 
+                    download: true, 
+                    header: true, 
+                    skipEmptyLines: true, 
+                    complete: (results) => resolve(results.data), 
+                    error: (err) => {
+                        console.error("Erro ao carregar planilha GIAP:", err);
+                        reject(new Error("Não foi possível carregar a planilha GIAP. Verifique o link e a conexão."));
+                    }
+                });
             });
         }
         
@@ -316,11 +313,9 @@
         }
         
         function populateFilters() {
-            // Filtros da aba Inventário
             const tiposUnidade = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
             tipoUnidadeFilter.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tiposUnidade.map(u => `<option value="${u}">${u}</option>`).join('');
 
-            // Filtros da aba GIAP
             const unidadesGiap = [...new Set(giapInventory.map(item => item.Unidade).filter(Boolean))].sort();
             giapUnidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidadesGiap.map(u => `<option value="${u}">${u}</option>`).join('');
         }
@@ -521,7 +516,7 @@
                 const newDocRef = await addDoc(collection(db, 'patrimonio'), { ...newItem, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 fullInventory.push({ id: newDocRef.id, ...newItem });
                 systemTombamentos.add(tombo);
-                invalidateCache();
+                // No need to invalidate cache, we will reload on next page visit
                 await logAction('Adição via GIAP', { details: `Item com TOMBAMENTO ${tombo} adicionado.` });
                 applyAllFiltersAndRender();
             } catch (error) { console.error("Erro ao adicionar item:", error); alert('Erro ao adicionar item ao sistema.'); }
@@ -534,7 +529,6 @@
                 autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Adicionando ${itemsToAdd.length} itens...`;
                 let count = 0;
                 for (const item of itemsToAdd) { await addItemToSystem(item); count++; }
-                invalidateCache();
                 await logAction('Adição em Massa via GIAP', { details: `${count} de ${itemsToAdd.length} itens adicionados.` });
                 autoSaveStatus.textContent = `${count} itens adicionados com sucesso!`;
                 applyAllFiltersAndRender();
@@ -548,7 +542,6 @@
                 await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
                 const item = fullInventory.find(i => i.id === docId);
                 if (item) { Object.assign(item, updates); }
-                invalidateCache();
                 await logAction('Preenchimento Automático', { itemId: docId, details: `Dados preenchidos via tombamento ${updates['Tombamento']}.` });
                 autoSaveStatus.textContent = 'Dados preenchidos e salvos!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
@@ -578,7 +571,6 @@
                     const docRef = doc(db, 'patrimonio', docId);
                     await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
                     Object.assign(item, updates);
-                    invalidateCache();
                     await logAction('Sincronização com GIAP', { itemId: docId, details: `Campos atualizados: ${Object.keys(updates).join(', ')}` });
                     applyAllFiltersAndRender();
                     autoSaveStatus.textContent = 'Sincronizado com sucesso!';
