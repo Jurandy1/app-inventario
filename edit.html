@@ -14,7 +14,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 350px); }
-        .reconciliation-container { max-height: calc(100vh - 450px); }
+        .reconciliation-container { max-height: calc(100vh - 300px); }
         .status-feedback { color: #475569; }
         .nav-btn {
             padding: 0.75rem 1rem;
@@ -38,39 +38,14 @@
         .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        table { table-layout: fixed; }
-        th, td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .is-dirty { background-color: #fef9c3 !important; }
-        .is-divergent { background-color: #feefc7 !important; }
         select[multiple] { height: 150px; }
-        .step-number {
-            background-color: #3b82f6;
-            color: white;
-            border-radius: 9999px;
-            width: 2rem;
-            height: 2rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-right: 0.75rem;
-        }
-        .reconciliation-list-item {
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .reconciliation-list-item:hover {
-            background-color: #eff6ff;
-        }
-        .reconciliation-list-item.selected {
-            background-color: #dbeafe;
-            border-left: 4px solid #3b82f6;
-        }
-        .reconciliation-list-item.linked {
-            background-color: #f0fdf4;
-            opacity: 0.6;
-            pointer-events: none;
-        }
+        .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal-container { transition: all 0.3s ease; max-height: 90vh; }
+        .reconciliation-list-item { cursor: pointer; transition: background-color 0.2s; }
+        .reconciliation-list-item:hover { background-color: #eff6ff; }
+        .reconciliation-list-item.selected { background-color: #dbeafe; border-left: 4px solid #3b82f6; }
+        .reconciliation-list-item.linked { background-color: #f0fdf4; opacity: 0.6; pointer-events: none; }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -102,8 +77,11 @@
         <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
             <div class="container mx-auto px-4">
                 <div id="edit-nav" class="flex space-x-1 overflow-x-auto">
-                    <button class="nav-btn" data-tab="edicao">✏️ Inventário</button>
-                    <button class="nav-btn active" data-tab="reconciliation">🔗 Conciliação de Unidades</button>
+                    <button class="nav-btn" data-tab="edicao">✏️ Inventário Editável</button>
+                    <button class="nav-btn" data-tab="unidades">🔗 Ligar Unidades</button>
+                    <button class="nav-btn active" data-tab="conciliar">🤝 Conciliar Itens</button>
+                    <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
+                    <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
                     <button class="nav-btn" data-tab="giap">📋 Planilha GIAP</button>
                 </div>
             </div>
@@ -111,39 +89,30 @@
 
         <main class="container mx-auto p-4">
             
-            <!-- ABA: Edição em Massa (Inventário do Sistema) -->
+            <!-- ABA: Inventário Editável -->
             <div id="content-edicao" class="hidden fade-in">
-                <div class="card">
-                    <!-- Painel de Filtros Aprimorado -->
-                    <div id="filter-panel" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b border-slate-200">
-                        <div>
-                            <label for="main-filter-descricao" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
-                            <input type="text" id="main-filter-descricao" class="w-full p-2 border rounded-lg" placeholder="Digite para buscar...">
-                        </div>
-                        <div>
-                            <label for="main-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
-                            <select id="main-filter-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                        </div>
-                        <div>
-                            <label for="main-filter-unidade" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
-                            <select id="main-filter-unidade" class="w-full p-2 border rounded-lg bg-white"></select>
-                        </div>
+                 <div class="card">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <!-- Filtros aqui -->
                     </div>
-                    <!-- Painel de Ações -->
-                    <div class="flex items-center gap-4 flex-wrap">
-                        <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed" disabled>Salvar Alterações</button>
-                    </div>
+                    <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Salvar Alterações</button>
                 </div>
-
                 <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1700px]">
+                        <table class="w-full text-sm min-w-[1800px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
                                     <th class="p-3 text-left font-semibold">Tombamento</th>
                                     <th class="p-3 text-left font-semibold">Descrição</th>
                                     <th class="p-3 text-left font-semibold">Tipo</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
+                                    <th class="p-3 text-left font-semibold">Localização</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
+                                    <th class="p-3 text-left font-semibold">Origem da Doação</th>
+                                    <th class="p-3 text-left font-semibold">Estado</th>
+                                    <th class="p-3 text-left font-semibold">Quantidade</th>
+                                    <th class="p-3 text-left font-semibold">Observação</th>
                                 </tr>
                             </thead>
                             <tbody id="edit-table-body"></tbody>
@@ -152,90 +121,83 @@
                 </div>
             </div>
 
-            <!-- ABA: Conciliação de Unidades -->
-            <div id="content-reconciliation" class="fade-in">
+            <!-- ABA: Ligar Unidades -->
+            <div id="content-unidades" class="hidden fade-in">
                 <div class="card">
-                    <div class="mb-6">
-                        <h2 class="text-xl font-bold text-slate-800 flex items-center"><span class="step-number">1</span>Ligar Unidades</h2>
-                        <p class="text-sm text-slate-600 ml-12">Selecione uma unidade do seu sistema e depois escolha as unidades correspondentes da planilha GIAP. Isso ensina o sistema a comparar os dados corretamente. As ligações são salvas no seu navegador.</p>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 ml-12">
-                            <div>
-                                <label for="recon-system-unit-select" class="block text-sm font-medium mb-1">Unidade do Sistema</label>
-                                <select id="recon-system-unit-select" class="w-full p-2 border rounded-lg bg-white"></select>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label for="recon-giap-unit-multiselect" class="block text-sm font-medium mb-1">Unidades da Planilha GIAP (Use Ctrl/Shift+Click para selecionar várias)</label>
-                                <select id="recon-giap-unit-multiselect" multiple class="w-full p-2 border rounded-lg bg-white"></select>
-                            </div>
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">Mapeamento de Unidades</h2>
+                    <p class="text-sm text-slate-600 mb-4">Ligue cada 'Unidade do Sistema' a uma ou mais 'Unidades da Planilha'. As ligações são salvas no seu navegador.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label for="map-system-unit-select" class="block text-sm font-medium mb-1">Unidade do Sistema</label>
+                            <select id="map-system-unit-select" class="w-full p-2 border rounded-lg bg-white"></select>
                         </div>
-                    </div>
-
-                    <div class="mb-6 border-t pt-6">
-                        <h2 class="text-xl font-bold text-slate-800 flex items-center"><span class="step-number">2</span>Conciliar Itens Sem Tombamento</h2>
-                        <p class="text-sm text-slate-600 ml-12">Após ligar as unidades, o sistema mostrará abaixo os itens sem tombamento do seu sistema e os tombamentos disponíveis da planilha. Clique em um item de cada lado para ligá-los.</p>
-                        <div id="reconciliation-workspace" class="hidden mt-4 ml-12">
-                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <h3 class="font-bold mb-2">Itens sem Tombamento no Sistema</h3>
-                                    <div id="recon-system-items-list" class="reconciliation-container overflow-y-auto border rounded-lg p-2 bg-slate-50"></div>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold mb-2">Tombamentos Disponíveis na Planilha</h3>
-                                    <div id="recon-giap-items-list" class="reconciliation-container overflow-y-auto border rounded-lg p-2 bg-slate-50"></div>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
-
-                    <div class="border-t pt-6">
-                        <h2 class="text-xl font-bold text-slate-800 flex items-center"><span class="step-number">3</span>Finalizar e Ver Resultados</h2>
-                        <p class="text-sm text-slate-600 ml-12">Quando terminar de ligar os itens de uma unidade, clique em "Finalizar Conciliação". O sistema irá gerar relatórios de tombamentos que sobraram e possíveis transferências pendentes.</p>
-                        <div class="mt-4 ml-12">
-                             <button id="finalize-reconciliation-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-slate-400" disabled>Finalizar Conciliação da Unidade Selecionada</button>
-                        </div>
-                        <div id="reconciliation-results" class="hidden mt-6 ml-12 space-y-6">
-                            <div>
-                                <h3 class="font-bold text-lg text-yellow-700">⚠️ Tombamentos Sobrando</h3>
-                                <p class="text-sm text-slate-500 mb-2">Estes tombamentos constam na planilha para as unidades ligadas, mas não foram associados a nenhum item do seu sistema.</p>
-                                <div id="recon-leftover-list" class="space-y-2"></div>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-lg text-red-700">🚨 Transferências Pendentes Identificadas</h3>
-                                <p class="text-sm text-slate-500 mb-2">Estes itens no seu sistema possuem um tombamento que, na planilha GIAP, está registrado em uma unidade diferente.</p>
-                                <div id="recon-transfer-list" class="space-y-2"></div>
-                            </div>
+                        <div class="md:col-span-2">
+                            <label for="map-giap-unit-multiselect" class="block text-sm font-medium mb-1">Unidades da Planilha GIAP (Use Ctrl/Shift+Click)</label>
+                            <select id="map-giap-unit-multiselect" multiple class="w-full p-2 border rounded-lg bg-white"></select>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- ABA: Planilha GIAP Completa -->
-            <div id="content-giap" class="hidden fade-in">
+            
+            <!-- ABA: Conciliar Itens -->
+            <div id="content-conciliar" class="fade-in">
                  <div class="card">
-                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div class="md:col-span-1">
-                             <label for="giap-search-input" class="block text-sm font-medium mb-1">Buscar na Planilha GIAP</label>
-                            <input type="text" id="giap-search-input" placeholder="Buscar por tombo, descrição..." class="w-full p-2 border rounded-lg">
-                        </div>
-                         <div>
-                            <label for="giap-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade (GIAP)</label>
-                            <select id="giap-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
-                        </div>
-                        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center flex flex-col justify-center">
-                            <p id="giap-summary" class="text-sm text-blue-800">Carregando resumo da planilha...</p>
-                            <p id="giap-count" class="text-2xl font-bold text-blue-600">0</p>
-                        </div>
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">Conciliar Itens Sem Tombamento</h2>
+                    <p class="text-sm text-slate-600 mb-4">Selecione uma unidade do seu sistema que já foi ligada. O sistema mostrará os itens sem tombo e os tombamentos disponíveis para você vincular.</p>
+                    <div>
+                        <label for="recon-unit-select" class="block text-sm font-medium mb-1">Selecione a Unidade do Sistema para Conciliar</label>
+                        <select id="recon-unit-select" class="w-full p-2 border rounded-lg bg-white max-w-md"></select>
                     </div>
+                    <div id="reconciliation-workspace" class="hidden mt-6">
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="font-bold mb-2">Itens sem Tombamento no Sistema</h3>
+                                <div id="recon-system-items-list" class="reconciliation-container overflow-y-auto border rounded-lg p-2 bg-slate-50"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-bold mb-2">Tombamentos Disponíveis na Planilha</h3>
+                                <div id="recon-giap-items-list" class="reconciliation-container overflow-y-auto border rounded-lg p-2 bg-slate-50"></div>
+                            </div>
+                         </div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- ABA: Tombos Sobrando -->
+            <div id="content-sobrando" class="hidden fade-in">
+                <div class="card">
+                     <h2 class="text-xl font-bold text-slate-800 mb-2">Tombamentos da Planilha Sem Vínculo</h2>
+                     <p class="text-sm text-slate-600 mb-4">Esta lista mostra os tombamentos da planilha que ainda não foram associados a nenhum item. Use "Sugerir" para encontrar possíveis correspondências.</p>
+                     <div id="leftover-tombos-container" class="reconciliation-container overflow-y-auto space-y-2"></div>
                 </div>
-                <div class="card mt-6 p-0 overflow-hidden">
+            </div>
+
+            <!-- ABA: Transferências -->
+            <div id="content-transferencias" class="hidden fade-in">
+                <div class="card">
+                     <h2 class="text-xl font-bold text-slate-800 mb-2">Transferências Pendentes</h2>
+                     <p class="text-sm text-slate-600 mb-4">Itens com tombamento registrado em uma unidade diferente na planilha GIAP.</p>
+                     <div id="pending-transfers-container" class="reconciliation-container overflow-y-auto space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- ABA: Planilha GIAP -->
+            <div id="content-giap" class="hidden fade-in">
+                <div class="card p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
                         <table class="w-full text-sm min-w-[1800px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
-                                    <th class="p-3 text-left font-semibold">Status</th>
-                                    <th class="p-3 text-left font-semibold">Tombamento</th>
+                                    <th class="p-3 text-left font-semibold">TOMBAMENTO</th>
                                     <th class="p-3 text-left font-semibold">Descrição</th>
+                                    <th class="p-3 text-left font-semibold">Cadastro</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tipo</th>
+                                    <th class="p-3 text-left font-semibold">Entrada</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
+                                    <th class="p-3 text-left font-semibold">Valor NF</th>
+                                    <th class="p-3 text-left font-semibold">Espécie</th>
                                 </tr>
                             </thead>
                             <tbody id="giap-table-body"></tbody>
@@ -246,13 +208,28 @@
         </main>
     </div>
     
+    <!-- Modals -->
+    <div id="suggestion-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div>
+        <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <!-- Content injected by JS -->
+        </div>
+    </div>
+    
+    <div id="link-confirmation-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div>
+        <div class="modal-container bg-white w-full max-w-4xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <!-- Content injected by JS -->
+        </div>
+    </div>
+    
     <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
         <div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando e analisando dados...</p></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -270,21 +247,17 @@
         
         const GIAP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaVN5Oiv5eDmdJpsCCys-0TQb9q-QaOeTqakTE6wBYup2sJYnPf2_uNIYkmrI7FIvis1aUxv21vB_k/pub?output=csv';
 
-        // --- IndexedDB Cache Setup ---
         const idb = new Dexie('InventoryDB');
         idb.version(2).stores({
-            patrimonio: 'id',
-            giap: '++_id',
-            metadata: 'key',
-            unitMapping: 'systemUnit'
+            patrimonio: 'id', giap: '++_id', metadata: 'key', unitMapping: 'systemUnit'
         });
-        const CACHE_DURATION_MS = 4 * 60 * 60 * 1000; // 4 hours
+        const CACHE_DURATION_MS = 4 * 60 * 60 * 1000;
 
         let fullInventory = [], giapInventory = [];
         let giapMap = new Map();
         let unitMapping = {};
+        let dirtyItems = new Map(); // Store full updated objects
         
-        // DOM Elements
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
         const feedbackStatus = document.getElementById('feedback-status');
@@ -292,36 +265,8 @@
         const logoutBtn = document.getElementById('logout-btn');
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
-
-        // Main Inventory Tab Elements
-        const mainFilterDescricao = document.getElementById('main-filter-descricao');
-        const mainFilterTipo = document.getElementById('main-filter-tipo');
-        const mainFilterUnidade = document.getElementById('main-filter-unidade');
-        const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
-        const editTableBody = document.getElementById('edit-table-body');
-
-        // GIAP Tab Elements
-        const giapTableBody = document.getElementById('giap-table-body');
-        const giapSearchInput = document.getElementById('giap-search-input');
-        const giapUnidadeFilter = document.getElementById('giap-unidade-filter');
-        const giapCountEl = document.getElementById('giap-count');
-        const giapSummaryEl = document.getElementById('giap-summary');
-
-        // Reconciliation Tab Elements
-        const reconSystemUnitSelect = document.getElementById('recon-system-unit-select');
-        const reconGiapUnitMultiselect = document.getElementById('recon-giap-unit-multiselect');
-        const reconciliationWorkspace = document.getElementById('reconciliation-workspace');
-        const reconSystemItemsList = document.getElementById('recon-system-items-list');
-        const reconGiapItemsList = document.getElementById('recon-giap-items-list');
-        const finalizeReconciliationBtn = document.getElementById('finalize-reconciliation-btn');
-        const reconciliationResults = document.getElementById('reconciliation-results');
-        const reconLeftoverList = document.getElementById('recon-leftover-list');
-        const reconTransferList = document.getElementById('recon-transfer-list');
         
-        let selectedSystemItem = null;
-        let selectedGiapItem = null;
-        let dirtyItems = new Set();
-
+        // --- AUTH & DATA LOADING ---
         onAuthStateChanged(auth, user => {
             if (user) {
                 document.getElementById('user-email-edit').textContent = user.email;
@@ -376,246 +321,286 @@
         
         async function loadUnitMappingFromDB() {
             const mappingArray = await idb.unitMapping.toArray();
-            return mappingArray.reduce((acc, curr) => {
-                acc[curr.systemUnit] = curr.giapUnits;
-                return acc;
-            }, {});
+            return mappingArray.reduce((acc, curr) => { acc[curr.systemUnit] = curr.giapUnits; return acc; }, {});
         }
 
         function initializeUI() {
+            populateEditableInventoryTab();
+            populateUnitMappingTab();
             populateReconciliationTab();
-            populateMainFilters();
+            populateLeftoverTombosTab();
+            populatePendingTransfersTab();
             populateGiapTab();
-            applyMainFiltersAndRender();
+        }
+
+        // --- UI POPULATION FUNCTIONS ---
+        function populateEditableInventoryTab() {
+            const tableBody = document.getElementById('edit-table-body');
+            const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+            const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
+            
+            tableBody.innerHTML = fullInventory.map(item => {
+                const itemData = dirtyItems.get(item.id) || item;
+                const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
+                
+                return `
+                <tr id="row-${item.id}" data-doc-id="${item.id}" class="${dirtyItems.has(item.id) ? 'is-dirty' : ''}">
+                    ${headers.map(h => {
+                        if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
+                        const value = escapeHtml(itemData[h]);
+                        const inputType = (h === 'Quantidade') ? 'number' : 'text';
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
+                    }).join('')}
+                </tr>`;
+            }).join('');
         }
         
-        // --- INVENTORY TAB LOGIC ---
-        function populateMainFilters() {
-            const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
-            mainFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-            updateUnidadeMainFilter();
-        }
-
-        function updateUnidadeMainFilter() {
-            const selectedTipo = mainFilterTipo.value;
-            const unidades = [...new Set(fullInventory.filter(i => !selectedTipo || i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
-            mainFilterUnidade.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-        }
-
-        function applyMainFiltersAndRender() {
-            const descFiltro = mainFilterDescricao.value.toLowerCase().trim();
-            const tipoFiltro = mainFilterTipo.value;
-            const unidadeFiltro = mainFilterUnidade.value;
-            
-            const filtered = fullInventory.filter(item => 
-                (!descFiltro || (item.Descrição || '').toLowerCase().includes(descFiltro)) &&
-                (!tipoFiltro || item.Tipo === tipoFiltro) &&
-                (!unidadeFiltro || item.Unidade === unidadeFiltro)
-            );
-            renderEditTable(filtered);
-        }
-
-        function renderEditTable(items) {
-             editTableBody.innerHTML = items.length > 0
-                ? items.map(item => `
-                    <tr id="row-${item.id}" data-doc-id="${item.id}" class="${dirtyItems.has(item.id) ? 'is-dirty' : ''}">
-                        <td class="p-2 border-b"><input data-field="Tombamento" class="w-full p-1 border rounded" value="${escapeHtml(item.Tombamento)}"></td>
-                        <td class="p-2 border-b">${escapeHtml(item.Descrição)}</td>
-                        <td class="p-2 border-b">${escapeHtml(item.Tipo)}</td>
-                        <td class="p-2 border-b">${escapeHtml(item.Unidade)}</td>
-                    </tr>
-                `).join('')
-                : `<tr><td colspan="4" class="text-center p-8 text-slate-500">Nenhum item encontrado.</td></tr>`;
-        }
-        
-        // --- GIAP TAB LOGIC ---
-        function populateGiapTab() {
-             const unidadesGiap = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
-             giapUnidadeFilter.innerHTML = '<option value="">Todas as Unidades</option>' + unidadesGiap.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-             applyGiapFiltersAndRender();
-        }
-
-        function applyGiapFiltersAndRender() {
-            const searchTerm = giapSearchInput.value.toLowerCase().trim();
-            const unidadeFiltro = giapUnidadeFilter.value;
-            const systemTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-
-            const filtered = giapInventory.filter(item => 
-                (!searchTerm || (item.Descrição || '').toLowerCase().includes(searchTerm) || (item.TOMBAMENTO || '').toLowerCase().includes(searchTerm)) &&
-                (!unidadeFiltro || item.Unidade === unidadeFiltro)
-            );
-            
-            giapSummaryEl.textContent = `${giapInventory.length} itens na planilha.`;
-            giapCountEl.textContent = `${giapInventory.filter(i => !systemTombamentos.has(i.TOMBAMENTO?.trim())).length} não cadastrados.`;
-
-            giapTableBody.innerHTML = filtered.length > 0
-                ? filtered.map(item => {
-                    const tombo = item.TOMBAMENTO?.trim();
-                    const isCadastrado = systemTombamentos.has(tombo);
-                    const statusHtml = isCadastrado 
-                        ? `<span class="text-xs font-bold text-green-600">Cadastrado</span>` 
-                        : `<span class="text-xs font-bold text-yellow-600">Não Cadastrado</span>`;
-                    return `
-                        <tr class="border-b">
-                            <td class="p-2">${statusHtml}</td>
-                            <td class="p-2">${escapeHtml(tombo)}</td>
-                            <td class="p-2">${escapeHtml(item.Descrição)}</td>
-                            <td class="p-2">${escapeHtml(item.Unidade)}</td>
-                        </tr>`;
-                }).join('')
-                : `<tr><td colspan="4" class="text-center p-8 text-slate-500">Nenhum item encontrado.</td></tr>`;
-        }
-
-        // --- RECONCILIATION TAB LOGIC ---
-        function populateReconciliationTab() {
+        function populateUnitMappingTab() {
             const systemUnits = [...new Set(fullInventory.map(i => i.Unidade).filter(Boolean))].sort();
             const giapUnits = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
+            const systemUnitSelect = document.getElementById('map-system-unit-select');
+            const giapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
+            
+            systemUnitSelect.innerHTML = '<option value="">Selecione uma Unidade</option>' + systemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+            giapUnitMultiselect.innerHTML = giapUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        }
 
-            reconSystemUnitSelect.innerHTML = '<option value="">Selecione uma Unidade do Sistema</option>' + systemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-            reconGiapUnitMultiselect.innerHTML = giapUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        function populateReconciliationTab() {
+            const reconUnitSelect = document.getElementById('recon-unit-select');
+            const mappedSystemUnits = Object.keys(unitMapping).filter(key => unitMapping[key].length > 0).sort();
+            reconUnitSelect.innerHTML = '<option value="">Selecione uma Unidade Mapeada</option>' + mappedSystemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
         }
         
-        function renderReconciliationWorkspace(systemUnit, mappedGiapUnits) {
-            reconciliationWorkspace.classList.remove('hidden');
-            finalizeReconciliationBtn.disabled = false;
-
-            const systemItemsToReconcile = fullInventory.filter(i => i.Unidade === systemUnit && (!i.Tombamento || i.Tombamento.trim() === ''));
-            const usedGiapTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-            const giapItemsToReconcile = giapInventory.filter(i => {
-                const tombo = i.TOMBAMENTO?.trim();
-                return mappedGiapUnits.includes(i.Unidade) && tombo && !usedGiapTombamentos.has(tombo);
+        function populateLeftoverTombosTab() {
+            const leftoverTombosContainer = document.getElementById('leftover-tombos-container');
+            const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
+            const leftoverItems = giapInventory.filter(item => {
+                const tombo = (item.TOMBAMENTO || '').trim();
+                const isPermuta = (item.TOMBAMENTO || '').toLowerCase().includes('permuta');
+                return tombo && !usedTombamentos.has(tombo) && !isPermuta;
             });
 
-            reconSystemItemsList.innerHTML = systemItemsToReconcile.length > 0 
-                ? systemItemsToReconcile.map(item => `<div class="reconciliation-list-item p-2 border-b" data-item-id="${item.id}"><strong>${escapeHtml(item.Descrição)}</strong></div>`).join('')
-                : `<p class="p-4 text-slate-500 text-sm">Nenhum item sem tombamento nesta unidade.</p>`;
-
-            reconGiapItemsList.innerHTML = giapItemsToReconcile.length > 0
-                ? giapItemsToReconcile.map(item => `<div class="reconciliation-list-item p-2 border-b" data-item-tombo="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)}</strong><br><span class="text-xs text-slate-600">${escapeHtml(item.Descrição)}</span></div>`).join('')
-                : `<p class="p-4 text-slate-500 text-sm">Nenhum tombamento disponível ou todos já foram usados.</p>`;
+            leftoverTombosContainer.innerHTML = leftoverItems.length > 0
+                ? leftoverItems.map(item => `
+                    <div class="p-3 border rounded-md bg-white flex justify-between items-center gap-4">
+                        <div>
+                            <strong class="font-mono">${escapeHtml(item.TOMBAMENTO)}</strong>
+                            <p class="text-sm text-slate-600">${escapeHtml(item.Descrição)}</p>
+                            <p class="text-xs text-slate-400">Unidade GIAP: ${escapeHtml(item.Unidade)}</p>
+                        </div>
+                        <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}" data-desc="${escapeHtml(item.Descrição)}">
+                            Sugerir Vínculo
+                        </button>
+                    </div>
+                `).join('')
+                : `<p class="text-slate-500 text-center p-4">Nenhum tombamento sobrando. Ótimo trabalho!</p>`;
         }
         
-        function handleReconSelection(listId, clickedElement) {
-            const list = document.getElementById(listId);
-            list.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
-            clickedElement.classList.add('selected');
-            
-            if (listId === 'recon-system-items-list') selectedSystemItem = clickedElement;
-            else selectedGiapItem = clickedElement;
-
-            if (selectedSystemItem && selectedGiapItem) {
-                const systemId = selectedSystemItem.dataset.itemId;
-                const giapTombo = selectedGiapItem.dataset.itemTombo;
-                const systemItem = fullInventory.find(i => i.id === systemId);
-                
-                if (systemItem) {
-                    systemItem.Tombamento = giapTombo;
-                    dirtyItems.add(systemId);
-                    
-                    selectedSystemItem.classList.add('linked');
-                    selectedGiapItem.classList.add('linked');
-                    selectedSystemItem.innerHTML += ` <span class="text-green-600 font-bold text-xs">✔ LIGADO A ${giapTombo}</span>`;
-                    
-                    selectedSystemItem = null;
-                    selectedGiapItem = null;
-                    
-                    saveAllChangesBtn.disabled = false;
-                    feedbackStatus.textContent = "Item ligado! Clique em 'Salvar Alterações' na aba Inventário.";
-                }
-            }
-        }
-
-        // --- EVENT LISTENERS ---
-        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
-        forceRefreshBtn.addEventListener('click', () => { if (confirm("Forçar a atualização?")) loadData(true); });
-
-        // Main Tab Filters
-        [mainFilterDescricao, mainFilterTipo, mainFilterUnidade].forEach(el => el.addEventListener('input', applyMainFiltersAndRender));
-        mainFilterTipo.addEventListener('change', updateUnidadeMainFilter);
-        
-        // GIAP Tab Filters
-        [giapSearchInput, giapUnidadeFilter].forEach(el => el.addEventListener('input', applyGiapFiltersAndRender));
-
-        // Reconciliation Listeners
-        reconSystemUnitSelect.addEventListener('change', async (e) => {
-            const selectedUnit = e.target.value;
-            reconciliationWorkspace.classList.add('hidden');
-            finalizeReconciliationBtn.disabled = true;
-            reconciliationResults.classList.add('hidden');
-            const mappedGiap = unitMapping[selectedUnit] || [];
-            Array.from(reconGiapUnitMultiselect.options).forEach(opt => opt.selected = mappedGiap.includes(opt.value));
-            if (selectedUnit && mappedGiap.length > 0) renderReconciliationWorkspace(selectedUnit, mappedGiap);
-        });
-
-        reconGiapUnitMultiselect.addEventListener('change', async () => {
-            const systemUnit = reconSystemUnitSelect.value;
-            if (!systemUnit) return alert("Selecione uma Unidade do Sistema primeiro.");
-            const giapUnits = Array.from(reconGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
-            unitMapping[systemUnit] = giapUnits;
-            await idb.unitMapping.put({ systemUnit, giapUnits });
-            feedbackStatus.textContent = `Mapeamento para '${systemUnit}' salvo!`;
-            if (systemUnit && giapUnits.length > 0) renderReconciliationWorkspace(systemUnit, giapUnits);
-        });
-        
-        reconSystemItemsList.addEventListener('click', e => handleReconSelection('recon-system-items-list', e.target.closest('.reconciliation-list-item')));
-        reconGiapItemsList.addEventListener('click', e => handleReconSelection('recon-giap-items-list', e.target.closest('.reconciliation-list-item')));
-
-        finalizeReconciliationBtn.addEventListener('click', () => {
-            const systemUnit = reconSystemUnitSelect.value;
-            const mappedGiapUnits = unitMapping[systemUnit] || [];
-            
-            const linkedTombos = new Set();
-            reconGiapItemsList.querySelectorAll('.linked').forEach(el => linkedTombos.add(el.dataset.itemTombo));
-            const allUsedTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-            
-            const leftoverItems = giapInventory.filter(i => {
-                const tombo = i.TOMBAMENTO?.trim();
-                return mappedGiapUnits.includes(i.Unidade) && tombo && !allUsedTombos.has(tombo) && !linkedTombos.has(tombo);
-            });
-            reconLeftoverList.innerHTML = leftoverItems.map(i => `<div class="p-2 border rounded-md bg-slate-50 flex justify-between items-center"><div><strong>${escapeHtml(i.TOMBAMENTO)}:</strong> ${escapeHtml(i.Descrição)}</div><button class="suggest-match-btn text-xs bg-blue-100 px-2 py-1 rounded" data-desc="${escapeHtml(i.Descrição)}">Sugerir</button></div>`).join('') || `<p class="text-slate-500 text-sm">Nenhum tombamento sobrando.</p>`;
-            
+        function populatePendingTransfersTab() {
+            const pendingTransfersContainer = document.getElementById('pending-transfers-container');
             const pendingTransfers = fullInventory.filter(item => {
                 const tombo = item.Tombamento?.trim();
                 const giapItem = giapMap.get(tombo);
                 return giapItem && item.Unidade !== giapItem.Unidade;
             });
-            reconTransferList.innerHTML = pendingTransfers.map(t => `<div class="p-2 border rounded-md bg-red-50"><strong>${escapeHtml(t.Descrição)}</strong> (T: ${escapeHtml(t.Tombamento)}) está em <strong>${escapeHtml(t.Unidade)}</strong> mas na planilha consta em <strong>${escapeHtml(giapMap.get(t.Tombamento.trim()).Unidade)}</strong>.</div>`).join('') || `<p class="text-slate-500 text-sm">Nenhuma transferência pendente.</p>`;
-            
-            reconciliationResults.classList.remove('hidden');
-        });
 
-        saveAllChangesBtn.addEventListener('click', async () => {
-            if (dirtyItems.size === 0) return;
-            feedbackStatus.textContent = `Salvando ${dirtyItems.size} alterações...`;
-            const batch = writeBatch(db);
-            dirtyItems.forEach(id => {
-                const item = fullInventory.find(i => i.id === id);
-                if (item) {
-                    const docRef = doc(db, 'patrimonio', id);
-                    batch.update(docRef, { Tombamento: item.Tombamento, updatedAt: serverTimestamp() });
-                }
-            });
-            await batch.commit();
-            await idb.patrimonio.clear();
-            await idb.metadata.clear();
-            feedbackStatus.textContent = 'Alterações salvas! Recarregando...';
-            setTimeout(() => window.location.reload(), 1500);
-        });
+            pendingTransfersContainer.innerHTML = pendingTransfers.length > 0
+                ? pendingTransfers.map(item => `
+                    <div class="p-3 border rounded-md bg-red-50 text-red-800">
+                        <strong>${escapeHtml(item.Descrição)}</strong> (T: ${escapeHtml(item.Tombamento)})
+                        <p class="text-sm">Está em <strong>${escapeHtml(item.Unidade)}</strong> mas na planilha consta em <strong>${escapeHtml(giapMap.get(item.Tombamento.trim()).Unidade)}</strong>.</p>
+                    </div>
+                `).join('')
+                : `<p class="text-slate-500 text-center p-4">Nenhuma transferência pendente identificada.</p>`;
+        }
 
+        function populateGiapTab() {
+            const giapTableBody = document.getElementById('giap-table-body');
+            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+             giapTableBody.innerHTML = giapInventory.map(item => `
+                <tr class="border-b">
+                    ${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}
+                </tr>
+            `).join('');
+        }
+        
+        // --- EVENT LISTENERS ---
+        forceRefreshBtn.addEventListener('click', () => { if (confirm("Forçar a atualização?")) loadData(true); });
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
         navButtons.forEach(button => {
             button.addEventListener('click', (e) => {
                 const tabName = e.currentTarget.dataset.tab;
                 navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
                 contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName)));
-                if(tabName === 'edicao') applyMainFiltersAndRender();
-                if(tabName === 'giap') applyGiapFiltersAndRender();
             });
         });
+        
+        document.getElementById('save-all-changes-btn').addEventListener('click', async () => {
+            if (dirtyItems.size === 0) return;
+            feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Salvando ${dirtyItems.size} alterações...`;
+            const batch = writeBatch(db);
+            dirtyItems.forEach((updatedData, id) => {
+                const docRef = doc(db, 'patrimonio', id);
+                const dataToSave = { ...updatedData };
+                delete dataToSave.id;
+                dataToSave.updatedAt = serverTimestamp();
+                batch.update(docRef, dataToSave);
+            });
 
+            try {
+                await batch.commit();
+                await idb.patrimonio.clear(); await idb.metadata.clear();
+                feedbackStatus.textContent = 'Alterações salvas! Recarregando...';
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                feedbackStatus.textContent = 'Erro ao salvar.';
+                console.error(error);
+            }
+        });
+        
+        document.getElementById('edit-table-body').addEventListener('change', (e) => {
+            const input = e.target.closest('input, select');
+            if (input) {
+                const row = input.closest('tr');
+                const docId = row.dataset.docId;
+                const field = input.dataset.field;
+                const value = input.type === 'number' ? Number(input.value) : input.value;
+                const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
+                const updatedItem = { ...currentItem, [field]: value };
+                dirtyItems.set(docId, updatedItem);
+                row.classList.add('is-dirty');
+                document.getElementById('save-all-changes-btn').disabled = false;
+            }
+        });
+
+        document.getElementById('map-system-unit-select').addEventListener('change', (e) => {
+            const selectedUnit = e.target.value;
+            const mappedGiap = unitMapping[selectedUnit] || [];
+            Array.from(document.getElementById('map-giap-unit-multiselect').options).forEach(opt => opt.selected = mappedGiap.includes(opt.value));
+        });
+        
+        document.getElementById('map-giap-unit-multiselect').addEventListener('change', async () => {
+            const systemUnit = document.getElementById('map-system-unit-select').value;
+            if (!systemUnit) return alert("Selecione uma Unidade do Sistema primeiro.");
+            const giapUnits = Array.from(document.getElementById('map-giap-unit-multiselect').selectedOptions).map(opt => opt.value);
+            unitMapping[systemUnit] = giapUnits;
+            await idb.unitMapping.put({ systemUnit, giapUnits });
+            feedbackStatus.textContent = `Mapeamento para '${systemUnit}' salvo!`;
+            populateReconciliationTab();
+        });
+
+        document.getElementById('recon-unit-select').addEventListener('change', (e) => {
+            const systemUnit = e.target.value;
+            const workspace = document.getElementById('reconciliation-workspace');
+            if (!systemUnit) {
+                workspace.classList.add('hidden');
+                return;
+            }
+            const mappedGiapUnits = unitMapping[systemUnit] || [];
+            const systemItems = fullInventory.filter(i => i.Unidade === systemUnit && !i.Tombamento?.trim());
+            const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
+            const giapItems = giapInventory.filter(i => {
+                const tombo = i.TOMBAMENTO?.trim();
+                return mappedGiapUnits.includes(i.Unidade) && tombo && !usedTombamentos.has(tombo);
+            });
+            document.getElementById('recon-system-items-list').innerHTML = systemItems.map(item => `<div class="reconciliation-list-item p-3 border-b" data-item-id="${item.id}"><strong>${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">${escapeHtml(item.Localização) || 'Sem localização'}</p></div>`).join('') || `<p class="p-4 text-slate-500">Nenhum item sem tombo.</p>`;
+            document.getElementById('recon-giap-items-list').innerHTML = giapItems.map(item => `<div class="reconciliation-list-item p-3 border-b" data-item-tombo="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)}</strong><p class="text-xs text-slate-500">${escapeHtml(item.Descrição)}</p></div>`).join('') || `<p class="p-4 text-slate-500">Nenhum tombo disponível.</p>`;
+            workspace.classList.remove('hidden');
+        });
+
+        let selectedReconSystemItem, selectedReconGiapItem;
+        document.getElementById('recon-system-items-list').addEventListener('click', e => {
+            const itemEl = e.target.closest('.reconciliation-list-item');
+            if(itemEl) {
+                if(selectedReconSystemItem) selectedReconSystemItem.classList.remove('selected');
+                selectedReconSystemItem = itemEl;
+                itemEl.classList.add('selected');
+                tryLinkItems();
+            }
+        });
+        document.getElementById('recon-giap-items-list').addEventListener('click', e => {
+            const itemEl = e.target.closest('.reconciliation-list-item');
+            if(itemEl) {
+                if(selectedReconGiapItem) selectedReconGiapItem.classList.remove('selected');
+                selectedReconGiapItem = itemEl;
+                itemEl.classList.add('selected');
+                tryLinkItems();
+            }
+        });
+
+        function tryLinkItems() {
+            if (!selectedReconSystemItem || !selectedReconGiapItem) return;
+            const systemId = selectedReconSystemItem.dataset.itemId;
+            const giapTombo = selectedReconGiapItem.dataset.itemTombo;
+            const systemItem = fullInventory.find(i => i.id === systemId);
+            const giapItem = giapMap.get(giapTombo);
+            if (!systemItem || !giapItem) return;
+
+            const modal = document.getElementById('link-confirmation-modal');
+            const modalContainer = modal.querySelector('.modal-container');
+            modalContainer.innerHTML = `
+                <div class="flex items-center justify-between p-4 border-b">
+                    <h3 class="text-xl font-semibold">Confirmar Vínculo e Atualização</h3>
+                    <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button>
+                </div>
+                <div class="p-6 grid grid-cols-2 gap-6">
+                    <div><h4 class="font-bold">Item do Sistema</h4><p><strong>Desc:</strong> ${escapeHtml(systemItem.Descrição)}</p></div>
+                    <div><h4 class="font-bold text-green-700">Dados da Planilha</h4><p><strong>Tombo:</strong> ${escapeHtml(giapItem.TOMBAMENTO)}</p><p><strong>Desc:</strong> ${escapeHtml(giapItem.Descrição)}</p></div>
+                    <div class="col-span-2 border-t pt-4"><label class="block font-medium">Defina o Estado de Conservação:</label><select id="link-estado-select" class="mt-1 w-full p-2 border rounded-lg"><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div>
+                </div>
+                <div class="flex justify-end p-4 bg-slate-50"><button type="button" class="bg-green-600 text-white px-6 py-2 rounded-lg" id="confirm-link-btn">Atualizar e Vincular</button></div>`;
+            openModal(modal);
+
+            document.getElementById('confirm-link-btn').onclick = () => {
+                const updatedItem = { ...systemItem };
+                updatedItem.Tombamento = giapItem.TOMBAMENTO;
+                updatedItem.Descrição = giapItem.Descrição;
+                updatedItem.Fornecedor = giapItem['Fornecedor'];
+                updatedItem.NF = giapItem.NF;
+                updatedItem.Tipo = giapItem.Tipo;
+                updatedItem.Estado = document.getElementById('link-estado-select').value;
+                dirtyItems.set(systemId, updatedItem);
+                document.getElementById('save-all-changes-btn').disabled = false;
+                const index = fullInventory.findIndex(i => i.id === systemId);
+                if (index !== -1) fullInventory[index] = updatedItem;
+                feedbackStatus.textContent = `Item vinculado! Salve as alterações.`;
+                selectedReconSystemItem.classList.add('linked');
+                selectedReconGiapItem.classList.add('linked');
+                selectedReconSystemItem = null;
+                selectedReconGiapItem = null;
+                closeModal(modal);
+            };
+        }
+        
         function escapeHtml(unsafe) {
             if (unsafe === undefined || unsafe === null) return '';
             return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
+        function openModal(modalEl) {
+            if (!modalEl) return;
+            const overlay = modalEl.querySelector('.modal-overlay');
+            const container = modalEl.querySelector('.modal-container');
+            modalEl.classList.remove('hidden');
+            setTimeout(() => {
+                overlay?.classList.remove('opacity-0');
+                container?.classList.remove('opacity-0', 'scale-95');
+            }, 10);
+        };
+        function closeModal(modalEl) {
+            if (!modalEl) return;
+            const overlay = modalEl.querySelector('.modal-overlay');
+            const container = modalEl.querySelector('.modal-container');
+            overlay?.classList.add('opacity-0');
+            container?.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => { modalEl.classList.add('hidden'); }, 300);
+        };
+        
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.js-close-modal') || e.target.matches('.modal-overlay')) {
+                closeModal(e.target.closest('.modal'));
+            }
+        });
+
     </script>
 </body>
 </html>
