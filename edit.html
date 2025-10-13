@@ -89,8 +89,8 @@
                     <!-- Painel de Filtros Aprimorado -->
                     <div id="filter-panel" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b border-slate-200">
                         <div>
-                            <label for="main-filter-descricao" class="block text-sm font-medium mb-1">Filtrar por Descrição</label>
-                            <select id="main-filter-descricao" class="w-full p-2 border rounded-lg bg-white"></select>
+                            <label for="main-filter-descricao" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
+                            <input type="text" id="main-filter-descricao" class="w-full p-2 border rounded-lg" placeholder="Digite para buscar...">
                         </div>
                         <div>
                             <label for="main-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
@@ -254,7 +254,6 @@
         const logoutBtn = document.getElementById('logout-btn');
         const forceRefreshBtn = document.getElementById('force-refresh-btn');
 
-        // BUG FIX: debounce function was missing.
         const debounce = (func, delay) => {
             let t;
             return (...a) => {
@@ -348,9 +347,6 @@
         }
         
         function populateMainFilters() {
-            const descricoes = [...new Set(fullInventory.map(i => i.Descrição).filter(Boolean))].sort();
-            mainFilterDescricao.innerHTML = '<option value="">Todas as Descrições</option>' + descricoes.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
-            
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             mainFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
             
@@ -372,12 +368,12 @@
         }
 
         function applyAllFiltersAndRender() {
-            const descFiltro = mainFilterDescricao.value;
+            const descFiltro = (mainFilterDescricao.value || '').toLowerCase().trim();
             const tipoFiltro = mainFilterTipo.value;
             const unidadeFiltro = mainFilterUnidade.value;
 
             filteredInventory = fullInventory.filter(item => 
-                (!descFiltro || item.Descrição === descFiltro) &&
+                (!descFiltro || (item.Descrição || '').toLowerCase().includes(descFiltro)) &&
                 (!tipoFiltro || item.Tipo === tipoFiltro) &&
                 (!unidadeFiltro || item.Unidade === unidadeFiltro)
             );
@@ -532,7 +528,8 @@
             }
         });
 
-        mainFilterDescricao.addEventListener('change', applyAllFiltersAndRender);
+        const debouncedMainFilter = debounce(applyAllFiltersAndRender, 400);
+        mainFilterDescricao.addEventListener('input', debouncedMainFilter);
         mainFilterTipo.addEventListener('change', () => {
             updateUnidadeMainFilter();
             applyAllFiltersAndRender();
