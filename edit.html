@@ -3,28 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edição em Massa - Sistema de Patrimônio</title>
+    <title>Auditoria e Edição - Sistema de Patrimônio</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .table-container { max-height: calc(100vh - 250px); }
+        .table-container { max-height: calc(100vh - 300px); }
         .status-saving { color: #f59e0b; }
         .status-saved { color: #10b981; }
         .status-error { color: #ef4444; }
         .saving-spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #3b82f6;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            margin-right: 8px;
+            border: 2px solid #f3f3f3; border-top: 2px solid #3b82f6; border-radius: 50%;
+            width: 16px; height: 16px; animation: spin 1s linear infinite;
+            display: inline-block; margin-right: 8px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .nav-btn {
+            padding: 0.75rem 1rem; border-bottom: 3px solid transparent; transition: all 0.2s ease;
+            font-weight: 600; color: #475569;
+        }
+        .nav-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -33,7 +36,7 @@
         <header class="bg-white shadow-md sticky top-0 z-50">
             <div class="container mx-auto p-4 flex justify-between items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-800">Edição em Massa do Inventário</h1>
+                    <h1 class="text-2xl font-bold text-slate-800">Auditoria e Edição do Inventário</h1>
                     <p id="auto-save-status" class="text-sm font-semibold status-saved">Pronto. As alterações serão salvas automaticamente.</p>
                 </div>
                 <div id="user-info-edit" class="text-right">
@@ -42,52 +45,81 @@
                 </div>
             </div>
         </header>
+        
+        <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
+            <div class="container mx-auto px-4">
+                <div id="main-nav" class="flex space-x-1 overflow-x-auto">
+                    <button class="nav-btn active" data-tab="edicao">✏️ Edição em Massa</button>
+                    <button class="nav-btn" data-tab="restantes">📋 Tombamentos Restantes</button>
+                </div>
+            </div>
+        </nav>
 
         <main class="container mx-auto p-4">
-            <div class="card">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                     <div>
-                        <label for="edit-search-input" class="block text-sm font-medium mb-1">Buscar Itens</label>
-                        <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo, unidade..." class="w-full p-2 border rounded-lg">
+            
+            <div id="content-edicao" class="fade-in">
+                <div class="bg-white p-4 rounded-lg shadow mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" id="edit-search-input" placeholder="Buscar por qualquer campo..." class="w-full p-2 border rounded-lg md:col-span-3">
                     </div>
-                     <div>
-                        <label for="edit-tipo-filter" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
-                        <select id="edit-tipo-filter" class="w-full p-2 border rounded-lg bg-white"></select>
-                    </div>
-                     <div>
-                        <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
-                        <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white" disabled></select>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-0 overflow-hidden">
+                    <div id="table-container" class="table-container overflow-auto">
+                        <table class="w-full text-sm min-w-[1600px]">
+                            <thead class="bg-slate-100 sticky top-0">
+                                <tr>
+                                    <th class="p-3 text-left font-semibold">TOMBAMENTO (A1)</th>
+                                    <th class="p-3 text-left font-semibold">Descrição B(1)</th>
+                                    <th class="p-3 text-left font-semibold">Cadastro</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
+                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tipo</th>
+                                    <th class="p-3 text-left font-semibold">Entrada</th>
+                                    <th class="p-3 text-left font-semibold">Unidade</th>
+                                    <th class="p-3 text-left font-semibold">Valor NF</th>
+                                    <th class="p-3 text-left font-semibold">Espécie</th>
+                                </tr>
+                            </thead>
+                            <tbody id="edit-table-body"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
-            <div class="card mt-6 p-0 overflow-hidden">
-                <div id="table-container" class="table-container overflow-y-auto">
-                    <table class="w-full text-sm min-w-[1200px]">
-                        <thead class="bg-slate-100 sticky top-0">
-                            <tr>
-                                <th class="p-3 text-left font-semibold">Tombamento</th>
-                                <th class="p-3 text-left font-semibold">Descrição</th>
-                                <th class="p-3 text-left font-semibold">Unidade</th>
-                                <th class="p-3 text-left font-semibold">Localização</th>
-                                <th class="p-3 text-left font-semibold">Fornecedor</th>
-                                <th class="p-3 text-left font-semibold">Origem da Doação</th>
-                                <th class="p-3 text-left font-semibold">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="edit-table-body">
-                            <!-- Conteúdo gerado via JS -->
-                        </tbody>
-                    </table>
+            <div id="content-restantes" class="hidden fade-in">
+                <div class="bg-white rounded-lg shadow p-0 overflow-hidden">
+                    <div class="p-4 border-b">
+                        <h2 class="text-xl font-bold">Tombamentos do Estoque GIAP Não Alocados</h2>
+                        <p class="text-sm text-slate-600 mt-1">Esta lista mostra os itens da planilha GIAP que ainda não foram encontrados no sistema de patrimônio.</p>
+                    </div>
+                    <div class="table-container overflow-auto">
+                        <table class="w-full text-sm min-w-[1200px]">
+                             <thead class="bg-slate-100 sticky top-0">
+                                <tr>
+                                    <th class="p-3 text-left font-semibold">TOMBAMENTO (A1)</th>
+                                    <th class="p-3 text-left font-semibold">Descrição B(1)</th>
+                                    <th class="p-3 text-left font-semibold">Cadastro</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
+                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tipo</th>
+                                    <th class="p-3 text-left font-semibold">Entrada</th>
+                                    <th class="p-3 text-left font-semibold">Unidade</th>
+                                    <th class="p-3 text-left font-semibold">Valor NF</th>
+                                    <th class="p-3 text-left font-semibold">Espécie</th>
+                                </tr>
+                            </thead>
+                            <tbody id="restantes-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
         </main>
 
     </div>
     
-    <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
-        <!-- Será preenchido por JS -->
-    </div>
+    <div id="loading-or-error-screen" class="flex items-center justify-center h-screen"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -106,173 +138,194 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        const GIAP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaVN5Oiv5eDmdJpsCCys-0TQb9q-QaOeTqakTE6wBYup2sJYnPf2_uNIYkmrI7FIvis1aUxv21vB_k/pub?output=csv';
 
-        let fullInventory = [];
+        let fullInventory = [], giapData = [], remainingTombamentos = [];
         let filteredInventory = [];
         
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
-        const tableBody = document.getElementById('edit-table-body');
+        const editTableBody = document.getElementById('edit-table-body');
         const searchInput = document.getElementById('edit-search-input');
-        const tipoFilter = document.getElementById('edit-tipo-filter');
-        const unidadeFilter = document.getElementById('edit-unidade-filter');
         const autoSaveStatus = document.getElementById('auto-save-status');
+        const restantesTableBody = document.getElementById('restantes-table-body');
+        const navButtons = document.querySelectorAll('#main-nav .nav-btn');
+        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
 
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
-
-        async function logAction(action, details) {
-            if (!auth.currentUser) return;
-            try {
-                await addDoc(collection(db, 'historico'), { ...details, action, user: auth.currentUser.email, timestamp: serverTimestamp() });
-            } catch (error) { console.error("Falha ao registrar ação no histórico:", error); }
-        }
 
         const debouncedSave = debounce(async (itemId, field, value, oldValue) => {
             autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando...`;
             autoSaveStatus.className = 'text-sm font-semibold status-saving';
-            
             try {
                 const docRef = doc(db, 'patrimonio', itemId);
                 await updateDoc(docRef, { [field]: value, updatedAt: serverTimestamp() });
-
                 const item = fullInventory.find(i => i.id === itemId);
-                if (item) item[field] = value; // Update local data
-
-                logAction('Edição em Massa', { 
-                    itemId, 
-                    itemDesc: item?.Descrição || 'N/A',
-                    details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.`
-                });
-
+                if (item) item[field] = value;
                 autoSaveStatus.textContent = 'Salvo com sucesso!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
-                localStorage.removeItem('patrimonioCache_fullList'); // Invalidate cache for main page
+                localStorage.removeItem('patrimonioCache_fullList');
             } catch (error) {
                 console.error("Erro no auto-save:", error);
                 autoSaveStatus.textContent = 'Erro ao salvar!';
                 autoSaveStatus.className = 'text-sm font-semibold status-error';
             }
-        }, 1500); // 1.5 second delay
+        }, 1500);
 
         onAuthStateChanged(auth, user => {
             if (user) {
                 document.getElementById('user-email-edit').textContent = user.email;
                 authGate.classList.remove('hidden');
-                loadData();
+                loadAllData();
             } else {
-                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2>...</div>`;
+                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2><p>Você precisa estar logado para acessar esta página.</p></div>`;
             }
         });
 
-        async function loadData() {
-            loadingScreen.innerHTML = `<div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando inventário...</p></div>`;
-            const cacheKey = 'patrimonioCache_fullList';
-            const cachedData = localStorage.getItem(cacheKey);
+        async function fetchGiapData() {
+            return new Promise((resolve, reject) => {
+                Papa.parse(GIAP_SHEET_URL, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        giapData = results.data;
+                        resolve();
+                    },
+                    error: (error) => {
+                        console.error("Erro ao buscar dados do GIAP:", error);
+                        reject(error);
+                    }
+                });
+            });
+        }
 
-            if (cachedData) {
-                const data = JSON.parse(cachedData);
-                if (Date.now() - data.timestamp < 28800000) { // Cache de 8 horas
-                    fullInventory = data.items;
-                    initializePage();
-                    return;
-                }
-            }
-            
+        async function loadAllData() {
+            loadingScreen.innerHTML = `<div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando inventário e dados do GIAP...</p></div>`;
             try {
-                const querySnapshot = await getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
+                const inventoryPromise = getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
+                const giapPromise = fetchGiapData();
+                
+                const [querySnapshot] = await Promise.all([inventoryPromise, giapPromise]);
+
                 fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                localStorage.setItem(cacheKey, JSON.stringify({ items: fullInventory, timestamp: Date.now() }));
                 initializePage();
             } catch (error) {
-                 console.error("Erro fatal ao carregar o patrimônio:", error);
-                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar</h2>...</div>`;
+                 console.error("Erro fatal ao carregar dados:", error);
+                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar</h2><p>Não foi possível carregar os dados. Verifique o console para mais detalhes.</p></div>`;
             }
         }
         
         function initializePage() {
             loadingScreen.classList.add('hidden');
-            populateFilters();
+            findRemainingTombamentos();
             applyFiltersAndRender();
+            renderRemainingTable();
         }
 
-        function populateFilters() {
-            const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
-            tipoFilter.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-        }
-
-        function updateUnidadeFilter() {
-            const selectedTipo = tipoFilter.value;
-            if(selectedTipo) {
-                const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
-                unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
-                unidadeFilter.disabled = false;
-            } else {
-                unidadeFilter.innerHTML = '<option value="">Selecione um Tipo</option>';
-                unidadeFilter.disabled = true;
-            }
+        function findRemainingTombamentos() {
+            const inventoryTombamentos = new Set(fullInventory.map(item => item.Tombamento?.trim()).filter(Boolean));
+            remainingTombamentos = giapData.filter(giapItem => {
+                const tomb = giapItem['TOMBAMENTO (A1)']?.trim();
+                return tomb && !inventoryTombamentos.has(tomb);
+            });
         }
         
         function applyFiltersAndRender() {
             const searchTerm = (searchInput.value || '').toLowerCase().trim();
-            const selectedTipo = tipoFilter.value;
-            const selectedUnidade = unidadeFilter.value;
             
-            filteredInventory = fullInventory.filter(item => {
-                return (!selectedTipo || item.Tipo === selectedTipo) &&
-                       (!selectedUnidade || item.Unidade === selectedUnidade) &&
-                       (!searchTerm || 
-                        (item.Descrição || '').toLowerCase().includes(searchTerm) ||
-                        (item.Tombamento || '').toLowerCase().includes(searchTerm) ||
-                        (item.Unidade || '').toLowerCase().includes(searchTerm));
-            });
-            renderTable();
+            if (!searchTerm) {
+                filteredInventory = [...fullInventory];
+            } else {
+                filteredInventory = fullInventory.filter(item => 
+                    Object.values(item).some(val => 
+                        String(val).toLowerCase().includes(searchTerm)
+                    )
+                );
+            }
+            renderEditTable();
         }
 
-        function renderTable() {
+        function renderEditTable() {
             if (filteredInventory.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-slate-500">Nenhum item encontrado.</td></tr>`;
+                editTableBody.innerHTML = `<tr><td colspan="10" class="text-center p-8 text-slate-500">Nenhum item encontrado.</td></tr>`;
                 return;
             }
-            const estados = ['Novo', 'Bom', 'Regular', 'Avariado'];
 
-            tableBody.innerHTML = filteredInventory.map(item => `
-                <tr id="row-${item.id}" data-doc-id="${item.id}">
-                    <td class="p-2 border-b"><input type="text" data-field="Tombamento" class="w-full p-1 border rounded" value="${item.Tombamento || ''}" data-old-value="${item.Tombamento || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Descrição" class="w-full p-1 border rounded" value="${item.Descrição || ''}" data-old-value="${item.Descrição || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Unidade" class="w-full p-1 border rounded" value="${item.Unidade || ''}" data-old-value="${item.Unidade || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Localização" class="w-full p-1 border rounded" value="${item.Localização || ''}" data-old-value="${item.Localização || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Fornecedor" class="w-full p-1 border rounded" value="${item.Fornecedor || ''}" data-old-value="${item.Fornecedor || ''}"></td>
-                    <td class="p-2 border-b"><input type="text" data-field="Origem da Doação" class="w-full p-1 border rounded" value="${item['Origem da Doação'] || ''}" data-old-value="${item['Origem da Doação'] || ''}"></td>
-                    <td class="p-2 border-b">
-                        <select data-field="Estado" class="w-full p-1 border rounded bg-white" data-old-value="${item.Estado || ''}">
-                            ${estados.map(e => `<option value="${e}" ${item.Estado === e ? 'selected' : ''}>${e}</option>`).join('')}
-                        </select>
-                    </td>
+            const renderInput = (item, field) => `<input type="text" data-field="${field}" class="w-full p-1 border rounded bg-white" value="${item[field] || ''}" data-old-value="${item[field] || ''}">`;
+
+            editTableBody.innerHTML = filteredInventory.map(item => `
+                <tr id="row-${item.id}" data-doc-id="${item.id}" class="border-b hover:bg-slate-50">
+                    <td class="p-2">${renderInput(item, 'Tombamento')}</td>
+                    <td class="p-2">${renderInput(item, 'Descrição')}</td>
+                    <td class="p-2">${renderInput(item, 'Cadastro')}</td>
+                    <td class="p-2">${renderInput(item, 'NF')}</td>
+                    <td class="p-2">${renderInput(item, 'Fornecedor')}</td>
+                    <td class="p-2">${renderInput(item, 'Tipo')}</td>
+                    <td class="p-2">${renderInput(item, 'Entrada')}</td>
+                    <td class="p-2">${renderInput(item, 'Unidade')}</td>
+                    <td class="p-2">${renderInput(item, 'Valor NF')}</td>
+                    <td class="p-2">${renderInput(item, 'Espécie')}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderRemainingTable() {
+            if (remainingTombamentos.length === 0) {
+                restantesTableBody.innerHTML = `<tr><td colspan="10" class="text-center p-8 text-slate-500">Parabéns! Todos os itens do GIAP foram alocados.</td></tr>`;
+                return;
+            }
+
+            restantesTableBody.innerHTML = remainingTombamentos.map(item => `
+                <tr class="border-b">
+                    <td class="p-2 font-mono text-xs">${item['TOMBAMENTO (A1)'] || ''}</td>
+                    <td class="p-2">${item['Descrição B(1)'] || ''}</td>
+                    <td class="p-2">${item['Cadastro'] || ''}</td>
+                    <td class="p-2">${item['NF'] || ''}</td>
+                    <td class="p-2">${item['Nome Fornecedor'] || ''}</td>
+                    <td class="p-2">${item['Tipo'] || ''}</td>
+                    <td class="p-2">${item['Entrada'] || ''}</td>
+                    <td class="p-2">${item['Unidade'] || ''}</td>
+                    <td class="p-2">${item['Valor NF'] || ''}</td>
+                    <td class="p-2">${item['Espécie'] || ''}</td>
                 </tr>
             `).join('');
         }
         
+        function switchTab(tabName) {
+            navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
+        }
+
         // --- Event Listeners ---
         searchInput.addEventListener('input', debounce(applyFiltersAndRender, 400));
-        tipoFilter.addEventListener('change', () => {
-            updateUnidadeFilter();
-            applyFiltersAndRender();
-        });
-        unidadeFilter.addEventListener('change', applyFiltersAndRender);
         
-        tableBody.addEventListener('change', (e) => {
+        editTableBody.addEventListener('change', (e) => {
             const target = e.target;
-            if (target.matches('input, select')) {
+            if (target.matches('input')) {
                 const docId = target.closest('tr').dataset.docId;
                 const field = target.dataset.field;
                 const newValue = target.value;
                 const oldValue = target.dataset.oldValue;
 
                 if (newValue !== oldValue) {
-                    debouncedSave(docId, field, newValue, oldValue);
-                    target.dataset.oldValue = newValue; // Update old value for next change
+                    // Mapeia o nome do fornecedor para o campo correto no Firebase se necessário
+                    const firebaseField = (field === 'Nome Fornecedor') ? 'Fornecedor' : field;
+                    const firebaseFieldTomb = (field === 'TOMBAMENTO (A1)') ? 'Tombamento' : field;
+                    const firebaseFieldDesc = (field === 'Descrição B(1)') ? 'Descrição' : field;
+
+
+                    debouncedSave(docId, firebaseField, newValue, oldValue);
+                    debouncedSave(docId, firebaseFieldTomb, newValue, oldValue);
+                    debouncedSave(docId, firebaseFieldDesc, newValue, oldValue);
+
+                    target.dataset.oldValue = newValue;
                 }
             }
+        });
+
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => switchTab(button.dataset.tab));
         });
 
     </script>
