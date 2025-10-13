@@ -317,7 +317,6 @@
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
         
-        // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
         const feedbackStatus = document.getElementById('feedback-status');
@@ -367,6 +366,15 @@
         const linkConfirmationModal = document.getElementById('link-confirmation-modal');
 
         const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
+
+        const debounce = (func, delay) => {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        };
 
         onAuthStateChanged(auth, user => {
             document.getElementById('user-email-edit').textContent = user ? user.email : '';
@@ -471,9 +479,11 @@
             
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             editFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+            
+            const debouncedRender = debounce(renderTable, 300);
             editFilterTipo.onchange = () => { updateUnidades(); renderTable(); };
             editFilterUnidade.onchange = renderTable;
-            editFilterDescricao.oninput = renderTable;
+            editFilterDescricao.oninput = debouncedRender;
             updateUnidades();
             renderTable();
         }
@@ -568,11 +578,15 @@
         
         forceRefreshBtn.addEventListener('click', () => { if (confirm("Forçar a atualização?")) loadData(true); });
         logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+        
         navButtons.forEach(button => {
             button.addEventListener('click', (e) => {
                 const tabName = e.currentTarget.dataset.tab;
                 navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
                 contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName)));
+                if(tabName === 'edicao') {
+                    populateEditableInventoryTab();
+                }
             });
         });
         
