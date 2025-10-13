@@ -615,26 +615,20 @@
                 const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
                 const updatedItem = { ...currentItem, [field]: value };
                 
-                // --- AUTOFILL LOGIC ---
                 if (field === 'Tombamento' && value.trim()) {
                     const giapItem = giapMap.get(value.trim());
                     if (giapItem) {
                         if (confirm(`Item encontrado na Planilha GIAP:\n\nDescrição: ${giapItem.Descrição}\n\nDeseja preencher os campos Descrição, Fornecedor e NF?`)) {
                             updatedItem.Descrição = giapItem.Descrição || '';
-                            updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
+                            updatedItem.Fornecedor = giapItem.Fornecedor || '';
                             updatedItem.NF = giapItem.NF || '';
-                            // Re-render the row to show the changes
-                            const newRowHTML = [...row.children].map(cell => cell.outerHTML).join('');
-                            const tempRow = document.createElement('tr');
-                            tempRow.innerHTML = newRowHTML;
-                            tempRow.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
-                            tempRow.querySelector('[data-field="Fornecedor"]').value = updatedItem.Fornecedor;
-                            tempRow.querySelector('[data-field="NF"]').value = updatedItem.NF;
-                            row.innerHTML = tempRow.innerHTML;
+                            
+                            row.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
+                            row.querySelector('[data-field="Fornecedor"]').value = updatedItem.Fornecedor;
+                            row.querySelector('[data-field="NF"]').value = updatedItem.NF;
                         }
                     }
                 }
-                // --- END AUTOFILL ---
                 
                 dirtyItems.set(docId, updatedItem);
                 row.classList.add('is-dirty');
@@ -701,7 +695,7 @@
                 if (type === 'system') {
                     return `<div class="reconciliation-list-item p-3 border-b" data-id="${item.id}"><strong>${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado || 'N/A')}</p><p class="text-xs text-slate-500">Localização: ${escapeHtml(item.Localização || 'N/A')}</p></div>`;
                 } else {
-                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p><p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p></div>`;
+                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p><p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p></div>`;
                 }
             };
             reconSystemItemsList.innerHTML = systemItems.map(item => renderItem(item, 'system')).join('') || `<p class="p-4 text-slate-500">Nenhum item sem tombo.</p>`;
@@ -759,7 +753,80 @@
         
         leftoverFilterDesc.addEventListener('input', populateLeftoverTombosTab);
         
-        // ... (rest of the script from previous full version)
+        massTransferSearchBtn.addEventListener('click', () => {
+            const tombosInput = massTransferTombos.value;
+            const tombos = tombosInput.split(',').map(t => t.trim()).filter(Boolean);
+            const existingTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()));
+            const foundItems = [];
+            const notFound = [];
+
+            tombos.forEach(tombo => {
+                const giapItem = giapMap.get(tombo);
+                if (giapItem && !existingTombos.has(tombo)) {
+                    foundItems.push(giapItem);
+                } else {
+                    notFound.push(tombo);
+                }
+            });
+
+            if (notFound.length > 0) alert(`Não encontrados ou já existem: ${notFound.join(', ')}`);
+
+            if (foundItems.length > 0) {
+                const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
+                massTransferList.innerHTML = foundItems.map(item => `
+                    <div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center">
+                        <div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição)}</div>
+                        <div><select data-tombo="${escapeHtml(item.TOMBAMENTO)}" class="mass-transfer-status w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option>${opt}</option>`).join('')}</select></div>
+                    </div>`).join('');
+                massTransferResults.classList.remove('hidden');
+            } else {
+                massTransferResults.classList.add('hidden');
+            }
+        });
+
+        massTransferSetAllStatus.addEventListener('change', (e) => {
+            document.querySelectorAll('.mass-transfer-status').forEach(select => select.value = e.target.value);
+        });
+        
+        massTransferConfirmBtn.addEventListener('click', async () => {
+            const destinationUnit = massTransferUnit.value;
+            if (!destinationUnit) return alert('Selecione uma unidade de destino.');
+            
+            const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status'));
+            if (itemsToCreate.length === 0) return;
+
+            feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Criando ${itemsToCreate.length} itens...`;
+            const batch = writeBatch(db);
+            itemsToCreate.forEach(select => {
+                const tombo = select.dataset.tombo;
+                const giapItem = giapMap.get(tombo);
+                if (giapItem) {
+                    const newItemRef = doc(collection(db, 'patrimonio'));
+                    const newItem = {
+                        Tombamento: tombo,
+                        Descrição: giapItem.Descrição || '',
+                        Tipo: giapItem.Tipo || '',
+                        Unidade: destinationUnit,
+                        Localização: '',
+                        Fornecedor: giapItem.Fornecedor || '',
+                        NF: giapItem.NF || '',
+                        'Origem da Doação': '',
+                        Estado: select.value,
+                        Quantidade: 1,
+                        Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`
+                    };
+                    batch.set(newItemRef, newItem);
+                }
+            });
+            try {
+                await batch.commit();
+                await idb.patrimonio.clear(); await idb.metadata.clear();
+                feedbackStatus.textContent = 'Itens criados! Recarregando...';
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (e) {
+                feedbackStatus.textContent = 'Erro ao criar itens.'; console.error(e);
+            }
+        });
 
         function escapeHtml(unsafe) {
             if (unsafe === undefined || unsafe === null) return '';
