@@ -127,7 +127,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.12 (GIAP Sync)</span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.11 (Auto-Save & Histórico)</span></h2>
             <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
         </div>
     </div>
@@ -199,6 +199,7 @@
                                 <th class="p-3 text-left">Tomb.</th>
                                 <th class="p-3 text-left">Descrição</th>
                                 <th class="p-3 text-left">Unidade</th>
+                                <th class="p-3 text-left">Fornecedor</th>
                                 <th class="p-3 text-left">Doação</th>
                                 <th class="p-3 text-left">Estado</th>
                                 <th id="table-header-actions" class="p-3 text-left hidden">Ações</th>
@@ -211,21 +212,28 @@
             </main>
         </div>
 
-        <!-- O restante do seu HTML (Notas Fiscais, Histórico, Modais, etc.) permanece o mesmo -->
-        <!-- ... -->
+        <!-- Notas Fiscais -->
+        <div id="content-notas-fiscais" class="hidden fade-in">
+            <!-- Conteúdo de Notas Fiscais aqui -->
+        </div>
+        
+        <!-- Histórico -->
+        <div id="content-historico" class="hidden fade-in">
+            <!-- Conteúdo do Histórico aqui -->
+        </div>
 
     </main>
-    
-    <!-- MODAIS E OUTRAS SEÇÕES OCULTAS (SEM ALTERAÇÕES SIGNIFICATIVAS) -->
-    <!-- ... (Todo o HTML de modais que já existia) ... -->
+
+    <!-- MODAIS -->
     <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
     <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</label><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-origem-da-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-origem-da-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
     <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200" onclick="this.closest('.modal').classList.add('hidden')">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
-    
+    <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Cancelar</button> </div></div></div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, query, orderBy, getDocs, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
@@ -241,137 +249,335 @@
         const auth = getAuth(app);
 
         // --- ESTADO DA APLICAÇÃO ---
-        let patrimonioFullList = [];
+        let patrimonioFullList = [], historicoFullList = [];
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
+        let patrimonioFilteredList = [], patrimonioCurrentPage = 1;
+        const patrimonioItemsPerPage = 20;
 
         // --- ELEMENTOS DO DOM ---
+        const connectionStatusEl = document.getElementById('connectionStatus');
         const tableBodyEl = document.getElementById('inventory-table-body');
-        const kpiTotalItens = document.getElementById('kpi-total-itens');
-        const kpiTotalUnidades = document.getElementById('kpi-total-unidades');
-        const kpiTotalAvariados = document.getElementById('kpi-total-avariados');
-        const kpiTotalNovos = document.getElementById('kpi-total-novos');
-        // Adicione outros elementos do DOM que você precisa aqui
+        const paginationControlsEl = document.getElementById('pagination-controls');
+        const filtroTipoUnidadeEl = document.getElementById('filtro-tipo-unidade');
+        const filtroUnidadeEl = document.getElementById('filtro-unidade');
+        const filtroEstadoEl = document.getElementById('filtro-estado');
+        const filtroBuscaEl = document.getElementById('filtro-busca');
+        const resetFiltersBtn = document.getElementById('reset-filters-btn');
+        const itemModal = document.getElementById('item-modal');
+        const openAddModalBtn = document.getElementById('open-add-modal-btn');
+        const itemForm = document.getElementById('item-form');
+        const loginModal = document.getElementById('login-modal');
+        const openLoginModalBtn = document.getElementById('open-login-modal-btn');
+        const loginForm = document.getElementById('login-form');
+        const transferModal = document.getElementById('transfer-modal');
+        const transferForm = document.getElementById('transfer-form');
+        const userInfoEl = document.getElementById('user-info');
+        const userEmailEl = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+        const adminActionsPatrimonio = document.getElementById('admin-actions-patrimonio');
+        const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const navButtons = document.querySelectorAll('#main-nav > .nav-btn, #main-nav > a.nav-btn');
+        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
 
         const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
         
         const getNormalizedEstado = (estadoStr) => {
-            const normalized = normalizeStr(estadoStr);
-            if (['avariado', 'quebrado', 'defeito', 'danificado'].some(k => normalized.includes(k))) return 'Avariado';
-            if (normalized === 'novo') return 'Novo';
-            if (['bom', 'otimo', 'ótimo'].includes(normalized)) return 'Bom';
-            return 'Regular';
+            const normalized = normalizeStr(estadoStr).replace(/ç/g, 'c').replace(/ã/g, 'a').normalize('NFD').replace(/[\u0300-\u036f]/g, '');  // Enhanced: Remove accents and normalize ç/ã for better matching (e.g., "não" -> "nao")
+            // Expanded 'Avariado' keywords based on your examples
+            if (['avariado', 'avariada', 'quebrado', 'quebrada', 'defeito', 'com defeito', 'defeituoso', 'danificado', 'danificada', 'nao funciona', 'nao esta funcionando', 'precisa de manutencao', 'manutencao', 'ruim', 'velho', 'inutilizavel', 'fora de uso'].some(k => normalized.includes(k))) {
+                return 'Avariado';
+            }
+            // Positive states: Strict matches with variations
+            if (normalized === 'novo' || normalized === 'nova') return 'Novo';
+            if (['bom', 'otimo', 'ótimo'].includes(normalized)) return 'Bom';  // Already handles "otimo" variations
+            if (normalized === 'regular') return 'Regular';
+            // Default to 'Avariado' for anything else (e.g., empty, unknown, or ambiguous)
+            return 'Avariado';
         };
 
-        async function loadAllPatrimonio() {
-            // ... (sua função de carregar patrimônio, pode manter como está)
+        function getStateColor(state) {
+            const normalizedEstado = getNormalizedEstado(state);
+            return { 'Novo': 'badge-green', 'Bom': 'badge-blue', 'Regular': 'badge-yellow', 'Avariado': 'badge-red' }[normalizedEstado] || 'bg-slate-200';
+        }
+        
+        async function logAction(action, details) {
+            if (!isLoggedIn) return;
             try {
-                const querySnapshot = await getDocs(query(collection(db, 'patrimonio'), orderBy('Descrição')));
-                patrimonioFullList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                // Chamar renderDashboard aqui, depois que os dados foram carregados
-                if (document.getElementById('content-dashboard').offsetParent) {
-                    renderDashboard(patrimonioFullList);
-                }
-                // Chamar outras funções de renderização aqui...
+                await addDoc(collection(db, 'historico'), {
+                    ...details,
+                    action: action,
+                    user: auth.currentUser.email,
+                    timestamp: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Falha ao registrar ação no histórico:", error);
+            }
+        }
 
+        async function loadAllPatrimonio() {
+            tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando patrimônio...</p></td></tr>`;
+            const cacheKey = 'patrimonioCache_fullList';
+            const cachedData = localStorage.getItem(cacheKey);
+
+            if (cachedData) {
+                const data = JSON.parse(cachedData);
+                if (Date.now() - data.timestamp < 28800000) { // Cache de 8 horas
+                    patrimonioFullList = data.items;
+                    initializeUI();
+                    return;
+                }
+            }
+
+            try {
+                const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
+                patrimonioFullList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // Ordena os dados no lado do cliente para evitar problemas de índice no Firestore
+                patrimonioFullList.sort((a, b) => {
+                    const descA = a.Descrição || '';
+                    const descB = b.Descrição || '';
+                    return descA.localeCompare(descB);
+                });
+
+                localStorage.setItem(cacheKey, JSON.stringify({ items: patrimonioFullList, timestamp: Date.now() }));
+                initializeUI();
             } catch (error) {
                  console.error("Erro ao carregar patrimônio: ", error);
+                 tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10 text-red-500">Falha ao carregar dados.</td></tr>`;
             }
+        }
+        
+        function initializeUI() {
+            populateFilters(patrimonioFullList);
+            applyPatrimonioFiltersAndRender();
+            if (document.getElementById('content-dashboard').offsetParent) {
+                 renderDashboard(patrimonioFullList);
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            isLoggedIn = !!user;
+            updateUIVisibility();
+            loadAllPatrimonio(); // Carrega os dados independente do login para visualização
+        });
+
+        function updateUIVisibility() {
+            const loggedInElements = [adminActionsPatrimonio, document.getElementById('table-header-actions'), document.getElementById('nav-edit-link'), document.getElementById('nav-history')];
+            
+            if (isLoggedIn) {
+                userEmailEl.textContent = auth.currentUser.email;
+                userInfoEl.classList.remove('hidden'); userInfoEl.classList.add('flex');
+                openLoginModalBtn.classList.add('hidden');
+                loggedInElements.forEach(el => el && el.classList.remove('hidden'));
+            } else {
+                userEmailEl.textContent = '';
+                userInfoEl.classList.add('hidden'); userInfoEl.classList.remove('flex');
+                openLoginModalBtn.classList.remove('hidden');
+                loggedInElements.forEach(el => el && el.classList.add('hidden'));
+            }
+            document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+            applyPatrimonioFiltersAndRender();
+        }
+
+        function populateFilters(items) {
+            const tipos = [...new Set(items.map(item => item.Tipo).filter(Boolean))].sort();
+            filtroTipoUnidadeEl.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            const estados = ['Novo', 'Bom', 'Regular', 'Avariado'];
+            filtroEstadoEl.innerHTML = '<option value="">TODOS OS ESTADOS</option>' + estados.map(e => `<option value="${e}">${e}</option>`).join('');
+        }
+        
+        function applyPatrimonioFiltersAndRender() {
+            if(!patrimonioFullList) return;
+            patrimonioFilteredList = patrimonioFullList.filter(item => {
+                return (!filtroTipoUnidadeEl.value || item.Tipo === filtroTipoUnidadeEl.value) &&
+                       (!filtroUnidadeEl.value || item.Unidade === filtroUnidadeEl.value) &&
+                       (!filtroEstadoEl.value || getNormalizedEstado(item.Estado) === filtroEstadoEl.value) &&
+                       (!filtroBuscaEl.value || normalizeStr(item.Descrição).includes(normalizeStr(filtroBuscaEl.value)));
+            });
+            patrimonioCurrentPage = 1;
+            renderPatrimonioTable();
+        }
+
+        function renderPatrimonioTable() {
+            const startIndex = (patrimonioCurrentPage - 1) * patrimonioItemsPerPage;
+            const itemsToDisplay = patrimonioFilteredList.slice(startIndex, startIndex + patrimonioItemsPerPage);
+            
+            const actionButtonsHTML = (itemId) => !isLoggedIn ? '' : `<td class="px-3 py-2 space-x-2"><button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button><button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button><button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></td>`;
+
+            tableBodyEl.innerHTML = itemsToDisplay.length === 0 
+                ? `<tr><td colspan="${isLoggedIn ? 7 : 6}" class="text-center py-10 text-slate-500">Nenhum item encontrado.</td></tr>`
+                : itemsToDisplay.map(item => `
+                    <tr class="border-b border-slate-200 hover:bg-slate-50">
+                        <td class="px-3 py-2 font-mono text-xs">${item.Tombamento || 'S/T'}</td>
+                        <td class="px-3 py-2 font-medium text-slate-900">${item.Descrição || 'N/A'}</td>
+                        <td class="px-3 py-2">${item.Unidade || 'N/A'}</td>
+                        <td class="px-3 py-2 text-xs">${item.Fornecedor || 'N/A'}</td>
+                        <td class="px-3 py-2 text-xs">${item['Origem da Doação'] || 'N/A'}</td>
+                        <td class="px-3 py-2"><span class="badge ${getStateColor(item.Estado)}">${item.Estado || 'N/A'}</span></td>
+                        ${actionButtonsHTML(item.id)}
+                    </tr>`).join('');
+            renderPatrimonioPagination();
+        }
+        
+        function renderPatrimonioPagination() {
+            const totalPages = Math.ceil(patrimonioFilteredList.length / patrimonioItemsPerPage);
+            paginationControlsEl.innerHTML = totalPages <= 1 ? '' : `<span class="text-sm text-slate-600">Página ${patrimonioCurrentPage} de ${totalPages}</span> <div class="inline-flex"><button data-page="${patrimonioCurrentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg" ${patrimonioCurrentPage === 1 ? 'disabled' : ''}>Anterior</button><button data-page="${patrimonioCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg" ${patrimonioCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button></div>`;
+        }
+        
+        const openModal = (modalEl) => { modalEl.classList.remove('hidden'); };
+        const closeModal = (modalEl) => { if(!modalEl) return; modalEl.classList.add('hidden'); };
+
+        function openItemModal(item = null) {
+            itemForm.reset();
+            itemForm['item-id'].value = item ? item.id : '';
+            document.getElementById('modal-title').textContent = item ? 'Editar Item' : 'Adicionar Novo Item';
+            if (item) {
+                for (const key in item) {
+                    if (itemForm[key]) itemForm[key].value = item[key];
+                }
+                 itemForm['item-descricao'].value = item['Descrição'] || '';
+                 itemForm['item-origem-da-doacao'].value = item['Origem da Doação'] || '';
+            }
+            openModal(itemModal);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if(!isLoggedIn) return;
+            const id = itemForm['item-id'].value;
+            const itemData = { Tombamento: itemForm['item-tombamento'].value, Tipo: itemForm['item-tipo'].value, 'Descrição': itemForm['item-descricao'].value, Unidade: itemForm['item-unidade'].value, Quantidade: parseInt(itemForm['item-quantidade'].value), Localização: itemForm['item-localizacao'].value, Estado: itemForm['item-estado'].value, Fornecedor: itemForm['item-fornecedor'].value, 'Origem da Doação': itemForm['item-origem-da-doacao'].value, Observação: itemForm['item-observacao'].value, updatedAt: serverTimestamp() };
+            const action = id ? 'Edição' : 'Criação';
+            try {
+                if (id) await updateDoc(doc(db, 'patrimonio', id), itemData);
+                else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
+                logAction(action, { itemId: id || 'novo', itemDesc: itemData['Descrição'], details: `Item ${id ? 'editado' : 'criado'}: ${itemData['Descrição']}` });
+                closeModal(itemModal);
+                localStorage.removeItem('patrimonioCache_fullList'); 
+                loadAllPatrimonio();
+            } catch (error) { console.error("Erro ao salvar o item: ", error); }
+        }
+        
+        function openDeleteModal(id) {
+            const item = patrimonioFullList.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('delete-item-info').textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
+            confirmDeleteBtn.dataset.id = id;
+            openModal(deleteConfirmModal);
+        }
+        
+        async function handleDelete() {
+            if(!isLoggedIn) return;
+            const id = confirmDeleteBtn.dataset.id;
+            const item = patrimonioFullList.find(i => i.id === id);
+            try {
+                await deleteDoc(doc(db, 'patrimonio', id));
+                logAction('Exclusão', { itemId: id, itemDesc: item.Descrição, details: `Item excluído: ${item.Descrição}` });
+                closeModal(deleteConfirmModal);
+                localStorage.removeItem('patrimonioCache_fullList');
+                loadAllPatrimonio();
+            } catch(error) { console.error("Erro ao excluir item: ", error); }
+        }
+
+        function openTransferModal(id) {
+            const item = patrimonioFullList.find(i => i.id === id);
+            if (!item) return;
+            transferForm.reset();
+            transferForm['transfer-item-id'].value = id;
+            document.getElementById('transfer-item-description').textContent = item.Descrição;
+            document.getElementById('transfer-item-current-unit').textContent = `${item.Unidade} (${item.Localização || 'N/D'})`;
+            const tipos = [...new Set(patrimonioFullList.map(i => i.Tipo).filter(Boolean))].sort();
+            transferForm['transfer-tipo'].innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            openModal(transferModal);
+        }
+
+        function updateUnidadeFilter(tipoSelectEl, unidadeSelectEl) {
+            const selectedTipo = tipoSelectEl.value;
+            unidadeSelectEl.innerHTML = selectedTipo ? '<option value="">TODAS AS UNIDADES</option>' + [...new Set(patrimonioFullList.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort().map(u => `<option value="${u}">${u}</option>`).join('') : '<option value="">Selecione um Tipo</option>';
+            unidadeSelectEl.disabled = !selectedTipo;
+        }
+
+        async function handleTransferSubmit(e) {
+            e.preventDefault();
+            if(!isLoggedIn) return;
+            const id = transferForm['transfer-item-id'].value;
+            const newUnidade = transferForm['transfer-unidade'].value;
+            const originalItem = patrimonioFullList.find(i => i.id === id);
+            const updatedData = { Tipo: transferForm['transfer-tipo'].value, Unidade: newUnidade, Localização: transferForm['transfer-localizacao'].value, updatedAt: serverTimestamp() };
+            try {
+                await updateDoc(doc(db, 'patrimonio', id), updatedData);
+                logAction('Transferência', { itemId: id, itemDesc: originalItem.Descrição, details: `De '${originalItem.Unidade}' para '${newUnidade}'` });
+                closeModal(transferModal);
+                localStorage.removeItem('patrimonioCache_fullList');
+                loadAllPatrimonio();
+            } catch (error) { console.error("Erro ao transferir item:", error); }
+        }
+        
+        function switchTab(tabName) {
+            if(tabName === 'edit') return;
+            navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
+            if (tabName === 'dashboard') renderDashboard(patrimonioFullList);
         }
 
         function renderDashboard(items) {
             if (!items || items.length === 0) return;
+            const kpi = (id, value) => document.getElementById(id).textContent = value;
+            kpi('kpi-total-itens', items.reduce((s, i) => s + (i.Quantidade || 1), 0));
+            kpi('kpi-total-unidades', new Set(items.map(i => i.Unidade)).size);
+            const estadosCount = items.reduce((a, i) => { const n = getNormalizedEstado(i.Estado); a[n] = (a[n] || 0) + (i.Quantidade || 1); return a; }, {});
+            kpi('kpi-total-avariados', estadosCount['Avariado'] || 0);
+            kpi('kpi-total-novos', estadosCount['Novo'] || 0);
 
-            // --- KPIs ---
-            kpiTotalItens.textContent = items.reduce((sum, item) => sum + (item.Quantidade || 1), 0);
-            kpiTotalUnidades.textContent = new Set(items.map(i => i.Unidade)).size;
-            const estadosCount = items.reduce((acc, item) => {
-                const estado = getNormalizedEstado(item.Estado);
-                acc[estado] = (acc[estado] || 0) + (item.Quantidade || 1);
-                return acc;
-            }, {});
-            kpiTotalAvariados.textContent = estadosCount['Avariado'] || 0;
-            kpiTotalNovos.textContent = estadosCount['Novo'] || 0;
-
-            // --- Gráfico de Estado (Pizza) ---
+            // Chart rendering
             const estadoCtx = document.getElementById('dashboardEstadoChart').getContext('2d');
-            if (window.dashboardEstadoChart instanceof Chart) {
-                window.dashboardEstadoChart.destroy();
-            }
-            window.dashboardEstadoChart = new Chart(estadoCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(estadosCount),
-                    datasets: [{
-                        label: 'Itens por Estado',
-                        data: Object.values(estadosCount),
-                        backgroundColor: ['#ef4444', '#10b981', '#3b82f6', '#f59e0b'],
-                        hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top' } }
-                }
-            });
+            if (dashboardEstadoChart) dashboardEstadoChart.destroy();
+            dashboardEstadoChart = new Chart(estadoCtx, { type: 'doughnut', data: { labels: Object.keys(estadosCount), datasets: [{ data: Object.values(estadosCount), backgroundColor: ['#ef4444', '#10b981', '#3b82f6', '#f59e0b'] }] }, options: { responsive: true, maintainAspectRatio: false } });
 
-            // --- Gráfico de Unidades (Barras) ---
-            const unidadesCount = items.reduce((acc, item) => {
-                const unidade = item.Unidade || 'Não especificada';
-                acc[unidade] = (acc[unidade] || 0) + (item.Quantidade || 1);
-                return acc;
-            }, {});
-
-            const sortedUnidades = Object.entries(unidadesCount).sort(([, a], [, b]) => b - a).slice(0, 10);
-            
+            const unidadesCount = items.reduce((a, i) => { const u = i.Unidade || 'N/D'; a[u] = (a[u] || 0) + 1; return a; }, {});
+            const sortedUnidades = Object.entries(unidadesCount).sort(([,a],[,b]) => b-a).slice(0, 10);
             const tipoCtx = document.getElementById('dashboardTipoChart').getContext('2d');
-            if (window.dashboardTipoChart instanceof Chart) {
-                window.dashboardTipoChart.destroy();
-            }
-            window.dashboardTipoChart = new Chart(tipoCtx, {
-                type: 'bar',
-                data: {
-                    labels: sortedUnidades.map(u => u[0]),
-                    datasets: [{
-                        label: 'Nº de Itens',
-                        data: sortedUnidades.map(u => u[1]),
-                        backgroundColor: '#3b82f6',
-                        borderColor: '#1e40af',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
-                }
-            });
+            if (dashboardTipoChart) dashboardTipoChart.destroy();
+            dashboardTipoChart = new Chart(tipoCtx, { type: 'bar', data: { labels: sortedUnidades.map(u => u[0]), datasets: [{ label: 'Itens', data: sortedUnidades.map(u => u[1]), backgroundColor: '#3b82f6' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false } });
         }
+
+        async function handleLogin(e) { e.preventDefault(); try { await signInWithEmailAndPassword(auth, loginForm.email.value, loginForm.password.value); closeModal(loginModal); } catch (error) { loginForm.querySelector('#login-error').classList.remove('hidden'); } }
         
-        onAuthStateChanged(auth, (user) => {
-            isLoggedIn = !!user;
-            // updateUIVisibility(); // Sua função para mostrar/esconder elementos
-            if (user) {
-                document.getElementById('user-info').classList.remove('hidden');
-                document.getElementById('user-email').textContent = user.email;
-                document.getElementById('open-login-modal-btn').classList.add('hidden');
-                loadAllPatrimonio();
-            } else {
-                 signInAnonymously(auth).catch(err => console.error(err));
-                 document.getElementById('user-info').classList.add('hidden');
-                 document.getElementById('open-login-modal-btn').classList.remove('hidden');
-                 renderDashboard([]); // Limpa o dashboard se não estiver logado
-            }
-        });
-
         document.addEventListener('DOMContentLoaded', () => {
-            loadAllPatrimonio();
-            // ... (seus outros event listeners)
-        });
+            const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
+            
+            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 400);
+            filtroTipoUnidadeEl.addEventListener('change', () => { updateUnidadeFilter(filtroTipoUnidadeEl, filtroUnidadeEl); debouncedFilter(); });
+            [filtroUnidadeEl, filtroEstadoEl, filtroBuscaEl].forEach(el => el.addEventListener('input', debouncedFilter));
 
+            resetFiltersBtn.addEventListener('click', () => { document.getElementById('patrimonio-filters-form').reset(); applyPatrimonioFiltersAndRender(); });
+            paginationControlsEl.addEventListener('click', (e) => { if(e.target.dataset.page) { patrimonioCurrentPage = parseInt(e.target.dataset.page); renderPatrimonioTable(); }});
+            tableBodyEl.addEventListener('click', (e) => {
+                const btn = e.target.closest('button'); if (!btn || !isLoggedIn) return;
+                const id = btn.dataset.id;
+                if (btn.classList.contains('edit-btn')) openItemModal(patrimonioFullList.find(i => i.id === id));
+                if (btn.classList.contains('delete-btn')) openDeleteModal(id);
+                if (btn.classList.contains('transfer-btn')) openTransferModal(id);
+            });
+            
+            openAddModalBtn.addEventListener('click', () => openItemModal());
+            itemForm.addEventListener('submit', handleFormSubmit);
+            loginForm.addEventListener('submit', handleLogin);
+            openLoginModalBtn.addEventListener('click', () => openModal(loginModal));
+            logoutBtn.addEventListener('click', () => signOut(auth));
+            transferForm.addEventListener('submit', handleTransferSubmit);
+            document.getElementById('transfer-tipo').addEventListener('change', (e) => updateUnidadeFilter(e.target, transferForm['transfer-unidade']));
+            confirmDeleteBtn.addEventListener('click', handleDelete);
+            
+            navButtons.forEach(button => button.addEventListener('click', (e) => {
+                if(e.currentTarget.tagName === 'BUTTON') switchTab(button.dataset.tab);
+            }));
+        });
     </script>
 </body>
 </html>
+
+
+
+
