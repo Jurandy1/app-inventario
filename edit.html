@@ -326,21 +326,18 @@
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         
-        // Editable Inventory Tab
         const editTableBody = document.getElementById('edit-table-body');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
         const editFilterUnidade = document.getElementById('edit-filter-unidade');
         const editFilterDescricao = document.getElementById('edit-filter-descricao');
 
-        // Unit Mapping Tab
         const mapFilterTipo = document.getElementById('map-filter-tipo');
         const mapSystemUnitSelect = document.getElementById('map-system-unit-select');
         const mapGiapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
         const saveMappingBtn = document.getElementById('save-mapping-btn');
         const savedMappingsContainer = document.getElementById('saved-mappings-container');
 
-        // Reconciliation Tab
         const reconUnitSelect = document.getElementById('recon-unit-select');
         const linkSelectedBtn = document.getElementById('link-selected-btn');
         const reconciliationWorkspace = document.getElementById('reconciliation-workspace');
@@ -351,14 +348,11 @@
         const reconGiapFilter = document.getElementById('recon-giap-filter');
         const reconGiapItemsList = document.getElementById('recon-giap-items-list');
 
-        // Leftover Tab
         const leftoverFilterDesc = document.getElementById('leftover-filter-desc');
         const leftoverTombosContainer = document.getElementById('leftover-tombos-container');
         
-        // Transfers Tab
         const pendingTransfersContainer = document.getElementById('pending-transfers-container');
 
-        // Mass Transfer Tab
         const massTransferTombos = document.getElementById('mass-transfer-tombos');
         const massTransferUnit = document.getElementById('mass-transfer-unit');
         const massTransferSearchBtn = document.getElementById('mass-transfer-search-btn');
@@ -367,10 +361,8 @@
         const massTransferList = document.getElementById('mass-transfer-list');
         const massTransferConfirmBtn = document.getElementById('mass-transfer-confirm-btn');
         
-        // GIAP Tab
         const giapTableBody = document.getElementById('giap-table-body');
 
-        // Modals
         const suggestionModal = document.getElementById('suggestion-modal');
         const linkConfirmationModal = document.getElementById('link-confirmation-modal');
 
@@ -446,8 +438,6 @@
             populateMassTransferTab();
             populateGiapTab();
         }
-        
-        // --- UI Population & Logic ---
 
         function populateEditableInventoryTab() {
             const updateUnidades = () => {
@@ -618,9 +608,10 @@
                 if (field === 'Tombamento' && value.trim()) {
                     const giapItem = giapMap.get(value.trim());
                     if (giapItem) {
-                        if (confirm(`Item encontrado na Planilha GIAP:\n\nDescrição: ${giapItem.Descrição}\n\nDeseja preencher os campos Descrição, Fornecedor e NF?`)) {
-                            updatedItem.Descrição = giapItem.Descrição || '';
-                            updatedItem.Fornecedor = giapItem.Fornecedor || '';
+                        const descriptionToShow = giapItem.Descrição || giapItem.Espécie || 'N/A';
+                        if (confirm(`Item encontrado na Planilha GIAP:\n\nDescrição: ${descriptionToShow}\n\nDeseja preencher os campos Descrição, Fornecedor e NF?`)) {
+                            updatedItem.Descrição = descriptionToShow;
+                            updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
                             updatedItem.NF = giapItem.NF || '';
                             
                             row.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
@@ -695,7 +686,7 @@
                 if (type === 'system') {
                     return `<div class="reconciliation-list-item p-3 border-b" data-id="${item.id}"><strong>${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado || 'N/A')}</p><p class="text-xs text-slate-500">Localização: ${escapeHtml(item.Localização || 'N/A')}</p></div>`;
                 } else {
-                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p><p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p></div>`;
+                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p><p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p></div>`;
                 }
             };
             reconSystemItemsList.innerHTML = systemItems.map(item => renderItem(item, 'system')).join('') || `<p class="p-4 text-slate-500">Nenhum item sem tombo.</p>`;
@@ -734,10 +725,10 @@
                 if(systemItem && giapItem) {
                     const updatedItem = { ...systemItem };
                     updatedItem.Tombamento = giapItem.TOMBAMENTO;
-                    updatedItem.Descrição = giapItem.Descrição;
-                    updatedItem.Fornecedor = giapItem['Fornecedor'];
-                    updatedItem.NF = giapItem.NF;
-                    updatedItem.Tipo = giapItem.Tipo;
+                    updatedItem.Descrição = giapItem.Descrição || giapItem.Espécie || '';
+                    updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
+                    updatedItem.NF = giapItem.NF || '';
+                    updatedItem.Tipo = giapItem.Tipo || '';
                     updatedItem.Estado = systemItem.Estado || 'Bom';
                     dirtyItems.set(systemId, updatedItem);
                     const itemIndex = fullInventory.findIndex(i => i.id === systemId);
@@ -775,7 +766,7 @@
                 const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
                 massTransferList.innerHTML = foundItems.map(item => `
                     <div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center">
-                        <div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição)}</div>
+                        <div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição || item.Espécie)}</div>
                         <div><select data-tombo="${escapeHtml(item.TOMBAMENTO)}" class="mass-transfer-status w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option>${opt}</option>`).join('')}</select></div>
                     </div>`).join('');
                 massTransferResults.classList.remove('hidden');
@@ -804,11 +795,11 @@
                     const newItemRef = doc(collection(db, 'patrimonio'));
                     const newItem = {
                         Tombamento: tombo,
-                        Descrição: giapItem.Descrição || '',
+                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
                         Tipo: giapItem.Tipo || '',
                         Unidade: destinationUnit,
                         Localização: '',
-                        Fornecedor: giapItem.Fornecedor || '',
+                        Fornecedor: giapItem['Nome Fornecedor'] || '',
                         NF: giapItem.NF || '',
                         'Origem da Doação': '',
                         Estado: select.value,
