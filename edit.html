@@ -8,10 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 280px); }
+        .status-feedback { color: #475569; }
         .status-saving { color: #f59e0b; }
         .status-saved { color: #10b981; }
         .status-error { color: #ef4444; }
@@ -39,6 +40,7 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         table { table-layout: fixed; }
         th, td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .is-dirty { background-color: #fef9c3 !important; }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -48,7 +50,7 @@
             <div class="container mx-auto p-4 flex justify-between items-center">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-800">Auditoria e Edição do Inventário</h1>
-                    <p id="auto-save-status" class="text-sm font-semibold status-saved">Pronto. As alterações na aba de edição serão salvas automaticamente.</p>
+                    <p id="feedback-status" class="text-sm font-semibold status-feedback">Faça as alterações e clique em "Salvar Alterações".</p>
                 </div>
                 <div id="user-info-edit" class="text-right">
                     <p id="user-email-edit" class="font-semibold"></p>
@@ -87,7 +89,10 @@
                             <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white" disabled></select>
                         </div>
                     </div>
-                    <button id="export-edit-csv" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Exportar como CSV</button>
+                    <div class="flex items-center gap-4">
+                        <button id="export-edit-csv" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Exportar CSV</button>
+                        <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed hidden" disabled>Salvar Alterações</button>
+                    </div>
                 </div>
 
                 <div class="card mt-6 p-0 overflow-hidden">
@@ -136,15 +141,20 @@
                 </div>
                 <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1200px]">
+                        <table class="w-full text-sm min-w-[1800px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
                                     <th class="p-3 text-left font-semibold">Status</th>
-                                    <th class="p-3 text-left font-semibold">TOMBAMENTO (A1)</th>
-                                    <th class="p-3 text-left font-semibold">Descrição B(1)</th>
-                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tombamento</th>
+                                    <th class="p-3 text-left font-semibold">Descrição</th>
+                                    <th class="p-3 text-left font-semibold">Cadastro</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tipo</th>
+                                    <th class="p-3 text-left font-semibold">Entrada</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Valor NF</th>
+                                    <th class="p-3 text-left font-semibold">Espécie</th>
                                     <th class="p-3 text-left font-semibold">Ações</th>
                                 </tr>
                             </thead>
@@ -162,7 +172,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -187,7 +197,7 @@
         
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
-        const autoSaveStatus = document.getElementById('auto-save-status');
+        const feedbackStatus = document.getElementById('feedback-status');
 
         // Elements for "Inventário no Sistema" tab
         const editTableBody = document.getElementById('edit-table-body');
@@ -195,6 +205,7 @@
         const tipoUnidadeFilter = document.getElementById('edit-tipo-unidade-filter');
         const unidadeFilter = document.getElementById('edit-unidade-filter');
         const exportEditCsvBtn = document.getElementById('export-edit-csv');
+        const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
 
         // Elements for "Planilha GIAP" tab
         const giapTableBody = document.getElementById('giap-table-body');
@@ -210,24 +221,6 @@
         const logoutBtn = document.getElementById('logout-btn');
 
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
-
-        const debouncedSave = debounce(async (itemId, field, value, oldValue) => {
-            autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando...`;
-            autoSaveStatus.className = 'text-sm font-semibold status-saving';
-            try {
-                const docRef = doc(db, 'patrimonio', itemId);
-                await updateDoc(docRef, { [field]: value, updatedAt: serverTimestamp() });
-                const item = fullInventory.find(i => i.id === itemId);
-                if (item) item[field] = value; 
-                await logAction('Edição em Massa', { itemId, details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.` });
-                autoSaveStatus.textContent = 'Salvo com sucesso!';
-                autoSaveStatus.className = 'text-sm font-semibold status-saved';
-            } catch (error) {
-                console.error("Erro no auto-save:", error);
-                autoSaveStatus.textContent = 'Erro ao salvar!';
-                autoSaveStatus.className = 'text-sm font-semibold status-error';
-            }
-        }, 1500);
 
         async function logAction(type, details) {
             try {
@@ -262,7 +255,6 @@
 
         async function loadAllData() {
             try {
-                // Now load both in parallel
                 const [_, giapData] = await Promise.all([
                     loadFirebaseInventory(),
                     loadGiapInventory()
@@ -378,11 +370,11 @@
                 const giapItem = giapMap.get(tombo);
                 const showSync = giapItem && hasDifferences(item, giapItem);
                 return `
-                <tr id="row-${item.id}" data-doc-id="${item.id}" class="hover:bg-slate-50">
+                <tr id="row-${item.id}" data-doc-id="${item.id}" class="hover:bg-slate-50 transition-colors">
                     ${headers.map(h => {
                         const value = escapeHtml(item[h]);
                         const inputType = (h === 'Quantidade') ? 'number' : 'text';
-                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}" data-old-value="${value}"></td>`;
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
                     }).join('')}
                     <td class="p-2 border-b">
                         ${showSync ? `<button class="sync-with-giap bg-yellow-500 text-white px-2 py-1 text-xs rounded" data-doc-id="${item.id}">Sincronizar</button>` : ''}
@@ -397,10 +389,10 @@
             giapSummaryEl.textContent = `${itemsNaoCadastrados} itens ainda não cadastrados.`;
 
             if (filteredGiap.length === 0) {
-                giapTableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-slate-500">Nenhum item encontrado na planilha com os filtros atuais.</td></tr>`;
+                giapTableBody.innerHTML = `<tr><td colspan="12" class="text-center p-8 text-slate-500">Nenhum item encontrado na planilha com os filtros atuais.</td></tr>`;
                 return;
             }
-            const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Nome Fornecedor', 'Unidade', 'Valor NF'];
+            const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
             giapTableBody.innerHTML = filteredGiap.map(item => {
                 const tombo = item['TOMBAMENTO (A1)']?.trim();
                 const isCadastrado = systemTombamentos.has(tombo);
@@ -424,6 +416,12 @@
             return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
         
+        function markRowAsDirty(rowElement) {
+            rowElement.classList.add('is-dirty');
+            saveAllChangesBtn.disabled = false;
+            saveAllChangesBtn.classList.remove('hidden');
+        }
+
         // --- Event Listeners ---
         const debouncedFilter = debounce(applyAllFiltersAndRender, 400);
         searchInput.addEventListener('input', debouncedFilter);
@@ -438,13 +436,11 @@
         editTableBody.addEventListener('change', async (e) => {
             const target = e.target;
             if (target.matches('input')) {
-                const docId = target.closest('tr').dataset.docId;
-                const field = target.dataset.field;
-                const newValue = target.value;
-                const oldValue = target.dataset.oldValue;
+                const row = target.closest('tr');
+                markRowAsDirty(row);
 
-                if (field === 'Tombamento' && newValue.trim() && newValue.trim() !== oldValue.trim()) {
-                    const giapItem = giapMap.get(newValue.trim());
+                if (target.dataset.field === 'Tombamento' && target.value.trim()) {
+                    const giapItem = giapMap.get(target.value.trim());
                     if (giapItem) {
                         if (confirm(`Encontramos o item "${giapItem['Descrição B(1)']}" na planilha GIAP. Deseja preencher os campos automaticamente?`)) {
                              const updates = {
@@ -452,15 +448,67 @@
                                 'Unidade': giapItem['Unidade'] || '', 'Localização': '', 'Fornecedor': giapItem['Nome Fornecedor'] || '', 'Origem da Doação': '',
                                 'Estado': 'Novo', 'Quantidade': 1, 'Observação': ''
                             };
-                            await saveRowUpdates(docId, updates);
-                            return; 
+                            // Populate fields without saving
+                            for (const [field, value] of Object.entries(updates)) {
+                                const input = row.querySelector(`input[data-field="${field}"]`);
+                                if (input) input.value = value;
+                            }
                         }
                     }
                 }
-                if (newValue !== oldValue) {
-                    debouncedSave(docId, field, newValue, oldValue);
-                    target.dataset.oldValue = newValue;
-                }
+            }
+        });
+
+        saveAllChangesBtn.addEventListener('click', async () => {
+            const dirtyRows = document.querySelectorAll('#edit-table-body tr.is-dirty');
+            if (dirtyRows.length === 0) {
+                alert("Nenhuma alteração para salvar.");
+                return;
+            }
+
+            feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Salvando ${dirtyRows.length} alterações...`;
+            feedbackStatus.className = 'text-sm font-semibold status-saving';
+
+            const batch = writeBatch(db);
+            let changesCount = 0;
+
+            dirtyRows.forEach(row => {
+                const docId = row.dataset.docId;
+                const docRef = doc(db, 'patrimonio', docId);
+                const updates = {};
+                row.querySelectorAll('input').forEach(input => {
+                    updates[input.dataset.field] = input.value;
+                });
+                updates.updatedAt = serverTimestamp();
+                batch.update(docRef, updates);
+                changesCount++;
+            });
+
+            try {
+                await batch.commit();
+                await logAction('Salvar em Massa', { details: `${changesCount} itens atualizados.` });
+                
+                // Update local data to reflect changes
+                dirtyRows.forEach(row => {
+                    const docId = row.dataset.docId;
+                    const item = fullInventory.find(i => i.id === docId);
+                    if (item) {
+                        row.querySelectorAll('input').forEach(input => {
+                            item[input.dataset.field] = input.value;
+                        });
+                    }
+                    row.classList.remove('is-dirty');
+                });
+                
+                feedbackStatus.textContent = `${changesCount} alterações salvas com sucesso!`;
+                feedbackStatus.className = 'text-sm font-semibold status-saved';
+                saveAllChangesBtn.disabled = true;
+                saveAllChangesBtn.classList.add('hidden');
+
+            } catch (error) {
+                console.error("Erro ao salvar alterações:", error);
+                feedbackStatus.textContent = 'Erro ao salvar alterações!';
+                feedbackStatus.className = 'text-sm font-semibold status-error';
             }
         });
 
@@ -516,7 +564,6 @@
                 const newDocRef = await addDoc(collection(db, 'patrimonio'), { ...newItem, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 fullInventory.push({ id: newDocRef.id, ...newItem });
                 systemTombamentos.add(tombo);
-                // No need to invalidate cache, we will reload on next page visit
                 await logAction('Adição via GIAP', { details: `Item com TOMBAMENTO ${tombo} adicionado.` });
                 applyAllFiltersAndRender();
             } catch (error) { console.error("Erro ao adicionar item:", error); alert('Erro ao adicionar item ao sistema.'); }
@@ -526,28 +573,14 @@
             const itemsToAdd = giapInventory.filter(item => { const tombo = item['TOMBAMENTO (A1)']?.trim(); return tombo && !systemTombamentos.has(tombo); });
             if (itemsToAdd.length === 0) { alert("Todos os itens da planilha GIAP já se encontram no sistema."); return; }
             if (confirm(`Você está prestes a adicionar ${itemsToAdd.length} itens faltantes ao sistema. Deseja continuar?`)) {
-                autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Adicionando ${itemsToAdd.length} itens...`;
+                feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Adicionando ${itemsToAdd.length} itens...`;
                 let count = 0;
                 for (const item of itemsToAdd) { await addItemToSystem(item); count++; }
                 await logAction('Adição em Massa via GIAP', { details: `${count} de ${itemsToAdd.length} itens adicionados.` });
-                autoSaveStatus.textContent = `${count} itens adicionados com sucesso!`;
+                feedbackStatus.textContent = `${count} itens adicionados com sucesso!`;
                 applyAllFiltersAndRender();
             }
         });
-
-        async function saveRowUpdates(docId, updates) {
-            autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando dados preenchidos...`;
-            try {
-                const docRef = doc(db, 'patrimonio', docId);
-                await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
-                const item = fullInventory.find(i => i.id === docId);
-                if (item) { Object.assign(item, updates); }
-                await logAction('Preenchimento Automático', { itemId: docId, details: `Dados preenchidos via tombamento ${updates['Tombamento']}.` });
-                autoSaveStatus.textContent = 'Dados preenchidos e salvos!';
-                autoSaveStatus.className = 'text-sm font-semibold status-saved';
-                applyAllFiltersAndRender(); 
-            } catch (error) { console.error("Erro ao salvar atualizações:", error); autoSaveStatus.textContent = 'Erro ao salvar!'; autoSaveStatus.className = 'text-sm font-semibold status-error'; }
-        }
         
         async function syncWithGiap(docId) {
             const item = fullInventory.find(i => i.id === docId);
@@ -567,14 +600,14 @@
 
             if (Object.keys(updates).length > 0) {
                 try {
-                    autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Sincronizando...`;
+                    feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Sincronizando...`;
                     const docRef = doc(db, 'patrimonio', docId);
                     await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
                     Object.assign(item, updates);
                     await logAction('Sincronização com GIAP', { itemId: docId, details: `Campos atualizados: ${Object.keys(updates).join(', ')}` });
                     applyAllFiltersAndRender();
-                    autoSaveStatus.textContent = 'Sincronizado com sucesso!';
-                } catch (error) { console.error("Erro na sincronização:", error); autoSaveStatus.textContent = 'Erro na sincronização!'; }
+                    feedbackStatus.textContent = 'Sincronizado com sucesso!';
+                } catch (error) { console.error("Erro na sincronização:", error); feedbackStatus.textContent = 'Erro na sincronização!'; }
             } else { alert("Nenhuma diferença encontrada. Os dados já estão sincronizados."); }
         }
     </script>
