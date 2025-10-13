@@ -170,7 +170,7 @@
                             <label for="recon-unit-select" class="block text-sm font-medium mb-1">Selecione a Unidade do Sistema para Conciliar</label>
                             <select id="recon-unit-select" class="w-full p-2 border rounded-lg bg-white max-w-md"></select>
                         </div>
-                        <button id="link-selected-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Ligar Selecionados</button>
+                        <button id="link-selected-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Ligar e Salvar Selecionados</button>
                     </div>
                     <div id="reconciliation-workspace" class="hidden mt-6">
                          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -366,7 +366,7 @@
         const linkConfirmationModal = document.getElementById('link-confirmation-modal');
 
         const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
-
+        
         const debounce = (func, delay) => {
             let timeout;
             return function(...args) {
@@ -674,8 +674,8 @@
         });
         
         reconUnitSelect.addEventListener('change', renderReconciliationWorkspace);
-        reconSystemFilter.addEventListener('input', renderReconciliationWorkspace);
-        reconGiapFilter.addEventListener('input', renderReconciliationWorkspace);
+        reconSystemFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
+        reconGiapFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
 
         function renderReconciliationWorkspace() {
             const systemUnit = reconUnitSelect.value;
@@ -689,18 +689,18 @@
             let systemItems = fullInventory.filter(i => i.Unidade === systemUnit && !i.Tombamento?.trim() && (i.Descrição || '').toLowerCase().includes(systemFilterText));
             let giapItems = giapInventory.filter(i => {
                 const tombo = i.TOMBAMENTO?.trim();
-                const desc = (i.Descrição || '').toLowerCase();
+                const desc = (i.Descrição || i.Espécie || '').toLowerCase();
                 return mappedGiapUnits.includes(i.Unidade) && tombo && !usedTombamentos.has(tombo) && desc.includes(giapFilterText);
             });
 
             systemItems.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
-            giapItems.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
+            giapItems.sort((a, b) => (a.Descrição || i.Espécie || '').localeCompare(b.Descrição || b.Espécie || ''));
 
             const renderItem = (item, type) => {
                 if (type === 'system') {
                     return `<div class="reconciliation-list-item p-3 border-b" data-id="${item.id}"><strong>${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado || 'N/A')}</p><p class="text-xs text-slate-500">Localização: ${escapeHtml(item.Localização || 'N/A')}</p></div>`;
                 } else {
-                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p><p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p></div>`;
+                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição || item.Espécie)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')} | Espécie: ${escapeHtml(item.Espécie || 'N/D')}</p><p class="text-xs text-slate-500">Valor NF: R$ ${escapeHtml(item['Valor NF'] || '0,00')}</p></div>`;
                 }
             };
             reconSystemItemsList.innerHTML = systemItems.map(item => renderItem(item, 'system')).join('') || `<p class="p-4 text-slate-500">Nenhum item sem tombo.</p>`;
@@ -725,10 +725,14 @@
         reconSystemItemsList.addEventListener('click', handleReconSelection);
         reconGiapItemsList.addEventListener('click', handleReconSelection);
         
-        linkSelectedBtn.addEventListener('click', () => {
+        linkSelectedBtn.addEventListener('click', async () => {
             const selectedSystemNodes = document.querySelectorAll('#recon-system-items-list .selected');
             const selectedGiapNodes = document.querySelectorAll('#recon-giap-items-list .selected');
-            
+            if (selectedSystemNodes.length === 0) return;
+
+            feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Ligando ${selectedSystemNodes.length} item(s)...`;
+            const batch = writeBatch(db);
+
             selectedSystemNodes.forEach((systemNode, index) => {
                 const giapNode = selectedGiapNodes[index];
                 const systemId = systemNode.dataset.id;
@@ -737,23 +741,29 @@
                 const giapItem = giapMap.get(giapTombo);
                 
                 if(systemItem && giapItem) {
-                    const updatedItem = { ...systemItem };
-                    updatedItem.Tombamento = giapItem.TOMBAMENTO;
-                    updatedItem.Descrição = giapItem.Descrição || giapItem.Espécie || '';
-                    updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
-                    updatedItem.NF = giapItem.NF || '';
-                    updatedItem.Tipo = giapItem.Tipo || '';
-                    updatedItem.Estado = systemItem.Estado || 'Bom';
-                    dirtyItems.set(systemId, updatedItem);
-                    const itemIndex = fullInventory.findIndex(i => i.id === systemId);
-                    if (itemIndex !== -1) fullInventory[itemIndex] = updatedItem;
-                    systemNode.classList.add('linked');
-                    giapNode.classList.add('linked');
+                    const docRef = doc(db, 'patrimonio', systemId);
+                    const updatedData = {
+                        Tombamento: giapItem.TOMBAMENTO,
+                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                        Fornecedor: giapItem['Nome Fornecedor'] || '',
+                        NF: giapItem.NF || '',
+                        Tipo: giapItem.Tipo || systemItem.Tipo,
+                        Estado: systemItem.Estado || 'Bom',
+                        updatedAt: serverTimestamp()
+                    };
+                    batch.update(docRef, updatedData);
                 }
             });
-            saveAllChangesBtn.disabled = false;
-            feedbackStatus.textContent = `${selectedSystemNodes.length} item(s) vinculado(s)! Salve as alterações.`;
-            renderReconciliationWorkspace();
+
+            try {
+                await batch.commit();
+                await idb.patrimonio.clear(); await idb.metadata.clear();
+                feedbackStatus.textContent = 'Itens vinculados e salvos! Recarregando...';
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                feedbackStatus.textContent = 'Erro ao salvar vínculos.';
+                console.error(error);
+            }
         });
         
         leftoverFilterDesc.addEventListener('input', populateLeftoverTombosTab);
