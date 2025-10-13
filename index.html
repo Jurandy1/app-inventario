@@ -431,14 +431,24 @@
 
         function openItemModal(item = null) {
             itemForm.reset();
-            itemForm['item-id'].value = item ? item.id : '';
             document.getElementById('modal-title').textContent = item ? 'Editar Item' : 'Adicionar Novo Item';
+
             if (item) {
-                for (const key in item) {
-                    if (itemForm[key]) itemForm[key].value = item[key];
-                }
-                 itemForm['item-descricao'].value = item['Descrição'] || '';
-                 itemForm['item-origem-da-doacao'].value = item['Origem da Doação'] || '';
+                // Mapeamento explícito e seguro dos campos do Firestore para os campos do formulário
+                document.getElementById('item-id').value = item.id || '';
+                document.getElementById('item-tombamento').value = item.Tombamento || '';
+                document.getElementById('item-tipo').value = item.Tipo || '';
+                document.getElementById('item-descricao').value = item.Descrição || '';
+                document.getElementById('item-unidade').value = item.Unidade || '';
+                document.getElementById('item-quantidade').value = item.Quantidade || 1;
+                document.getElementById('item-localizacao').value = item.Localização || '';
+                document.getElementById('item-estado').value = item.Estado || 'Bom';
+                document.getElementById('item-fornecedor').value = item.Fornecedor || '';
+                document.getElementById('item-origem-da-doacao').value = item['Origem da Doação'] || '';
+                document.getElementById('item-observacao').value = item.Observação || '';
+            } else {
+                // Limpa o ID para garantir que é um novo item
+                document.getElementById('item-id').value = '';
             }
             openModal(itemModal);
         }
@@ -607,3 +617,4 @@
     </script>
 </body>
 </html>
+
