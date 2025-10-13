@@ -283,6 +283,14 @@
         <div class="modal-container bg-white w-full max-w-4xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"></div>
     </div>
     
+    <!-- Full Page Overlay for saving -->
+    <div id="full-page-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
+        <div class="text-center text-white">
+            <div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-white mx-auto"></div>
+            <p id="overlay-message" class="mt-4 text-lg font-semibold">Salvando... Recarregando...</p>
+        </div>
+    </div>
+
     <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
         <div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando e analisando dados...</p></div>
     </div>
@@ -364,6 +372,8 @@
 
         const suggestionModal = document.getElementById('suggestion-modal');
         const linkConfirmationModal = document.getElementById('link-confirmation-modal');
+        const fullPageOverlay = document.getElementById('full-page-overlay');
+        const overlayMessage = document.getElementById('overlay-message');
 
         const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
         
@@ -375,6 +385,11 @@
                 timeout = setTimeout(() => func.apply(context, args), delay);
             };
         };
+        
+        function showOverlay(message) {
+            overlayMessage.textContent = message;
+            fullPageOverlay.classList.remove('hidden');
+        }
 
         onAuthStateChanged(auth, user => {
             document.getElementById('user-email-edit').textContent = user ? user.email : '';
@@ -592,7 +607,7 @@
         
         saveAllChangesBtn.addEventListener('click', async () => {
             if (dirtyItems.size === 0) return;
-            feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Salvando ${dirtyItems.size} alterações...`;
+            showOverlay(`Salvando ${dirtyItems.size} alterações...`);
             const batch = writeBatch(db);
             dirtyItems.forEach((updatedData, id) => {
                 const docRef = doc(db, 'patrimonio', id);
@@ -604,9 +619,11 @@
             try {
                 await batch.commit();
                 await idb.patrimonio.clear(); await idb.metadata.clear();
-                feedbackStatus.textContent = 'Alterações salvas! Recarregando...';
-                setTimeout(() => window.location.reload(), 1500);
-            } catch (error) { feedbackStatus.textContent = 'Erro ao salvar.'; console.error(error); }
+                setTimeout(() => window.location.reload(), 500);
+            } catch (error) { 
+                fullPageOverlay.classList.add('hidden');
+                feedbackStatus.textContent = 'Erro ao salvar.'; console.error(error);
+            }
         });
         
         editTableBody.addEventListener('change', (e) => {
@@ -730,7 +747,7 @@
             const selectedGiapNodes = document.querySelectorAll('#recon-giap-items-list .selected');
             if (selectedSystemNodes.length === 0) return;
 
-            feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Ligando ${selectedSystemNodes.length} item(s)...`;
+            showOverlay(`Ligando e salvando ${selectedSystemNodes.length} item(s)...`);
             const batch = writeBatch(db);
 
             selectedSystemNodes.forEach((systemNode, index) => {
@@ -758,9 +775,9 @@
             try {
                 await batch.commit();
                 await idb.patrimonio.clear(); await idb.metadata.clear();
-                feedbackStatus.textContent = 'Itens vinculados e salvos! Recarregando...';
-                setTimeout(() => window.location.reload(), 1500);
+                setTimeout(() => window.location.reload(), 500);
             } catch (error) {
+                fullPageOverlay.classList.add('hidden');
                 feedbackStatus.textContent = 'Erro ao salvar vínculos.';
                 console.error(error);
             }
@@ -810,7 +827,7 @@
             const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status'));
             if (itemsToCreate.length === 0) return;
 
-            feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Criando ${itemsToCreate.length} itens...`;
+            showOverlay(`Criando ${itemsToCreate.length} itens...`);
             const batch = writeBatch(db);
             itemsToCreate.forEach(select => {
                 const tombo = select.dataset.tombo;
@@ -836,9 +853,9 @@
             try {
                 await batch.commit();
                 await idb.patrimonio.clear(); await idb.metadata.clear();
-                feedbackStatus.textContent = 'Itens criados! Recarregando...';
-                setTimeout(() => window.location.reload(), 1500);
+                setTimeout(() => window.location.reload(), 500);
             } catch (e) {
+                fullPageOverlay.classList.add('hidden');
                 feedbackStatus.textContent = 'Erro ao criar itens.'; console.error(e);
             }
         });
