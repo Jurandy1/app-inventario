@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .table-container { max-height: calc(100vh - 250px); }
+        .table-container { max-height: calc(100vh - 280px); }
         .status-saving { color: #f59e0b; }
         .status-saved { color: #10b981; }
         .status-error { color: #ef4444; }
@@ -73,14 +73,18 @@
             <!-- ABA: Edição em Massa -->
             <div id="content-edicao" class="fade-in">
                 <div class="card">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div class="md:col-span-2">
                             <label for="edit-search-input" class="block text-sm font-medium mb-1">Buscar Itens no Sistema</label>
-                            <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo, unidade..." class="w-full p-2 border rounded-lg">
+                            <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo..." class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label for="edit-tipo-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
+                            <select id="edit-tipo-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
                         </div>
                         <div>
                             <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
-                            <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
+                            <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white" disabled></select>
                         </div>
                     </div>
                     <button id="export-edit-csv" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Exportar como CSV</button>
@@ -113,12 +117,16 @@
             <!-- ABA: Planilha GIAP Completa -->
             <div id="content-giap" class="hidden fade-in">
                 <div class="card">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label for="giap-search-input" class="block text-sm font-medium mb-1">Buscar na Planilha GIAP</label>
-                            <input type="text" id="giap-search-input" placeholder="Buscar por tombo, descrição, fornecedor..." class="w-full p-2 border rounded-lg">
+                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div class="md:col-span-1">
+                             <label for="giap-search-input" class="block text-sm font-medium mb-1">Buscar na Planilha GIAP</label>
+                            <input type="text" id="giap-search-input" placeholder="Buscar por tombo, descrição..." class="w-full p-2 border rounded-lg">
                         </div>
-                        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center">
+                         <div>
+                            <label for="giap-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade (GIAP)</label>
+                            <select id="giap-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center flex flex-col justify-center">
                             <p id="giap-summary" class="text-sm text-blue-800">Carregando resumo da planilha...</p>
                             <p id="giap-count" class="text-2xl font-bold text-blue-600">0</p>
                         </div>
@@ -134,8 +142,6 @@
                                     <th class="p-3 text-left font-semibold">Status</th>
                                     <th class="p-3 text-left font-semibold">TOMBAMENTO (A1)</th>
                                     <th class="p-3 text-left font-semibold">Descrição B(1)</th>
-                                    <th class="p-3 text-left font-semibold">Cadastro</th>
-                                    <th class="p-3 text-left font-semibold">NF</th>
                                     <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Valor NF</th>
@@ -181,22 +187,35 @@
         
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
+        const autoSaveStatus = document.getElementById('auto-save-status');
+
+        // Elements for "Inventário no Sistema" tab
         const editTableBody = document.getElementById('edit-table-body');
         const searchInput = document.getElementById('edit-search-input');
+        const tipoUnidadeFilter = document.getElementById('edit-tipo-unidade-filter');
         const unidadeFilter = document.getElementById('edit-unidade-filter');
-        const autoSaveStatus = document.getElementById('auto-save-status');
+        const exportEditCsvBtn = document.getElementById('export-edit-csv');
+
+        // Elements for "Planilha GIAP" tab
         const giapTableBody = document.getElementById('giap-table-body');
         const giapSearchInput = document.getElementById('giap-search-input');
+        const giapUnidadeFilter = document.getElementById('giap-unidade-filter');
         const giapCountEl = document.getElementById('giap-count');
         const giapSummaryEl = document.getElementById('giap-summary');
-        const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
-        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
-        const logoutBtn = document.getElementById('logout-btn');
-        const exportEditCsvBtn = document.getElementById('export-edit-csv');
         const exportGiapCsvBtn = document.getElementById('export-giap-csv');
         const addAllMissingBtn = document.getElementById('add-all-missing-btn');
 
+        const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
+        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
+        const logoutBtn = document.getElementById('logout-btn');
+
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
+
+        function invalidateCache() {
+            console.log("Cache invalidado devido a uma alteração nos dados.");
+            localStorage.removeItem('patrimonioEditCache');
+            localStorage.removeItem('patrimonioCache_fullList'); // Invalida o cache da página principal também
+        }
 
         const debouncedSave = debounce(async (itemId, field, value, oldValue) => {
             autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando...`;
@@ -206,10 +225,10 @@
                 await updateDoc(docRef, { [field]: value, updatedAt: serverTimestamp() });
                 const item = fullInventory.find(i => i.id === itemId);
                 if (item) item[field] = value; 
+                invalidateCache();
                 await logAction('Edição em Massa', { itemId, details: `Campo '${field}' alterado de '${oldValue}' para '${value}'.` });
                 autoSaveStatus.textContent = 'Salvo com sucesso!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
-                localStorage.removeItem('patrimonioCache_fullList');
             } catch (error) {
                 console.error("Erro no auto-save:", error);
                 autoSaveStatus.textContent = 'Erro ao salvar!';
@@ -225,9 +244,7 @@
                     timestamp: serverTimestamp(),
                     details
                 });
-            } catch (error) {
-                console.error("Erro ao registrar log:", error);
-            }
+            } catch (error) { console.error("Erro ao registrar log:", error); }
         }
 
         onAuthStateChanged(auth, user => {
@@ -247,9 +264,7 @@
             try {
                 await signOut(auth);
                 window.location.href = 'index.html';
-            } catch (error) {
-                console.error("Erro ao sair:", error);
-            }
+            } catch (error) { console.error("Erro ao sair:", error); }
         });
 
         async function loadAllData() {
@@ -265,19 +280,27 @@
         }
 
         async function loadFirebaseInventory() {
+            const cacheKey = 'patrimonioEditCache';
+            const cachedData = localStorage.getItem(cacheKey);
+
+            if (cachedData) {
+                const { timestamp, items } = JSON.parse(cachedData);
+                if (Date.now() - timestamp < 4 * 60 * 60 * 1000) { // Cache de 4 horas
+                    console.log("Carregando inventário do cache local.");
+                    fullInventory = items;
+                    return;
+                }
+            }
+            
+            console.log("Buscando inventário do Firestore (sem cache ou cache expirado).");
             const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
             fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: fullInventory }));
         }
 
         function loadGiapInventory() {
             return new Promise((resolve, reject) => {
-                Papa.parse(GIAP_SHEET_URL, {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => resolve(results.data),
-                    error: (err) => reject(err)
-                });
+                Papa.parse(GIAP_SHEET_URL, { download: true, header: true, skipEmptyLines: true, complete: (results) => resolve(results.data), error: (err) => reject(err) });
             });
         }
         
@@ -293,42 +316,56 @@
         }
         
         function populateFilters() {
-            const unidades = [...new Set(fullInventory.map(item => item.Unidade).filter(Boolean))].sort();
-            unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+            // Filtros da aba Inventário
+            const tiposUnidade = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
+            tipoUnidadeFilter.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tiposUnidade.map(u => `<option value="${u}">${u}</option>`).join('');
+
+            // Filtros da aba GIAP
+            const unidadesGiap = [...new Set(giapInventory.map(item => item.Unidade).filter(Boolean))].sort();
+            giapUnidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidadesGiap.map(u => `<option value="${u}">${u}</option>`).join('');
         }
         
+        function updateUnidadeOptions() {
+            const selectedTipo = tipoUnidadeFilter.value;
+            unidadeFilter.innerHTML = '';
+            if (!selectedTipo) {
+                unidadeFilter.innerHTML = '<option value="">Selecione um Tipo</option>';
+                unidadeFilter.disabled = true;
+                return;
+            }
+            const unidades = [...new Set(fullInventory.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+            unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+            unidadeFilter.disabled = false;
+        }
+
         function applyAllFiltersAndRender() {
             // Aba 1: Inventário no Sistema (Firebase)
             const searchTerm = (searchInput.value || '').toLowerCase().trim();
+            const selectedTipo = tipoUnidadeFilter.value;
             const selectedUnidade = unidadeFilter.value;
+            
             filteredInventory = fullInventory.filter(item => {
-                return (!selectedUnidade || item.Unidade === selectedUnidade) &&
-                       (!searchTerm || 
-                        (item['Descrição'] || '').toLowerCase().includes(searchTerm) ||
-                        (item['Tombamento'] || '').toLowerCase().includes(searchTerm) ||
-                        (item['Fornecedor'] || '').toLowerCase().includes(searchTerm) ||
-                        (item.Unidade || '').toLowerCase().includes(searchTerm));
+                const searchMatch = !searchTerm || (item['Descrição'] || '').toLowerCase().includes(searchTerm) || (item['Tombamento'] || '').toLowerCase().includes(searchTerm);
+                const tipoMatch = !selectedTipo || item.Tipo === selectedTipo;
+                const unidadeMatch = !selectedUnidade || item.Unidade === selectedUnidade;
+                return searchMatch && tipoMatch && unidadeMatch;
             });
             renderEditTable();
 
             // Aba 2: Planilha GIAP Completa
             const giapSearchTerm = (giapSearchInput.value || '').toLowerCase().trim();
+            const giapSelectedUnidade = giapUnidadeFilter.value;
+
             filteredGiap = giapInventory.filter(item => {
-                 return !giapSearchTerm || 
-                        (item['Descrição B(1)'] || '').toLowerCase().includes(giapSearchTerm) ||
-                        (item['TOMBAMENTO (A1)'] || '').toLowerCase().includes(giapSearchTerm) ||
-                        (item['Nome Fornecedor'] || '').toLowerCase().includes(giapSearchTerm);
+                 const searchMatch = !giapSearchTerm || (item['Descrição B(1)'] || '').toLowerCase().includes(giapSearchTerm) || (item['TOMBAMENTO (A1)'] || '').toLowerCase().includes(giapSearchTerm);
+                 const unidadeMatch = !giapSelectedUnidade || item.Unidade === giapSelectedUnidade;
+                 return searchMatch && unidadeMatch;
             });
             renderGiapTable();
         }
 
         function hasDifferences(systemItem, giapItem) {
-            const mapping = {
-                'Descrição': 'Descrição B(1)',
-                'Unidade': 'Unidade',
-                'Fornecedor': 'Nome Fornecedor',
-                'Tipo': 'Tipo'
-            };
+            const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
             return Object.keys(mapping).some(systemKey => {
                 const giapKey = mapping[systemKey];
                 return (systemItem[systemKey] || '').trim() !== (giapItem[giapKey] || '').trim();
@@ -361,14 +398,14 @@
         
         function renderGiapTable() {
             const itemsNaoCadastrados = giapInventory.filter(item => !systemTombamentos.has(item['TOMBAMENTO (A1)']?.trim())).length;
-            giapCountEl.textContent = `${giapInventory.length} itens`;
-            giapSummaryEl.textContent = `${itemsNaoCadastrados} itens ainda não foram cadastrados.`;
+            giapCountEl.textContent = `${giapInventory.length} itens totais`;
+            giapSummaryEl.textContent = `${itemsNaoCadastrados} itens ainda não cadastrados.`;
 
             if (filteredGiap.length === 0) {
-                giapTableBody.innerHTML = `<tr><td colspan="9" class="text-center p-8 text-slate-500">Nenhum item encontrado na planilha com os filtros atuais.</td></tr>`;
+                giapTableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-slate-500">Nenhum item encontrado na planilha com os filtros atuais.</td></tr>`;
                 return;
             }
-            const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Unidade', 'Valor NF'];
+            const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Nome Fornecedor', 'Unidade', 'Valor NF'];
             giapTableBody.innerHTML = filteredGiap.map(item => {
                 const tombo = item['TOMBAMENTO (A1)']?.trim();
                 const isCadastrado = systemTombamentos.has(tombo);
@@ -388,7 +425,6 @@
         }
 
         function escapeHtml(unsafe) {
-            // Handle numbers and other types gracefully
             if (unsafe === undefined || unsafe === null) return '';
             return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
@@ -396,8 +432,13 @@
         // --- Event Listeners ---
         const debouncedFilter = debounce(applyAllFiltersAndRender, 400);
         searchInput.addEventListener('input', debouncedFilter);
+        tipoUnidadeFilter.addEventListener('change', () => {
+            updateUnidadeOptions();
+            debouncedFilter();
+        });
         unidadeFilter.addEventListener('change', debouncedFilter);
         giapSearchInput.addEventListener('input', debouncedFilter);
+        giapUnidadeFilter.addEventListener('change', debouncedFilter);
         
         editTableBody.addEventListener('change', async (e) => {
             const target = e.target;
@@ -410,25 +451,17 @@
                 if (field === 'Tombamento' && newValue.trim() && newValue.trim() !== oldValue.trim()) {
                     const giapItem = giapMap.get(newValue.trim());
                     if (giapItem) {
-                        if (confirm(`Encontramos o item "${giapItem['Descrição B(1)']}" na planilha GIAP para este tombamento. Deseja preencher os campos automaticamente com os dados da planilha?`)) {
+                        if (confirm(`Encontramos o item "${giapItem['Descrição B(1)']}" na planilha GIAP. Deseja preencher os campos automaticamente?`)) {
                              const updates = {
-                                'Tombamento': giapItem['TOMBAMENTO (A1)'] || '',
-                                'Descrição': giapItem['Descrição B(1)'] || '',
-                                'Tipo': giapItem['Tipo'] || '',
-                                'Unidade': giapItem['Unidade'] || '',
-                                'Localização': '', // Default
-                                'Fornecedor': giapItem['Nome Fornecedor'] || '',
-                                'Origem da Doação': '', // Default
-                                'Estado': 'Novo', // Default
-                                'Quantidade': 1, // Default
-                                'Observação': '' // Default
+                                'Tombamento': giapItem['TOMBAMENTO (A1)'] || '', 'Descrição': giapItem['Descrição B(1)'] || '', 'Tipo': giapItem['Tipo'] || '',
+                                'Unidade': giapItem['Unidade'] || '', 'Localização': '', 'Fornecedor': giapItem['Nome Fornecedor'] || '', 'Origem da Doação': '',
+                                'Estado': 'Novo', 'Quantidade': 1, 'Observação': ''
                             };
                             await saveRowUpdates(docId, updates);
                             return; 
                         }
                     }
                 }
-
                 if (newValue !== oldValue) {
                     debouncedSave(docId, field, newValue, oldValue);
                     target.dataset.oldValue = newValue;
@@ -439,7 +472,7 @@
         editTableBody.addEventListener('click', e => {
              if (e.target.classList.contains('sync-with-giap')) {
                 const docId = e.target.dataset.docId;
-                if (confirm('Tem certeza que deseja sincronizar este item com os dados do GIAP? Isso substituirá os campos no sistema com os dados da planilha.')) {
+                if (confirm('Tem certeza que deseja sincronizar este item com os dados do GIAP?')) {
                     syncWithGiap(docId);
                 }
             }
@@ -480,51 +513,28 @@
                 return;
             }
             const newItem = {
-                'Tombamento': itemFromGiap['TOMBAMENTO (A1)'] || '',
-                'Descrição': itemFromGiap['Descrição B(1)'] || '',
-                'Tipo': itemFromGiap['Tipo'] || '',
-                'Unidade': itemFromGiap['Unidade'] || '',
-                'Localização': '',
-                'Fornecedor': itemFromGiap['Nome Fornecedor'] || '',
-                'Origem da Doação': '',
-                'Estado': 'Novo',
-                'Quantidade': 1,
-                'Observação': '',
+                'Tombamento': itemFromGiap['TOMBAMENTO (A1)'] || '', 'Descrição': itemFromGiap['Descrição B(1)'] || '', 'Tipo': itemFromGiap['Tipo'] || '',
+                'Unidade': itemFromGiap['Unidade'] || '', 'Localização': '', 'Fornecedor': itemFromGiap['Nome Fornecedor'] || '', 'Origem da Doação': '',
+                'Estado': 'Novo', 'Quantidade': 1, 'Observação': ''
             };
             try {
-                const newDocRef = await addDoc(collection(db, 'patrimonio'), {
-                    ...newItem,
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                });
+                const newDocRef = await addDoc(collection(db, 'patrimonio'), { ...newItem, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 fullInventory.push({ id: newDocRef.id, ...newItem });
                 systemTombamentos.add(tombo);
+                invalidateCache();
                 await logAction('Adição via GIAP', { details: `Item com TOMBAMENTO ${tombo} adicionado.` });
                 applyAllFiltersAndRender();
-            } catch (error) {
-                console.error("Erro ao adicionar item:", error);
-                alert('Erro ao adicionar item ao sistema.');
-            }
+            } catch (error) { console.error("Erro ao adicionar item:", error); alert('Erro ao adicionar item ao sistema.'); }
         }
         
         addAllMissingBtn.addEventListener('click', async () => {
-            const itemsToAdd = giapInventory.filter(item => {
-                const tombo = item['TOMBAMENTO (A1)']?.trim();
-                return tombo && !systemTombamentos.has(tombo);
-            });
-
-            if (itemsToAdd.length === 0) {
-                alert("Todos os itens da planilha GIAP já se encontram no sistema.");
-                return;
-            }
-
+            const itemsToAdd = giapInventory.filter(item => { const tombo = item['TOMBAMENTO (A1)']?.trim(); return tombo && !systemTombamentos.has(tombo); });
+            if (itemsToAdd.length === 0) { alert("Todos os itens da planilha GIAP já se encontram no sistema."); return; }
             if (confirm(`Você está prestes a adicionar ${itemsToAdd.length} itens faltantes ao sistema. Deseja continuar?`)) {
                 autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Adicionando ${itemsToAdd.length} itens...`;
                 let count = 0;
-                for (const item of itemsToAdd) {
-                    await addItemToSystem(item);
-                    count++;
-                }
+                for (const item of itemsToAdd) { await addItemToSystem(item); count++; }
+                invalidateCache();
                 await logAction('Adição em Massa via GIAP', { details: `${count} de ${itemsToAdd.length} itens adicionados.` });
                 autoSaveStatus.textContent = `${count} itens adicionados com sucesso!`;
                 applyAllFiltersAndRender();
@@ -538,15 +548,12 @@
                 await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
                 const item = fullInventory.find(i => i.id === docId);
                 if (item) { Object.assign(item, updates); }
+                invalidateCache();
                 await logAction('Preenchimento Automático', { itemId: docId, details: `Dados preenchidos via tombamento ${updates['Tombamento']}.` });
                 autoSaveStatus.textContent = 'Dados preenchidos e salvos!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
                 applyAllFiltersAndRender(); 
-            } catch (error) {
-                console.error("Erro ao salvar atualizações da linha:", error);
-                autoSaveStatus.textContent = 'Erro ao salvar atualizações!';
-                autoSaveStatus.className = 'text-sm font-semibold status-error';
-            }
+            } catch (error) { console.error("Erro ao salvar atualizações:", error); autoSaveStatus.textContent = 'Erro ao salvar!'; autoSaveStatus.className = 'text-sm font-semibold status-error'; }
         }
         
         async function syncWithGiap(docId) {
@@ -554,25 +561,15 @@
             if (!item) return;
             const tombo = item['Tombamento']?.trim();
             const giapItem = giapMap.get(tombo);
-            if (!giapItem) {
-                alert("Item correspondente não encontrado na planilha GIAP para sincronização.");
-                return;
-            }
+            if (!giapItem) { alert("Item correspondente não encontrado na planilha GIAP."); return; }
+            
             const updates = {};
-            const mapping = {
-                'Descrição': 'Descrição B(1)',
-                'Unidade': 'Unidade',
-                'Fornecedor': 'Nome Fornecedor',
-                'Tipo': 'Tipo'
-            };
-
+            const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
             Object.keys(mapping).forEach(systemKey => {
                 const giapKey = mapping[systemKey];
                 const giapValue = giapItem[giapKey] || '';
                 const systemValue = item[systemKey] || '';
-                if (giapValue.trim() !== systemValue.trim()) {
-                    updates[systemKey] = giapValue;
-                }
+                if (giapValue.trim() !== systemValue.trim()) { updates[systemKey] = giapValue; }
             });
 
             if (Object.keys(updates).length > 0) {
@@ -581,16 +578,12 @@
                     const docRef = doc(db, 'patrimonio', docId);
                     await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
                     Object.assign(item, updates);
+                    invalidateCache();
                     await logAction('Sincronização com GIAP', { itemId: docId, details: `Campos atualizados: ${Object.keys(updates).join(', ')}` });
                     applyAllFiltersAndRender();
                     autoSaveStatus.textContent = 'Sincronizado com sucesso!';
-                } catch (error) {
-                    console.error("Erro na sincronização:", error);
-                    autoSaveStatus.textContent = 'Erro na sincronização!';
-                }
-            } else {
-                alert("Nenhuma diferença encontrada. Os dados já estão sincronizados.");
-            }
+                } catch (error) { console.error("Erro na sincronização:", error); autoSaveStatus.textContent = 'Erro na sincronização!'; }
+            } else { alert("Nenhuma diferença encontrada. Os dados já estão sincronizados."); }
         }
     </script>
 </body>
