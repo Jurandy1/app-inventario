@@ -217,9 +217,11 @@
             }
         }, 1500);
 
+        // BUG FIX: Padronizado para usar a coleção 'historico' em vez de 'logs'
         async function logAction(type, details) {
             try {
-                await addDoc(collection(db, 'logs'), {
+                // Alterado de 'logs' para 'historico' para corresponder às regras e ao index.html
+                await addDoc(collection(db, 'historico'), {
                     type,
                     user: auth.currentUser.email,
                     timestamp: serverTimestamp(),
