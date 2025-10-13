@@ -88,19 +88,19 @@
 
                 <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1200px]">
+                        <table class="w-full text-sm min-w-[1600px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
-                                    <th class="p-3 text-left font-semibold">TOMBAMENTO (A1)</th>
-                                    <th class="p-3 text-left font-semibold">Descrição B(1)</th>
-                                    <th class="p-3 text-left font-semibold">Cadastro</th>
-                                    <th class="p-3 text-left font-semibold">NF</th>
-                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tombamento</th>
+                                    <th class="p-3 text-left font-semibold">Descrição</th>
                                     <th class="p-3 text-left font-semibold">Tipo</th>
-                                    <th class="p-3 text-left font-semibold">Entrada</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
-                                    <th class="p-3 text-left font-semibold">Valor NF</th>
-                                    <th class="p-3 text-left font-semibold">Espécie</th>
+                                    <th class="p-3 text-left font-semibold">Localização</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Origem da Doação</th>
+                                    <th class="p-3 text-left font-semibold">Estado</th>
+                                    <th class="p-3 text-left font-semibold">Quantidade</th>
+                                    <th class="p-3 text-left font-semibold">Observação</th>
                                     <th class="p-3 text-left font-semibold">Ações</th>
                                 </tr>
                             </thead>
@@ -282,7 +282,7 @@
         }
         
         function compareAndInitialize() {
-            systemTombamentos = new Set(fullInventory.map(item => item['TOMBAMENTO (A1)']?.trim()).filter(Boolean));
+            systemTombamentos = new Set(fullInventory.map(item => item['Tombamento']?.trim()).filter(Boolean));
             giapMap = new Map(giapInventory.map(item => [item['TOMBAMENTO (A1)']?.trim(), item]));
             initializePage();
         }
@@ -304,9 +304,9 @@
             filteredInventory = fullInventory.filter(item => {
                 return (!selectedUnidade || item.Unidade === selectedUnidade) &&
                        (!searchTerm || 
-                        (item['Descrição B(1)'] || '').toLowerCase().includes(searchTerm) ||
-                        (item['TOMBAMENTO (A1)'] || '').toLowerCase().includes(searchTerm) ||
-                        (item['Nome Fornecedor'] || '').toLowerCase().includes(searchTerm) ||
+                        (item['Descrição'] || '').toLowerCase().includes(searchTerm) ||
+                        (item['Tombamento'] || '').toLowerCase().includes(searchTerm) ||
+                        (item['Fornecedor'] || '').toLowerCase().includes(searchTerm) ||
                         (item.Unidade || '').toLowerCase().includes(searchTerm));
             });
             renderEditTable();
@@ -323,8 +323,16 @@
         }
 
         function hasDifferences(systemItem, giapItem) {
-            const headers = ['Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
-            return headers.some(h => (systemItem[h] || '') !== (giapItem[h] || ''));
+            const mapping = {
+                'Descrição': 'Descrição B(1)',
+                'Unidade': 'Unidade',
+                'Fornecedor': 'Nome Fornecedor',
+                'Tipo': 'Tipo'
+            };
+            return Object.keys(mapping).some(systemKey => {
+                const giapKey = mapping[systemKey];
+                return (systemItem[systemKey] || '').trim() !== (giapItem[giapKey] || '').trim();
+            });
         }
 
         function renderEditTable() {
@@ -332,16 +340,17 @@
                 editTableBody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-slate-500">Nenhum item encontrado no sistema com os filtros atuais.</td></tr>`;
                 return;
             }
-            const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
             editTableBody.innerHTML = filteredInventory.map(item => {
-                const tombo = item['TOMBAMENTO (A1)']?.trim();
+                const tombo = item['Tombamento']?.trim();
                 const giapItem = giapMap.get(tombo);
                 const showSync = giapItem && hasDifferences(item, giapItem);
                 return `
                 <tr id="row-${item.id}" data-doc-id="${item.id}" class="hover:bg-slate-50">
                     ${headers.map(h => {
                         const value = escapeHtml(item[h]);
-                        return `<td class="p-2 border-b"><input type="text" data-field="${h}" class="w-full p-1 border rounded" value="${value}" data-old-value="${value}"></td>`;
+                        const inputType = (h === 'Quantidade') ? 'number' : 'text';
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}" data-old-value="${value}"></td>`;
                     }).join('')}
                     <td class="p-2 border-b">
                         ${showSync ? `<button class="sync-with-giap bg-yellow-500 text-white px-2 py-1 text-xs rounded" data-doc-id="${item.id}">Sincronizar</button>` : ''}
@@ -379,7 +388,9 @@
         }
 
         function escapeHtml(unsafe) {
-            return (unsafe || '').toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            // Handle numbers and other types gracefully
+            if (unsafe === undefined || unsafe === null) return '';
+            return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
         
         // --- Event Listeners ---
@@ -388,7 +399,6 @@
         unidadeFilter.addEventListener('change', debouncedFilter);
         giapSearchInput.addEventListener('input', debouncedFilter);
         
-        // FEATURE: Auto-preenchimento ao digitar o tombamento
         editTableBody.addEventListener('change', async (e) => {
             const target = e.target;
             if (target.matches('input')) {
@@ -397,16 +407,24 @@
                 const newValue = target.value;
                 const oldValue = target.dataset.oldValue;
 
-                if (field === 'TOMBAMENTO (A1)' && newValue.trim() !== oldValue.trim()) {
+                if (field === 'Tombamento' && newValue.trim() && newValue.trim() !== oldValue.trim()) {
                     const giapItem = giapMap.get(newValue.trim());
                     if (giapItem) {
                         if (confirm(`Encontramos o item "${giapItem['Descrição B(1)']}" na planilha GIAP para este tombamento. Deseja preencher os campos automaticamente com os dados da planilha?`)) {
-                            const updates = {};
-                            const headers = ['Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
-                            headers.forEach(h => { updates[h] = giapItem[h] || ''; });
-                            updates['TOMBAMENTO (A1)'] = newValue.trim();
+                             const updates = {
+                                'Tombamento': giapItem['TOMBAMENTO (A1)'] || '',
+                                'Descrição': giapItem['Descrição B(1)'] || '',
+                                'Tipo': giapItem['Tipo'] || '',
+                                'Unidade': giapItem['Unidade'] || '',
+                                'Localização': '', // Default
+                                'Fornecedor': giapItem['Nome Fornecedor'] || '',
+                                'Origem da Doação': '', // Default
+                                'Estado': 'Novo', // Default
+                                'Quantidade': 1, // Default
+                                'Observação': '' // Default
+                            };
                             await saveRowUpdates(docId, updates);
-                            return; // Encerra para evitar o save individual
+                            return; 
                         }
                     }
                 }
@@ -455,19 +473,31 @@
         exportEditCsvBtn.addEventListener('click', () => exportToCsv(filteredInventory, 'inventario_sistema.csv'));
         exportGiapCsvBtn.addEventListener('click', () => exportToCsv(filteredGiap, 'planilha_giap.csv'));
 
-        async function addItemToSystem(item) {
-            const tombo = item['TOMBAMENTO (A1)']?.trim();
+        async function addItemToSystem(itemFromGiap) {
+            const tombo = itemFromGiap['TOMBAMENTO (A1)']?.trim();
             if (!tombo || systemTombamentos.has(tombo)) {
                  alert(`O item com tombamento ${tombo} já está cadastrado.`);
                 return;
             }
+            const newItem = {
+                'Tombamento': itemFromGiap['TOMBAMENTO (A1)'] || '',
+                'Descrição': itemFromGiap['Descrição B(1)'] || '',
+                'Tipo': itemFromGiap['Tipo'] || '',
+                'Unidade': itemFromGiap['Unidade'] || '',
+                'Localização': '',
+                'Fornecedor': itemFromGiap['Nome Fornecedor'] || '',
+                'Origem da Doação': '',
+                'Estado': 'Novo',
+                'Quantidade': 1,
+                'Observação': '',
+            };
             try {
                 const newDocRef = await addDoc(collection(db, 'patrimonio'), {
-                    ...item,
+                    ...newItem,
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp()
                 });
-                fullInventory.push({ id: newDocRef.id, ...item });
+                fullInventory.push({ id: newDocRef.id, ...newItem });
                 systemTombamentos.add(tombo);
                 await logAction('Adição via GIAP', { details: `Item com TOMBAMENTO ${tombo} adicionado.` });
                 applyAllFiltersAndRender();
@@ -492,14 +522,8 @@
                 autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Adicionando ${itemsToAdd.length} itens...`;
                 let count = 0;
                 for (const item of itemsToAdd) {
-                    try {
-                        const newDocRef = await addDoc(collection(db, 'patrimonio'), { ...item, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-                        fullInventory.push({ id: newDocRef.id, ...item });
-                        systemTombamentos.add(item['TOMBAMENTO (A1)'].trim());
-                        count++;
-                    } catch (e) { 
-                        console.error('Falha ao adicionar o item:', item, e);
-                    }
+                    await addItemToSystem(item);
+                    count++;
                 }
                 await logAction('Adição em Massa via GIAP', { details: `${count} de ${itemsToAdd.length} itens adicionados.` });
                 autoSaveStatus.textContent = `${count} itens adicionados com sucesso!`;
@@ -507,7 +531,6 @@
             }
         });
 
-        // Nova função para salvar múltiplos campos de uma linha de uma vez
         async function saveRowUpdates(docId, updates) {
             autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Salvando dados preenchidos...`;
             try {
@@ -515,10 +538,10 @@
                 await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
                 const item = fullInventory.find(i => i.id === docId);
                 if (item) { Object.assign(item, updates); }
-                await logAction('Preenchimento Automático', { itemId: docId, details: `Dados preenchidos via tombamento ${updates['TOMBAMENTO (A1)']}.` });
+                await logAction('Preenchimento Automático', { itemId: docId, details: `Dados preenchidos via tombamento ${updates['Tombamento']}.` });
                 autoSaveStatus.textContent = 'Dados preenchidos e salvos!';
                 autoSaveStatus.className = 'text-sm font-semibold status-saved';
-                applyAllFiltersAndRender(); // Re-renderiza a tabela para atualizar tudo
+                applyAllFiltersAndRender(); 
             } catch (error) {
                 console.error("Erro ao salvar atualizações da linha:", error);
                 autoSaveStatus.textContent = 'Erro ao salvar atualizações!';
@@ -529,19 +552,29 @@
         async function syncWithGiap(docId) {
             const item = fullInventory.find(i => i.id === docId);
             if (!item) return;
-            const tombo = item['TOMBAMENTO (A1)']?.trim();
+            const tombo = item['Tombamento']?.trim();
             const giapItem = giapMap.get(tombo);
             if (!giapItem) {
                 alert("Item correspondente não encontrado na planilha GIAP para sincronização.");
                 return;
             }
             const updates = {};
-            const headers = ['Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
-            headers.forEach(h => {
-                const giapValue = giapItem[h] || '';
-                const systemValue = item[h] || '';
-                if (giapValue !== systemValue) { updates[h] = giapValue; }
+            const mapping = {
+                'Descrição': 'Descrição B(1)',
+                'Unidade': 'Unidade',
+                'Fornecedor': 'Nome Fornecedor',
+                'Tipo': 'Tipo'
+            };
+
+            Object.keys(mapping).forEach(systemKey => {
+                const giapKey = mapping[systemKey];
+                const giapValue = giapItem[giapKey] || '';
+                const systemValue = item[systemKey] || '';
+                if (giapValue.trim() !== systemValue.trim()) {
+                    updates[systemKey] = giapValue;
+                }
             });
+
             if (Object.keys(updates).length > 0) {
                 try {
                     autoSaveStatus.innerHTML = `<div class="saving-spinner"></div>Sincronizando...`;
