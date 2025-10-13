@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 280px); }
@@ -61,7 +60,7 @@
             </div>
         </header>
         
-        <!-- Navegação -->
+        <!-- Navegação por Abas -->
         <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
             <div class="container mx-auto px-4">
                 <div id="edit-nav" class="flex space-x-1">
@@ -72,15 +71,63 @@
         </nav>
 
         <main class="container mx-auto p-4">
-            <!-- Aba GIAP -->
-            <div id="content-giap" class="fade-in">
+            
+            <!-- ABA: Edição em Massa (Inventário do Sistema) -->
+            <div id="content-edicao" class="fade-in">
                 <div class="card">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div class="md:col-span-1">
-                            <label for="giap-search-input" class="block text-sm font-medium mb-1">Buscar na Planilha GIAP</label>
-                            <input type="text" id="giap-search-input" placeholder="Buscar por tombo, descrição..." class="w-full p-2 border rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div class="md:col-span-2">
+                            <label for="edit-search-input" class="block text-sm font-medium mb-1">Buscar Itens no Sistema</label>
+                            <input type="text" id="edit-search-input" placeholder="Buscar por descrição, tombo..." class="w-full p-2 border rounded-lg">
                         </div>
                         <div>
+                            <label for="edit-tipo-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
+                            <select id="edit-tipo-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
+                        </div>
+                        <div>
+                            <label for="edit-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
+                            <select id="edit-unidade-filter" class="w-full p-2 border rounded-lg bg-white" disabled></select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <button id="export-edit-csv" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Exportar CSV</button>
+                        <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed hidden" disabled>Salvar Alterações</button>
+                    </div>
+                </div>
+
+                <div class="card mt-6 p-0 overflow-hidden">
+                    <div class="table-container overflow-y-auto">
+                        <table class="w-full text-sm min-w-[1600px]">
+                            <thead class="bg-slate-100 sticky top-0">
+                                <tr>
+                                    <th class="p-3 text-left font-semibold">Tombamento</th>
+                                    <th class="p-3 text-left font-semibold">Descrição</th>
+                                    <th class="p-3 text-left font-semibold">Tipo</th>
+                                    <th class="p-3 text-left font-semibold">Unidade</th>
+                                    <th class="p-3 text-left font-semibold">Localização</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Origem da Doação</th>
+                                    <th class="p-3 text-left font-semibold">Estado</th>
+                                    <th class="p-3 text-left font-semibold">Quantidade</th>
+                                    <th class="p-3 text-left font-semibold">Observação</th>
+                                    <th class="p-3 text-left font-semibold">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="edit-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: Planilha GIAP Completa -->
+            <div id="content-giap" class="hidden fade-in">
+                <div class="card">
+                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div class="md:col-span-1">
+                             <label for="giap-search-input" class="block text-sm font-medium mb-1">Buscar na Planilha GIAP</label>
+                            <input type="text" id="giap-search-input" placeholder="Buscar por tombo, descrição..." class="w-full p-2 border rounded-lg">
+                        </div>
+                         <div>
                             <label for="giap-unidade-filter" class="block text-sm font-medium mb-1">Filtrar por Unidade (GIAP)</label>
                             <select id="giap-unidade-filter" class="w-full p-2 border rounded-lg bg-white"></select>
                         </div>
@@ -118,14 +165,14 @@
             </div>
         </main>
     </div>
-
+    
     <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
         <div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando e analisando dados...</p></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -140,16 +187,27 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        
         const GIAP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaVN5Oiv5eDmdJpsCCys-0TQb9q-QaOeTqakTE6wBYup2sJYnPf2_uNIYkmrI7FIvis1aUxv21vB_k/pub?output=csv';
 
         let fullInventory = [], giapInventory = [];
-        let filteredGiap = [];
+        let filteredInventory = [], filteredGiap = [];
         let giapMap = new Map();
         let systemTombamentos = new Set();
-
+        
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
         const feedbackStatus = document.getElementById('feedback-status');
+
+        // Elements for "Inventário no Sistema" tab
+        const editTableBody = document.getElementById('edit-table-body');
+        const searchInput = document.getElementById('edit-search-input');
+        const tipoUnidadeFilter = document.getElementById('edit-tipo-unidade-filter');
+        const unidadeFilter = document.getElementById('edit-unidade-filter');
+        const exportEditCsvBtn = document.getElementById('export-edit-csv');
+        const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
+
+        // Elements for "Planilha GIAP" tab
         const giapTableBody = document.getElementById('giap-table-body');
         const giapSearchInput = document.getElementById('giap-search-input');
         const giapUnidadeFilter = document.getElementById('giap-unidade-filter');
@@ -157,15 +215,28 @@
         const giapSummaryEl = document.getElementById('giap-summary');
         const exportGiapCsvBtn = document.getElementById('export-giap-csv');
         const addAllMissingBtn = document.getElementById('add-all-missing-btn');
+
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         const logoutBtn = document.getElementById('logout-btn');
+
+        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this, a), delay); } };
+
+        async function logAction(type, details) {
+            try {
+                await addDoc(collection(db, 'historico'), {
+                    type,
+                    user: auth.currentUser.email,
+                    timestamp: serverTimestamp(),
+                    details
+                });
+            } catch (error) { console.error("Erro ao registrar log:", error); }
+        }
 
         onAuthStateChanged(auth, user => {
             if (user) {
                 document.getElementById('user-email-edit').textContent = user.email;
                 authGate.classList.remove('hidden');
-                loadingScreen.classList.add('hidden');
                 loadAllData();
             } else {
                 authGate.classList.add('hidden');
@@ -175,40 +246,57 @@
         });
 
         logoutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            window.location.href = 'index.html';
+            try {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            } catch (error) { console.error("Erro ao sair:", error); }
         });
 
         async function loadAllData() {
-            const [_, giapData] = await Promise.all([
-                loadFirebaseInventory(),
-                loadGiapInventory()
-            ]);
-            giapInventory = giapData;
-            compareAndInitialize();
+            loadingScreen.classList.remove('hidden');
+            try {
+                const [_, giapData] = await Promise.all([
+                    loadFirebaseInventory(),
+                    loadGiapInventory()
+                ]);
+                giapInventory = giapData;
+                compareAndInitialize();
+                loadingScreen.classList.add('hidden');
+            } catch (error) {
+                console.error("Erro fatal ao carregar dados:", error);
+                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Erro ao Carregar Dados</h2><p class="text-slate-600 mt-2">${error.message}</p></div>`;
+            }
         }
 
         async function loadFirebaseInventory() {
-            const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
-            fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Buscando inventário do Firestore.");
+            try {
+                const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
+                fullInventory = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+                console.error("Erro ao buscar inventário do Firebase:", error);
+                throw new Error("Falha ao comunicar com o banco de dados. Verifique sua conexão.");
+            }
         }
 
         function loadGiapInventory() {
             return new Promise((resolve, reject) => {
-                Papa.parse(GIAP_SHEET_URL, {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => resolve(results.data),
-                    error: reject
+                Papa.parse(GIAP_SHEET_URL, { 
+                    download: true, 
+                    header: true, 
+                    skipEmptyLines: true, 
+                    complete: (results) => resolve(results.data), 
+                    error: (err) => {
+                        console.error("Erro ao carregar planilha GIAP:", err);
+                        reject(new Error("Não foi possível carregar a planilha GIAP. Verifique o link e a conexão."));
+                    }
                 });
             });
         }
-
-        // ✅ Corrigido para "TOMBAMENTO"
+        
         function compareAndInitialize() {
-            systemTombamentos = new Set(fullInventory.map(i => i['Tombamento']?.trim()).filter(Boolean));
-            giapMap = new Map(giapInventory.map(i => [i['TOMBAMENTO']?.trim(), i]));
+            systemTombamentos = new Set(fullInventory.map(item => item['Tombamento']?.trim()).filter(Boolean));
+            giapMap = new Map(giapInventory.map(item => [item['TOMBAMENTO (A1)']?.trim(), item]));
             initializePage();
         }
 
@@ -216,84 +304,238 @@
             populateFilters();
             applyAllFiltersAndRender();
         }
-
+        
         function populateFilters() {
-            const unidadesGiap = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
+            const tiposUnidade = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
+            tipoUnidadeFilter.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tiposUnidade.map(u => `<option value="${u}">${u}</option>`).join('');
+
+            const unidadesGiap = [...new Set(giapInventory.map(item => item.Unidade).filter(Boolean))].sort();
             giapUnidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidadesGiap.map(u => `<option value="${u}">${u}</option>`).join('');
+        }
+        
+        function updateUnidadeOptions() {
+            const selectedTipo = tipoUnidadeFilter.value;
+            unidadeFilter.innerHTML = '';
+            if (!selectedTipo) {
+                unidadeFilter.innerHTML = '<option value="">Selecione um Tipo</option>';
+                unidadeFilter.disabled = true;
+                return;
+            }
+            const unidades = [...new Set(fullInventory.filter(item => item.Tipo === selectedTipo).map(item => item.Unidade).filter(Boolean))].sort();
+            unidadeFilter.innerHTML = '<option value="">TODAS AS UNIDADES</option>' + unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+            unidadeFilter.disabled = false;
         }
 
         function applyAllFiltersAndRender() {
+            // Aba 1: Inventário no Sistema (Firebase)
+            const searchTerm = (searchInput.value || '').toLowerCase().trim();
+            const selectedTipo = tipoUnidadeFilter.value;
+            const selectedUnidade = unidadeFilter.value;
+            
+            filteredInventory = fullInventory.filter(item => {
+                const searchMatch = !searchTerm || (item['Descrição'] || '').toLowerCase().includes(searchTerm) || (item['Tombamento'] || '').toLowerCase().includes(searchTerm);
+                const tipoMatch = !selectedTipo || item.Tipo === selectedTipo;
+                const unidadeMatch = !selectedUnidade || item.Unidade === selectedUnidade;
+                return searchMatch && tipoMatch && unidadeMatch;
+            });
+            renderEditTable();
+
+            // Aba 2: Planilha GIAP Completa
             const giapSearchTerm = (giapSearchInput.value || '').toLowerCase().trim();
             const giapSelectedUnidade = giapUnidadeFilter.value;
-            filteredGiap = giapInventory.filter(i => {
-                const searchMatch = !giapSearchTerm || (i['Descrição'] || '').toLowerCase().includes(giapSearchTerm) || (i['TOMBAMENTO'] || '').toLowerCase().includes(giapSearchTerm);
-                const unidadeMatch = !giapSelectedUnidade || i.Unidade === giapSelectedUnidade;
-                return searchMatch && unidadeMatch;
+
+            filteredGiap = giapInventory.filter(item => {
+                 const searchMatch = !giapSearchTerm || (item['Descrição B(1)'] || '').toLowerCase().includes(giapSearchTerm) || (item['TOMBAMENTO (A1)'] || '').toLowerCase().includes(giapSearchTerm);
+                 const unidadeMatch = !giapSelectedUnidade || item.Unidade === giapSelectedUnidade;
+                 return searchMatch && unidadeMatch;
             });
             renderGiapTable();
         }
 
-        // ✅ Corrigido para exibir números de "TOMBAMENTO"
+        function hasDifferences(systemItem, giapItem) {
+            const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
+            return Object.keys(mapping).some(systemKey => {
+                const giapKey = mapping[systemKey];
+                return (systemItem[systemKey] || '').trim() !== (giapItem[giapKey] || '').trim();
+            });
+        }
+
+        function renderEditTable() {
+            if (filteredInventory.length === 0) {
+                editTableBody.innerHTML = `<tr><td colspan="11" class="text-center p-8 text-slate-500">Nenhum item encontrado no sistema com os filtros atuais.</td></tr>`;
+                return;
+            }
+            const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+            editTableBody.innerHTML = filteredInventory.map(item => {
+                const tombo = item['Tombamento']?.trim();
+                const giapItem = giapMap.get(tombo);
+                const showSync = giapItem && hasDifferences(item, giapItem);
+                
+                const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
+                const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${item.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
+
+                return `
+                <tr id="row-${item.id}" data-doc-id="${item.id}" class="hover:bg-slate-50 transition-colors">
+                    ${headers.map(h => {
+                        if (h === 'Estado') {
+                            return `<td class="p-2 border-b">${estadoSelect}</td>`;
+                        }
+                        const value = escapeHtml(item[h]);
+                        const inputType = (h === 'Quantidade') ? 'number' : 'text';
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
+                    }).join('')}
+                    <td class="p-2 border-b">
+                        ${showSync ? `<button class="sync-with-giap bg-yellow-500 text-white px-2 py-1 text-xs rounded" data-doc-id="${item.id}">Sincronizar</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+        
         function renderGiapTable() {
-            const itemsNaoCadastrados = giapInventory.filter(i => !systemTombamentos.has(i['TOMBAMENTO']?.trim())).length;
+            const itemsNaoCadastrados = giapInventory.filter(item => !systemTombamentos.has(item['TOMBAMENTO (A1)']?.trim())).length;
             giapCountEl.textContent = `${giapInventory.length} itens totais`;
             giapSummaryEl.textContent = `${itemsNaoCadastrados} itens ainda não cadastrados.`;
 
             if (filteredGiap.length === 0) {
-                giapTableBody.innerHTML = `<tr><td colspan="12" class="text-center p-8 text-slate-500">Nenhum item encontrado.</td></tr>`;
+                giapTableBody.innerHTML = `<tr><td colspan="12" class="text-center p-8 text-slate-500">Nenhum item encontrado na planilha com os filtros atuais.</td></tr>`;
                 return;
             }
-
-            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
             giapTableBody.innerHTML = filteredGiap.map(item => {
-                const tombo = item['TOMBAMENTO']?.trim();
+                const tombo = item['TOMBAMENTO (A1)']?.trim();
                 const isCadastrado = systemTombamentos.has(tombo);
                 const statusHtml = isCadastrado 
                     ? `<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">Cadastrado</span>` 
                     : `<span class="text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">Não Cadastrado</span>`;
-                const actionHtml = isCadastrado ? '' : `<button class="add-to-system bg-green-500 text-white px-2 py-1 text-xs rounded" data-tombo="${tombo}">Adicionar</button>`;
+                const actionHtml = isCadastrado 
+                    ? '' 
+                    : `<button class="add-to-system bg-green-500 text-white px-2 py-1 text-xs rounded" data-tombo="${escapeHtml(tombo)}">Adicionar</button>`;
+
                 return `<tr class="border-b ${isCadastrado ? 'bg-slate-50' : 'bg-white'}">
-                    <td class="p-2">${statusHtml}</td>
-                    <td class="p-2 text-slate-700">${tombo}</td>
-                    ${headers.slice(1).map(h => `<td class="p-2 text-slate-700">${item[h] || ''}</td>`).join('')}
-                    <td class="p-2">${actionHtml}</td>
+                     <td class="p-2">${statusHtml}</td>
+                     ${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}
+                     <td class="p-2">${actionHtml}</td>
                 </tr>`;
             }).join('');
         }
 
-        async function addItemToSystem(itemFromGiap) {
-            const tombo = itemFromGiap['TOMBAMENTO']?.trim();
-            if (!tombo || systemTombamentos.has(tombo)) {
-                alert(`O item com tombamento ${tombo} já está cadastrado.`);
-                return;
-            }
-            const newItem = {
-                'Tombamento': itemFromGiap['TOMBAMENTO'] || '',
-                'Descrição': itemFromGiap['Descrição'] || '',
-                'Tipo': itemFromGiap['Tipo'] || '',
-                'Unidade': itemFromGiap['Unidade'] || '',
-                'Fornecedor': itemFromGiap['Fornecedor'] || '',
-                'Localização': '',
-                'Origem da Doação': '',
-                'Estado': 'Novo',
-                'Quantidade': 1,
-                'Observação': ''
-            };
-            const newDocRef = await addDoc(collection(db, 'patrimonio'), { ...newItem, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-            fullInventory.push({ id: newDocRef.id, ...newItem });
-            systemTombamentos.add(tombo);
-            applyAllFiltersAndRender();
+        function escapeHtml(unsafe) {
+            if (unsafe === undefined || unsafe === null) return '';
+            return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+        
+        function markRowAsDirty(rowElement) {
+            rowElement.classList.add('is-dirty');
+            saveAllChangesBtn.disabled = false;
+            saveAllChangesBtn.classList.remove('hidden');
         }
 
-        giapSearchInput.addEventListener('input', applyAllFiltersAndRender);
-        giapUnidadeFilter.addEventListener('change', applyAllFiltersAndRender);
-        exportGiapCsvBtn.addEventListener('click', () => {
-            const csv = Papa.unparse(filteredGiap);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'planilha_giap.csv';
-            link.click();
+        // --- Event Listeners ---
+        const debouncedFilter = debounce(applyAllFiltersAndRender, 400);
+        searchInput.addEventListener('input', debouncedFilter);
+        tipoUnidadeFilter.addEventListener('change', () => {
+            updateUnidadeOptions();
+            debouncedFilter();
+        });
+        unidadeFilter.addEventListener('change', debouncedFilter);
+        giapSearchInput.addEventListener('input', debouncedFilter);
+        giapUnidadeFilter.addEventListener('change', debouncedFilter);
+        
+        editTableBody.addEventListener('change', async (e) => {
+            const target = e.target;
+            if (target.matches('input, select')) {
+                const row = target.closest('tr');
+                markRowAsDirty(row);
+
+                if (target.dataset.field === 'Tombamento' && target.value.trim()) {
+                    const giapItem = giapMap.get(target.value.trim());
+                    if (giapItem) {
+                        if (confirm(`Encontramos o item "${giapItem['Descrição B(1)']}" na planilha GIAP. Deseja preencher os campos automaticamente? (O 'Estado' não será alterado)`)) {
+                             const updates = {
+                                'Tombamento': giapItem['TOMBAMENTO (A1)'] || '', 
+                                'Descrição': giapItem['Descrição B(1)'] || '', 
+                                'Tipo': giapItem['Tipo'] || '',
+                                'Unidade': giapItem['Unidade'] || '', 
+                                'Fornecedor': giapItem['Nome Fornecedor'] || '',
+                            };
+                            for (const [field, value] of Object.entries(updates)) {
+                                const input = row.querySelector(`[data-field="${field}"]`);
+                                if (input) input.value = value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        saveAllChangesBtn.addEventListener('click', async () => {
+            const dirtyRows = document.querySelectorAll('#edit-table-body tr.is-dirty');
+            if (dirtyRows.length === 0) {
+                alert("Nenhuma alteração para salvar.");
+                return;
+            }
+
+            feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Salvando ${dirtyRows.length} alterações...`;
+            feedbackStatus.className = 'text-sm font-semibold status-saving';
+
+            const batch = writeBatch(db);
+            let changesCount = 0;
+
+            dirtyRows.forEach(row => {
+                const docId = row.dataset.docId;
+                if (!docId) return; // Skip rows without docId (e.g. headers)
+                const docRef = doc(db, 'patrimonio', docId);
+                const updates = {};
+                row.querySelectorAll('input, select').forEach(input => {
+                    updates[input.dataset.field] = input.type === 'number' ? Number(input.value) : input.value;
+                });
+                updates.updatedAt = serverTimestamp();
+                batch.update(docRef, updates);
+                changesCount++;
+            });
+
+            try {
+                await batch.commit();
+                await logAction('Salvar em Massa', { details: `${changesCount} itens atualizados.` });
+                
+                dirtyRows.forEach(row => {
+                    const docId = row.dataset.docId;
+                    const item = fullInventory.find(i => i.id === docId);
+                    if (item) {
+                        row.querySelectorAll('input, select').forEach(input => {
+                            item[input.dataset.field] = input.type === 'number' ? Number(input.value) : input.value;
+                        });
+                    }
+                    row.classList.remove('is-dirty');
+                });
+                
+                feedbackStatus.textContent = `${changesCount} alterações salvas com sucesso!`;
+                feedbackStatus.className = 'text-sm font-semibold status-saved';
+                saveAllChangesBtn.disabled = true;
+                saveAllChangesBtn.classList.add('hidden');
+
+            } catch (error) {
+                console.error("Erro ao salvar alterações:", error);
+                feedbackStatus.textContent = 'Erro ao salvar alterações!';
+                feedbackStatus.className = 'text-sm font-semibold status-error';
+            }
+        });
+
+        editTableBody.addEventListener('click', e => {
+             if (e.target.classList.contains('sync-with-giap')) {
+                const docId = e.target.dataset.docId;
+                if (confirm('Tem certeza que deseja sincronizar este item com os dados do GIAP?')) {
+                    syncWithGiap(docId);
+                }
+            }
+        });
+        
+        giapTableBody.addEventListener('click', e => {
+            if (e.target.classList.contains('add-to-system')) {
+                const tombo = e.target.dataset.tombo;
+                const item = giapMap.get(tombo);
+                if (item) addItemToSystem(item);
+            }
         });
 
         navButtons.forEach(button => {
@@ -303,6 +545,81 @@
                 contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
             });
         });
+
+        function exportToCsv(data, filename) {
+            const csv = Papa.unparse(data);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        exportEditCsvBtn.addEventListener('click', () => exportToCsv(filteredInventory, 'inventario_sistema.csv'));
+        exportGiapCsvBtn.addEventListener('click', () => exportToCsv(filteredGiap, 'planilha_giap.csv'));
+
+        async function addItemToSystem(itemFromGiap) {
+            const tombo = itemFromGiap['TOMBAMENTO (A1)']?.trim();
+            if (!tombo || systemTombamentos.has(tombo)) {
+                 alert(`O item com tombamento ${tombo} já está cadastrado.`);
+                return;
+            }
+            const newItem = {
+                'Tombamento': itemFromGiap['TOMBAMENTO (A1)'] || '', 'Descrição': itemFromGiap['Descrição B(1)'] || '', 'Tipo': itemFromGiap['Tipo'] || '',
+                'Unidade': itemFromGiap['Unidade'] || '', 'Localização': '', 'Fornecedor': itemFromGiap['Nome Fornecedor'] || '', 'Origem da Doação': '',
+                'Estado': 'Novo', 'Quantidade': 1, 'Observação': ''
+            };
+            try {
+                const newDocRef = await addDoc(collection(db, 'patrimonio'), { ...newItem, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                fullInventory.push({ id: newDocRef.id, ...newItem });
+                systemTombamentos.add(tombo);
+                await logAction('Adição via GIAP', { details: `Item com TOMBAMENTO ${tombo} adicionado.` });
+                applyAllFiltersAndRender();
+            } catch (error) { console.error("Erro ao adicionar item:", error); alert('Erro ao adicionar item ao sistema.'); }
+        }
+        
+        addAllMissingBtn.addEventListener('click', async () => {
+            const itemsToAdd = giapInventory.filter(item => { const tombo = item['TOMBAMENTO (A1)']?.trim(); return tombo && !systemTombamentos.has(tombo); });
+            if (itemsToAdd.length === 0) { alert("Todos os itens da planilha GIAP já se encontram no sistema."); return; }
+            if (confirm(`Você está prestes a adicionar ${itemsToAdd.length} itens faltantes ao sistema. Deseja continuar?`)) {
+                feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Adicionando ${itemsToAdd.length} itens...`;
+                let count = 0;
+                for (const item of itemsToAdd) { await addItemToSystem(item); count++; }
+                await logAction('Adição em Massa via GIAP', { details: `${count} de ${itemsToAdd.length} itens adicionados.` });
+                feedbackStatus.textContent = `${count} itens adicionados com sucesso!`;
+                applyAllFiltersAndRender();
+            }
+        });
+        
+        async function syncWithGiap(docId) {
+            const item = fullInventory.find(i => i.id === docId);
+            if (!item) return;
+            const tombo = item['Tombamento']?.trim();
+            const giapItem = giapMap.get(tombo);
+            if (!giapItem) { alert("Item correspondente não encontrado na planilha GIAP."); return; }
+            
+            const updates = {};
+            const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
+            Object.keys(mapping).forEach(systemKey => {
+                const giapKey = mapping[systemKey];
+                const giapValue = giapItem[giapKey] || '';
+                const systemValue = item[systemKey] || '';
+                if (giapValue.trim() !== systemValue.trim()) { updates[systemKey] = giapValue; }
+            });
+
+            if (Object.keys(updates).length > 0) {
+                try {
+                    feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Sincronizando...`;
+                    const docRef = doc(db, 'patrimonio', docId);
+                    await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
+                    Object.assign(item, updates);
+                    await logAction('Sincronização com GIAP', { itemId: docId, details: `Campos atualizados: ${Object.keys(updates).join(', ')}` });
+                    applyAllFiltersAndRender();
+                    feedbackStatus.textContent = 'Sincronizado com sucesso!';
+                } catch (error) { console.error("Erro na sincronização:", error); feedbackStatus.textContent = 'Erro na sincronização!'; }
+            } else { alert("Nenhuma diferença encontrada. Os dados já estão sincronizados."); }
+        }
     </script>
 </body>
 </html>
+
