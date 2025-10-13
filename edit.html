@@ -41,6 +41,7 @@
         table { table-layout: fixed; }
         th, td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .is-dirty { background-color: #fef9c3 !important; }
+        .is-divergent { background-color: #feefc7 !important; }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -90,8 +91,10 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
+                        <button id="check-divergences-btn" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">Verificar Divergências</button>
                         <button id="export-edit-csv" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Exportar CSV</button>
                         <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed hidden" disabled>Salvar Alterações</button>
+                        <button id="sync-all-divergences-btn" class="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600 hidden">Sincronizar Tudo</button>
                     </div>
                 </div>
 
@@ -206,6 +209,8 @@
         const unidadeFilter = document.getElementById('edit-unidade-filter');
         const exportEditCsvBtn = document.getElementById('export-edit-csv');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
+        const checkDivergencesBtn = document.getElementById('check-divergences-btn');
+        const syncAllDivergencesBtn = document.getElementById('sync-all-divergences-btn');
 
         // Elements for "Planilha GIAP" tab
         const giapTableBody = document.getElementById('giap-table-body');
@@ -296,6 +301,7 @@
         
         function compareAndInitialize() {
             systemTombamentos = new Set(fullInventory.map(item => item['Tombamento']?.trim()).filter(Boolean));
+            // Correct Key: 'TOMBAMENTO (A1)'
             giapMap = new Map(giapInventory.map(item => [item['TOMBAMENTO (A1)']?.trim(), item]));
             initializePage();
         }
@@ -345,6 +351,7 @@
             const giapSelectedUnidade = giapUnidadeFilter.value;
 
             filteredGiap = giapInventory.filter(item => {
+                 // Correct Keys: 'Descrição B(1)' and 'TOMBAMENTO (A1)'
                  const searchMatch = !giapSearchTerm || (item['Descrição B(1)'] || '').toLowerCase().includes(giapSearchTerm) || (item['TOMBAMENTO (A1)'] || '').toLowerCase().includes(giapSearchTerm);
                  const unidadeMatch = !giapSelectedUnidade || item.Unidade === giapSelectedUnidade;
                  return searchMatch && unidadeMatch;
@@ -353,6 +360,7 @@
         }
 
         function hasDifferences(systemItem, giapItem) {
+            // Correct Mapping
             const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
             return Object.keys(mapping).some(systemKey => {
                 const giapKey = mapping[systemKey];
@@ -392,6 +400,7 @@
         }
         
         function renderGiapTable() {
+            // Correct Key: 'TOMBAMENTO (A1)'
             const itemsNaoCadastrados = giapInventory.filter(item => !systemTombamentos.has(item['TOMBAMENTO (A1)']?.trim())).length;
             giapCountEl.textContent = `${giapInventory.length} itens totais`;
             giapSummaryEl.textContent = `${itemsNaoCadastrados} itens ainda não cadastrados.`;
@@ -400,6 +409,7 @@
                 giapTableBody.innerHTML = `<tr><td colspan="12" class="text-center p-8 text-slate-500">Nenhum item encontrado na planilha com os filtros atuais.</td></tr>`;
                 return;
             }
+            // Correct Headers for Display
             const headers = ['TOMBAMENTO (A1)', 'Descrição B(1)', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
             giapTableBody.innerHTML = filteredGiap.map(item => {
                 const tombo = item['TOMBAMENTO (A1)']?.trim();
@@ -451,6 +461,7 @@
                     const giapItem = giapMap.get(target.value.trim());
                     if (giapItem) {
                         if (confirm(`Encontramos o item "${giapItem['Descrição B(1)']}" na planilha GIAP. Deseja preencher os campos automaticamente? (O 'Estado' não será alterado)`)) {
+                             // Correct Mapping
                              const updates = {
                                 'Tombamento': giapItem['TOMBAMENTO (A1)'] || '', 
                                 'Descrição': giapItem['Descrição B(1)'] || '', 
@@ -559,11 +570,13 @@
         exportGiapCsvBtn.addEventListener('click', () => exportToCsv(filteredGiap, 'planilha_giap.csv'));
 
         async function addItemToSystem(itemFromGiap) {
+            // Correct Key: 'TOMBAMENTO (A1)'
             const tombo = itemFromGiap['TOMBAMENTO (A1)']?.trim();
             if (!tombo || systemTombamentos.has(tombo)) {
                  alert(`O item com tombamento ${tombo} já está cadastrado.`);
                 return;
             }
+            // Correct Mapping
             const newItem = {
                 'Tombamento': itemFromGiap['TOMBAMENTO (A1)'] || '', 'Descrição': itemFromGiap['Descrição B(1)'] || '', 'Tipo': itemFromGiap['Tipo'] || '',
                 'Unidade': itemFromGiap['Unidade'] || '', 'Localização': '', 'Fornecedor': itemFromGiap['Nome Fornecedor'] || '', 'Origem da Doação': '',
@@ -579,6 +592,7 @@
         }
         
         addAllMissingBtn.addEventListener('click', async () => {
+            // Correct Key: 'TOMBAMENTO (A1)'
             const itemsToAdd = giapInventory.filter(item => { const tombo = item['TOMBAMENTO (A1)']?.trim(); return tombo && !systemTombamentos.has(tombo); });
             if (itemsToAdd.length === 0) { alert("Todos os itens da planilha GIAP já se encontram no sistema."); return; }
             if (confirm(`Você está prestes a adicionar ${itemsToAdd.length} itens faltantes ao sistema. Deseja continuar?`)) {
@@ -599,6 +613,7 @@
             if (!giapItem) { alert("Item correspondente não encontrado na planilha GIAP."); return; }
             
             const updates = {};
+            // Correct Mapping
             const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
             Object.keys(mapping).forEach(systemKey => {
                 const giapKey = mapping[systemKey];
@@ -619,6 +634,77 @@
                 } catch (error) { console.error("Erro na sincronização:", error); feedbackStatus.textContent = 'Erro na sincronização!'; }
             } else { alert("Nenhuma diferença encontrada. Os dados já estão sincronizados."); }
         }
+
+        checkDivergencesBtn.addEventListener('click', () => {
+            feedbackStatus.textContent = 'Verificando divergências...';
+            let divergenceCount = 0;
+            document.querySelectorAll('#edit-table-body tr').forEach(row => {
+                const docId = row.dataset.docId;
+                const item = filteredInventory.find(i => i.id === docId);
+                if (!item) return;
+
+                const tombo = item['Tombamento']?.trim();
+                const giapItem = giapMap.get(tombo);
+                if(giapItem && hasDifferences(item, giapItem)) {
+                    row.classList.add('is-divergent');
+                    divergenceCount++;
+                } else {
+                    row.classList.remove('is-divergent');
+                }
+            });
+
+            if (divergenceCount > 0) {
+                feedbackStatus.textContent = `${divergenceCount} itens com dados divergentes da planilha GIAP encontrados.`;
+                syncAllDivergencesBtn.classList.remove('hidden');
+            } else {
+                feedbackStatus.textContent = 'Nenhuma divergência encontrada. Todos os itens estão sincronizados!';
+                syncAllDivergencesBtn.classList.add('hidden');
+            }
+        });
+
+        syncAllDivergencesBtn.addEventListener('click', async () => {
+            const divergentRows = document.querySelectorAll('#edit-table-body tr.is-divergent');
+            if(divergentRows.length === 0) {
+                alert("Nenhuma divergência para sincronizar.");
+                return;
+            }
+            if(!confirm(`Você está prestes a sincronizar ${divergentRows.length} itens com a planilha GIAP. Esta ação não pode ser desfeita. Deseja continuar?`)) return;
+
+            feedbackStatus.innerHTML = `<div class="saving-spinner"></div>Sincronizando ${divergentRows.length} itens...`;
+            const batch = writeBatch(db);
+            let syncCount = 0;
+
+            divergentRows.forEach(row => {
+                const docId = row.dataset.docId;
+                const item = fullInventory.find(i => i.id === docId);
+                const giapItem = giapMap.get(item?.Tombamento?.trim());
+
+                if (docId && item && giapItem) {
+                    const docRef = doc(db, 'patrimonio', docId);
+                    const updates = {};
+                    // Correct Mapping
+                    const mapping = { 'Descrição': 'Descrição B(1)', 'Unidade': 'Unidade', 'Fornecedor': 'Nome Fornecedor', 'Tipo': 'Tipo' };
+                    Object.keys(mapping).forEach(systemKey => {
+                        updates[systemKey] = giapItem[mapping[systemKey]] || '';
+                    });
+                    updates.updatedAt = serverTimestamp();
+                    batch.update(docRef, updates);
+                    syncCount++;
+                }
+            });
+
+            try {
+                await batch.commit();
+                await logAction('Sincronização em Massa', { details: `${syncCount} itens sincronizados com a planilha GIAP.` });
+                feedbackStatus.textContent = `${syncCount} itens sincronizados com sucesso! Recarregando...`;
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                console.error("Erro ao sincronizar em massa:", error);
+                feedbackStatus.textContent = 'Erro ao sincronizar. Verifique o console.';
+                feedbackStatus.className = 'text-sm font-semibold status-error';
+            }
+        });
+
     </script>
 </body>
 </html>
