@@ -161,8 +161,9 @@
         import { getFirestore, collection, query, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+        // BUG FIX: A configuração foi alinhada com a do index.html para garantir a mesma sessão de usuário.
         const firebaseConfig = {
-            apiKey: "AIzaSyBq9vMW3Aba8fqgXfRNtxqOltnTiaKjnU",
+            apiKey: "AIzaSyBq9vMW39Cba8fqgXfRNtxqOltnTiaKjnU",
             authDomain: "controle-de-patrimonio-semcas.firebaseapp.com",
             projectId: "controle-de-patrimonio-semcas",
             storageBucket: "controle-de-patrimonio-semcas.firebasestorage.app",
@@ -217,10 +218,8 @@
             }
         }, 1500);
 
-        // BUG FIX: Padronizado para usar a coleção 'historico' em vez de 'logs'
         async function logAction(type, details) {
             try {
-                // Alterado de 'logs' para 'historico' para corresponder às regras e ao index.html
                 await addDoc(collection(db, 'historico'), {
                     type,
                     user: auth.currentUser.email,
@@ -236,8 +235,11 @@
             if (user) {
                 document.getElementById('user-email-edit').textContent = user.email;
                 authGate.classList.remove('hidden');
+                loadingScreen.classList.add('hidden');
                 loadAllData();
             } else {
+                authGate.classList.add('hidden');
+                loadingScreen.classList.remove('hidden');
                 loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2><p class="text-slate-600 mt-2">Você precisa estar logado para acessar esta página.</p></div>`;
             }
         });
@@ -245,7 +247,7 @@
         logoutBtn.addEventListener('click', async () => {
             try {
                 await signOut(auth);
-                window.location.reload();
+                window.location.href = 'index.html'; // Redireciona para a página principal ao sair
             } catch (error) {
                 console.error("Erro ao sair:", error);
             }
@@ -253,7 +255,8 @@
 
         async function loadAllData() {
             try {
-                const [_, giapData] = await Promise.all([loadFirebaseInventory(), loadGiapInventory()]);
+                await loadFirebaseInventory();
+                const giapData = await loadGiapInventory();
                 giapInventory = giapData;
                 compareAndInitialize();
             } catch (error) {
@@ -291,7 +294,6 @@
         }
 
         function initializePage() {
-            loadingScreen.classList.add('hidden');
             populateFilters();
             applyAllFiltersAndRender();
         }
@@ -350,7 +352,6 @@
                         if (h === 'Cadastro' || h === 'Entrada') inputType = 'date';
                         let value = escapeHtml(item[h] || '');
                         if (inputType === 'date' && value) {
-                            // Assume value is in DD/MM/YYYY, convert to YYYY-MM-DD
                             const parts = value.split('/');
                             if (parts.length === 3) value = `${parts[2]}-${parts[1]}-${parts[0]}`;
                         }
@@ -381,7 +382,7 @@
         }
 
         function escapeHtml(unsafe) {
-            return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            return (unsafe || '').toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
         
         // --- Event Listeners ---
@@ -398,13 +399,8 @@
                 let newValue = target.value;
                 const oldValue = target.dataset.oldValue;
 
-                if (field === 'Cadastro' || field === 'Entrada') {
-                    // Convert back to DD/MM/YYYY if needed, but store as is
-                }
-
                 if (newValue !== oldValue) {
-                    // Validação básica
-                    if (field === 'Valor NF' && isNaN(newValue)) {
+                    if (field === 'Valor NF' && isNaN(parseFloat(newValue))) {
                         alert('Valor NF deve ser um número válido.');
                         target.value = oldValue;
                         return;
@@ -423,7 +419,6 @@
             });
         });
 
-        // Exportar CSV
         function exportToCsv(data, filename) {
             const csv = Papa.unparse(data);
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -441,7 +436,6 @@
             exportToCsv(filteredRestantes, 'tombamentos_restantes.csv');
         });
 
-        // Adicionar itens restantes
         async function addItemToSystem(item) {
             try {
                 const newDocRef = await addDoc(collection(db, 'patrimonio'), {
@@ -471,13 +465,12 @@
 
         addAllRestantesBtn.addEventListener('click', async () => {
             if (confirm('Tem certeza que deseja adicionar todos os itens restantes ao sistema?')) {
-                for (const item of [...filteredRestantes]) {  // Copy to avoid modification issues
+                for (const item of [...filteredRestantes]) {
                     await addItemToSystem(item);
                 }
             }
         });
 
-        // Sincronização com GIAP
         async function syncWithGiap(docId) {
             const item = fullInventory.find(i => i.id === docId);
             if (!item) return;
@@ -525,3 +518,4 @@
     </script>
 </body>
 </html>
+
