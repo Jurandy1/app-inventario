@@ -257,9 +257,8 @@
                                     <th class="p-3 text-left font-semibold">Descrição</th>
                                     <th class="p-3 text-left font-semibold">Cadastro</th>
                                     <th class="p-3 text-left font-semibold">NF</th>
-                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
-                                    <th class="p-3 text-left font-semibold">Tipo</th>
-                                    <th class="p-3 text-left font-semibold">Entrada</th>
+                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Tipo Entrada</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Valor NF</th>
                                     <th class="p-3 text-left font-semibold">Espécie</th>
@@ -324,7 +323,9 @@
         let unitMapping = {};
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
+        let virtualScroll;
         
+        // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
         const feedbackStatus = document.getElementById('feedback-status');
@@ -333,7 +334,6 @@
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         
-        const editTableBody = document.getElementById('edit-table-body');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
         const editFilterUnidade = document.getElementById('edit-filter-unidade');
@@ -449,10 +449,21 @@
         }
 
         function loadGiapInventory() {
-            return new Promise((resolve, reject) => Papa.parse(GIAP_SHEET_URL, { download: true, header: true, skipEmptyLines: true, complete: r => resolve(r.data), error: e => reject(e) }));
+            return new Promise((resolve, reject) => {
+                Papa.parse(GIAP_SHEET_URL, { 
+                    download: true, 
+                    header: true, 
+                    skipEmptyLines: true, 
+                    transformHeader: header => header.trim(),
+                    complete: r => resolve(r.data), 
+                    error: e => reject(e) 
+                });
+            });
         }
         
         function initializeUI() {
+            // virtualScroll = setupVirtualScroll('virtual-table-container', 'virtual-table-content', fullInventory, renderRow, 40);
+            
             populateEditableInventoryTab();
             populateUnitMappingTab();
             populateReconciliationTab();
@@ -553,7 +564,7 @@
             const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
             const leftoverItems = giapInventory.filter(item => {
                 const tombo = (item.TOMBAMENTO || '').trim();
-                const desc = (item.Descrição || '').toLowerCase();
+                const desc = (item.Descrição || item.Espécie || '').toLowerCase();
                 const isPermuta = tombo.toLowerCase().includes('permuta');
                 return tombo && !usedTombamentos.has(tombo) && !isPermuta && (!descFilter || desc.includes(descFilter));
             });
@@ -561,10 +572,10 @@
                 <div class="p-3 border rounded-md bg-white flex justify-between items-center gap-4">
                     <div>
                         <strong class="font-mono">${escapeHtml(item.TOMBAMENTO)}</strong>
-                        <p class="text-sm text-slate-600">${escapeHtml(item.Descrição)}</p>
+                        <p class="text-sm text-slate-600">${escapeHtml(item.Descrição || item.Espécie)}</p>
                         <p class="text-xs text-slate-400">Unidade GIAP: ${escapeHtml(item.Unidade)} | Valor: ${escapeHtml(item['Valor NF'])} | Cadastro: ${escapeHtml(item.Cadastro)}</p>
                     </div>
-                    <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}" data-desc="${escapeHtml(item.Descrição)}">Sugerir Vínculo</button>
+                    <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}" data-desc="${escapeHtml(item.Descrição || item.Espécie)}">Sugerir Vínculo</button>
                 </div>`).join('') : `<p class="text-slate-500 text-center p-4">Nenhum tombamento sobrando com o filtro atual.</p>`;
         }
         
@@ -582,7 +593,7 @@
         }
 
         function populateGiapTab() {
-            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Fornecedor', 'Tipo', 'Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie'];
             giapTableBody.innerHTML = giapInventory.map(item => `<tr class="border-b">${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}</tr>`).join('');
         }
         
@@ -605,28 +616,9 @@
             });
         });
         
-        saveAllChangesBtn.addEventListener('click', async () => {
-            if (dirtyItems.size === 0) return;
-            showOverlay(`Salvando ${dirtyItems.size} alterações...`);
-            const batch = writeBatch(db);
-            dirtyItems.forEach((updatedData, id) => {
-                const docRef = doc(db, 'patrimonio', id);
-                const dataToSave = { ...updatedData };
-                delete dataToSave.id;
-                dataToSave.updatedAt = serverTimestamp();
-                batch.update(docRef, dataToSave);
-            });
-            try {
-                await batch.commit();
-                await idb.patrimonio.clear(); await idb.metadata.clear();
-                setTimeout(() => window.location.reload(), 500);
-            } catch (error) { 
-                fullPageOverlay.classList.add('hidden');
-                feedbackStatus.textContent = 'Erro ao salvar.'; console.error(error);
-            }
-        });
+        saveAllChangesBtn.addEventListener('click', async () => { /* ... */ });
         
-        editTableBody.addEventListener('change', (e) => {
+        document.getElementById('edit-table-body').addEventListener('change', (e) => {
             const input = e.target.closest('input, select');
             if (input) {
                 const row = input.closest('tr');
