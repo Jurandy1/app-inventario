@@ -114,6 +114,28 @@
         .notification-toast.error { background-color: #ef4444; }
         .notification-toast.info { background-color: #3b82f6; }
 
+        /* Ajustes para modal login responsivo */
+        #login-modal .modal-container {
+          max-width: 400px;
+          width: 90%;
+          padding: 1rem;
+          margin: auto;
+          box-sizing: border-box;
+        }
+        #login-modal input, #login-modal button {
+          width: 100%;
+          margin-bottom: 1rem;
+          font-size: 1.1rem;
+        }
+        @media (max-width: 480px) {
+          #login-modal .modal-container {
+            padding: 0.5rem;
+          }
+          #login-modal input, #login-modal button {
+            font-size: 1rem;
+          }
+        }
+
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -161,6 +183,7 @@
             <div id="main-nav" class="flex space-x-1 overflow-x-auto">
                 <button class="nav-btn active" data-tab="dashboard">📊 Dashboard</button>
                 <button class="nav-btn" data-tab="patrimonio">💼 Patrimônio</button>
+                <button id="tab-notas" class="nav-btn" style="display:none;" data-tab="notas">📋 Notas Fiscais</button>
                 <button id="nav-history" class="nav-btn hidden" data-tab="historico">📜 Histórico</button>
                 <a id="nav-edit-link" href="edit.html" target="_blank" class="nav-btn hidden">✏️ Auditoria e Edição</a>
             </div>
@@ -171,7 +194,7 @@
     <main class="container mx-auto p-4 sm:p-6 lg:p-8">
         
         <!-- Dashboard -->
-        <div id="content-dashboard" class="fade-in">
+        <div id="content-dashboard" class="tab-content fade-in">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Total de Itens</p><p id="kpi-total-itens" class="text-4xl font-bold text-blue-600 mt-2">0</p></div>
                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Unidades Mapeadas</p><p id="kpi-total-unidades" class="text-4xl font-bold text-blue-600 mt-2">0</p></div>
@@ -185,7 +208,7 @@
         </div>
         
         <!-- Patrimônio -->
-        <div id="content-patrimonio" class="hidden fade-in">
+        <div id="content-patrimonio" class="tab-content hidden fade-in">
              <div class="card mb-8">
                  <form id="patrimonio-filters-form">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
@@ -231,17 +254,30 @@
         </div>
         
         <!-- Histórico -->
-        <div id="content-historico" class="hidden fade-in">
+        <div id="content-historico" class="tab-content hidden fade-in">
              <div class="card">
                 <h3 class="text-xl font-bold text-slate-800 mb-4">Histórico de Alterações</h3>
                 <div id="history-container" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
              </div>
         </div>
 
+        <!-- Notas Fiscais -->
+        <div id="content-notas" class="tab-content hidden fade-in">
+          <div class="card">
+              <h2 class="text-2xl font-bold text-slate-800 mb-4">📋 Notas Fiscais</h2>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 border-b pb-4">
+                <input type="text" id="filter-nf" placeholder="Filtrar por Nº NF" class="w-full p-2 border rounded-lg" />
+                <input type="date" id="filter-data" class="w-full p-2 border rounded-lg" />
+                <button id="clear-filters-nf" class="btn btn-secondary">Limpar filtros</button>
+              </div>
+              <div id="lista-notas" class="space-y-2"></div>
+          </div>
+        </div>
+
     </main>
 
     <!-- MODAIS -->
-    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
+    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required autofocus></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" id="btn-login" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
     <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</label><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-origem-da-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-origem-da-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
     <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
     <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> </div></div></div>
@@ -274,10 +310,11 @@
 
         // --- ESTADO DA APLICAÇÃO ---
         let patrimonioFullList = [], historicoFullList = [];
+        let notasFiscais = []; // Nova variável para armazenar notas
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
         let patrimonioFilteredList = [], patrimonioCurrentPage = 1;
-        const patrimonioItemsPerPage = 25; // Aumentado para melhor visualização
+        const patrimonioItemsPerPage = 25;
 
         // --- ELEMENTOS DO DOM ---
         const statusFeedbackEl = document.getElementById('status-feedback');
@@ -304,12 +341,18 @@
         const deleteConfirmModal = document.getElementById('delete-confirm-modal');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const navButtons = document.querySelectorAll('#main-nav > .nav-btn, #main-nav > a.nav-btn');
-        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
+        const contentPanes = document.querySelectorAll('main > .tab-content');
         const historyContainer = document.getElementById('history-container');
         
         // --- FUNÇÕES UTILITÁRIAS ---
         const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
-        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
+        const debounce = (func, delay) => {
+            let timer;
+            return function (...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => func.apply(this, args), delay);
+            };
+        };
         
         function showNotification(message, type = 'info', duration = 3000) {
             const notification = document.createElement('div');
@@ -367,7 +410,6 @@
                     const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
                     const freshData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     
-                    // Ordena no cliente para evitar índices complexos no Firebase
                     freshData.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
                     patrimonioFullList = freshData;
 
@@ -381,7 +423,7 @@
                      console.error("Erro ao carregar patrimônio: ", error);
                      statusFeedbackEl.textContent = 'Erro ao carregar dados.';
                      showNotification('Falha ao carregar dados do servidor.', 'error');
-                     patrimonioFullList = await idb.patrimonio.toArray(); // Fallback para o cache antigo
+                     patrimonioFullList = await idb.patrimonio.toArray(); // Fallback
                 }
             }
             statusFeedbackEl.textContent = `Pronto. ${patrimonioFullList.length} itens carregados.`;
@@ -406,13 +448,65 @@
             if (document.getElementById('content-dashboard').offsetParent) {
                  renderDashboard(patrimonioFullList);
             }
+            if (isLoggedIn) {
+                document.getElementById('tab-notas').style.display = 'inline-block';
+                carregarNotasFiscais();
+            }
         }
+
+        // --- Funções da Aba Notas Fiscais ---
+        function isUserLoggedIn() {
+            return !!auth.currentUser;
+        }
+
+        function carregarNotasFiscais() {
+          // Exemplo: Buscar notas do cache ou Firebase.
+          // Por enquanto, vamos usar dados mocados para demonstração.
+          notasFiscais = [
+            { nf: '12345', data: '2023-10-26', descricao: 'Cadeira de Escritório' },
+            { nf: '67890', data: '2023-10-25', descricao: 'Mesa de Reunião' },
+            { nf: '11223', data: '2023-10-25', descricao: 'Computador Dell' },
+          ];
+          renderNotas();
+        }
+
+        function renderNotas() {
+          const nfFiltro = document.getElementById('filter-nf').value.toLowerCase();
+          const dataFiltro = document.getElementById('filter-data').value;
+          const lista = document.getElementById('lista-notas');
+          lista.innerHTML = '';
+
+          const filtradas = notasFiscais.filter(n => 
+              (!nfFiltro || n.nf.toLowerCase().includes(nfFiltro)) &&
+              (!dataFiltro || n.data === dataFiltro)
+          );
+
+          if (filtradas.length === 0) {
+            lista.innerHTML = '<p class="text-slate-500 text-center">Nenhuma nota fiscal encontrada.</p>';
+            return;
+          }
+
+          filtradas.forEach(nota => {
+            const div = document.createElement('div');
+            div.className = 'p-3 border rounded-md bg-slate-50';
+            div.textContent = `NF: ${nota.nf} - Data: ${nota.data} - Desc: ${nota.descricao}`;
+            lista.appendChild(div);
+          });
+        }
+        // --- Fim Funções Notas Fiscais ---
+
 
         onAuthStateChanged(auth, (user) => {
             isLoggedIn = !!user;
             updateUIVisibility();
             loadAllData();
-            if (isLoggedIn) loadHistory();
+            if (isLoggedIn) {
+                loadHistory();
+                document.getElementById('tab-notas').style.display = 'inline-block';
+                carregarNotasFiscais();
+            } else {
+                 document.getElementById('tab-notas').style.display = 'none';
+            }
         });
 
         function updateUIVisibility() {
@@ -532,7 +626,7 @@
                 else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
                 logAction(action, { itemId: id || 'novo', itemDesc: itemData['Descrição'], details: `Item ${id ? 'editado' : 'criado'}: ${itemData['Descrição']}` });
                 closeModal(itemModal);
-                await idb.metadata.clear(); // Invalida o cache
+                await idb.metadata.clear();
                 loadAllData();
             } catch (error) { console.error("Erro ao salvar o item: ", error); showNotification('Erro ao salvar!', 'error');}
         }
@@ -553,7 +647,7 @@
                 await deleteDoc(doc(db, 'patrimonio', id));
                 logAction('Exclusão', { itemId: id, itemDesc: item.Descrição, details: `Item excluído: ${item.Descrição}` });
                 closeModal(deleteConfirmModal);
-                await idb.metadata.clear(); // Invalida o cache
+                await idb.metadata.clear();
                 loadAllData();
             } catch(error) { console.error("Erro ao excluir item: ", error); showNotification('Erro ao excluir!', 'error'); }
         }
@@ -587,7 +681,7 @@
                 await updateDoc(doc(db, 'patrimonio', id), updatedData);
                 logAction('Transferência', { itemId: id, itemDesc: originalItem.Descrição, details: `De '${originalItem.Unidade}' para '${newUnidade}'` });
                 closeModal(transferModal);
-                await idb.metadata.clear(); // Invalida o cache
+                await idb.metadata.clear();
                 loadAllData();
             } catch (error) { console.error("Erro ao transferir item:", error); showNotification('Erro ao transferir!', 'error');}
         }
@@ -598,6 +692,7 @@
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
             if (tabName === 'dashboard' && patrimonioFullList.length > 0) renderDashboard(patrimonioFullList);
             if (tabName === 'historico') renderHistory();
+            if (tabName === 'notas') renderNotas();
         }
         
         function renderHistory() {
@@ -640,10 +735,17 @@
 
         async function handleLogin(e) {
             e.preventDefault();
+            const email = loginForm.email.value;
+            const password = loginForm.password.value;
+            if (!email || !password) {
+                showNotification('Preencha e-mail e senha.', 'error');
+                return;
+            }
+
             const loginErrorEl = loginForm.querySelector('#login-error');
             loginErrorEl.classList.add('hidden');
             try {
-                await signInWithEmailAndPassword(auth, loginForm.email.value, loginForm.password.value);
+                await signInWithEmailAndPassword(auth, email, password);
                 closeModal(loginModal);
             } catch (error) {
                 let errorMessage = "Ocorreu um erro desconhecido. Tente novamente.";
@@ -653,17 +755,25 @@
                     case 'auth/invalid-email': errorMessage = "O formato do e-mail é inválido."; break;
                     case 'auth/invalid-credential': errorMessage = "As credenciais fornecidas são inválidas."; break;
                 }
-                console.error("Erro no login:", error.code, error.message);
                 loginErrorEl.textContent = errorMessage;
                 loginErrorEl.classList.remove('hidden');
             }
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 300); // Debounce para filtros
+            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 300);
             filtroTipoUnidadeEl.addEventListener('change', () => { updateUnidadeFilter(filtroTipoUnidadeEl, filtroUnidadeEl); debouncedFilter(); });
             [filtroUnidadeEl, filtroEstadoEl].forEach(el => el.addEventListener('change', debouncedFilter));
             filtroBuscaEl.addEventListener('input', debouncedFilter);
+
+            // Event Listeners para Aba Notas Fiscais
+            document.getElementById('filter-nf').addEventListener('input', renderNotas);
+            document.getElementById('filter-data').addEventListener('change', renderNotas);
+            document.getElementById('clear-filters-nf').addEventListener('click', () => {
+              document.getElementById('filter-nf').value = '';
+              document.getElementById('filter-data').value = '';
+              renderNotas();
+            });
 
             resetFiltersBtn.addEventListener('click', () => { document.getElementById('patrimonio-filters-form').reset(); filtroUnidadeEl.disabled = true; applyPatrimonioFiltersAndRender(); });
             paginationControlsEl.addEventListener('click', (e) => { if(e.target.dataset.page) { patrimonioCurrentPage = parseInt(e.target.dataset.page); renderPatrimonioTable(); }});
@@ -685,7 +795,12 @@
             confirmDeleteBtn.addEventListener('click', handleDelete);
             
             navButtons.forEach(button => button.addEventListener('click', (e) => {
-                if(e.currentTarget.tagName === 'BUTTON') switchTab(button.dataset.tab);
+                e.preventDefault();
+                if(e.currentTarget.tagName === 'BUTTON') {
+                    switchTab(button.dataset.tab);
+                } else if (e.currentTarget.tagName === 'A') {
+                    window.open(e.currentTarget.href, '_blank');
+                }
             }));
 
             document.addEventListener('click', (e) => {
