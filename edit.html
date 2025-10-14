@@ -41,14 +41,29 @@
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-container { transition: all 0.3s ease; max-height: 90vh; }
         
-        /* Estilos para a nova aba de conciliação */
         .reconciliation-list-item { cursor: pointer; transition: background-color 0.2s; }
         .reconciliation-list-item:hover { background-color: #eff6ff; }
         .reconciliation-list-item.selected { background-color: #dbeafe; border-left: 4px solid #3b82f6; font-weight: 600; }
         .reconciliation-list-item.selected-for-import { background-color: #e0e7ff; border-left: 4px solid #4f46e5; }
         .reconciliation-list-item.linked { background-color: #dcfce7; color: #166534; pointer-events: none; border-left: 4px solid #22c55e; }
         
-        /* --- Sistema de Notificação (Toast/Snackbar) --- */
+        .sub-nav-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            margin-bottom: -1px;
+            border-radius: 6px 6px 0 0;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            background-color: #f8fafc;
+        }
+        .sub-nav-btn.active {
+            background-color: white;
+            border-color: #e2e8f0;
+            color: #3b82f6;
+        }
+
         .notification-toast {
             position: fixed;
             bottom: 20px;
@@ -103,7 +118,7 @@
                     <button class="nav-btn" data-tab="conciliar">🤝 Conciliar Itens</button>
                     <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
                     <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
-                    <button class="nav-btn" data-tab="transferencia-massa">✈️ Transf. em Massa</button>
+                    <button class="nav-btn" data-tab="importacao">🔄 Importação e Substituição</button>
                     <button class="nav-btn" data-tab="giap">📋 Planilha GIAP</button>
                 </div>
             </div>
@@ -190,7 +205,7 @@
                 </div>
             </div>
             
-            <!-- ABA: Conciliar Itens (NOVA VERSÃO OTIMIZADA) -->
+            <!-- ABA: Conciliar Itens -->
             <div id="content-conciliar" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
@@ -252,7 +267,7 @@
                 </div>
             </div>
 
-            <!-- ABA: Tombos Sobrando (NOVA VERSÃO OTIMIZADA) -->
+            <!-- ABA: Tombos Sobrando -->
             <div id="content-sobrando" class="hidden fade-in">
                 <div class="card">
                      <h2 class="text-xl font-bold text-slate-800 mb-2">Tombamentos da Planilha Sem Vínculo</h2>
@@ -286,42 +301,90 @@
                 </div>
             </div>
             
-            <!-- ABA: Transferência em Massa -->
-            <div id="content-transferencia-massa" class="hidden fade-in">
+            <!-- ABA: Importação e Substituição -->
+            <div id="content-importacao" class="hidden fade-in">
                 <div class="card">
-                    <h2 class="text-xl font-bold text-slate-800 mb-2">Importar / Transferir em Massa</h2>
-                    <p class="text-sm text-slate-600 mb-4">Cole uma lista de tombamentos (separados por vírgula), escolha a unidade de destino e o sistema criará os itens baseado nos dados da planilha GIAP.</p>
-                    <div class="space-y-4">
-                        <div>
-                            <label for="mass-transfer-tombos" class="block text-sm font-medium mb-1">Números de Tombamento (separados por vírgula)</label>
-                            <textarea id="mass-transfer-tombos" rows="4" class="w-full p-2 border rounded-lg" placeholder="140230, 14233, 12345..."></textarea>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="mass-transfer-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
-                                <select id="mass-transfer-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                            </div>
-                            <div>
-                                <label for="mass-transfer-unit" class="block text-sm font-medium mb-1">Unidade de Destino</label>
-                                <select id="mass-transfer-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
-                            </div>
-                        </div>
-                        <button id="mass-transfer-search-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar Tombamentos</button>
+                    <div class="flex border-b mb-6">
+                        <button class="sub-nav-btn active" data-subtab="substituir">Substituir Inventário da Unidade</button>
+                        <button class="sub-nav-btn" data-subtab="massa">Importar por Tombamento (GIAP)</button>
                     </div>
-                    <div id="mass-transfer-results" class="hidden mt-6 border-t pt-4">
-                        <h3 class="font-bold text-slate-700 mb-2">Itens a serem criados</h3>
-                        <div class="flex items-center gap-4 mb-4">
-                             <label for="mass-transfer-set-all-status" class="block text-sm font-medium">Definir Estado para Todos:</label>
-                             <select id="mass-transfer-set-all-status" class="p-2 border rounded-lg bg-white">
-                                <option>Novo</option>
-                                <option>Bom</option>
-                                <option>Regular</option>
-                                <option>Avariado</option>
-                             </select>
+            
+                    <!-- Sub-Aba: Substituir Inventário -->
+                    <div id="subtab-content-substituir">
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">Substituir Inventário da Unidade por Planilha</h2>
+                        <p class="text-sm text-slate-600 mb-4">Esta ferramenta <strong class="text-red-600">APAGARÁ</strong> todos os itens da unidade selecionada e os substituirá pelos dados colados abaixo. Use com muito cuidado.</p>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="replace-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
+                                <select id="replace-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
+                            </div>
+                            <div>
+                                <label for="replace-unit" class="block text-sm font-medium mb-1">Unidade de Destino (a ser substituída)</label>
+                                <select id="replace-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
+                            </div>
                         </div>
-                        <div id="mass-transfer-list" class="space-y-2"></div>
-                        <div class="mt-6">
-                            <button id="mass-transfer-confirm-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Confirmar Criação em Massa</button>
+
+                        <div>
+                            <label for="replace-data" class="block text-sm font-medium mb-1">Cole os dados do Excel aqui</label>
+                            <p class="text-xs text-slate-500 mb-2">As colunas devem estar na ordem: UNIDADE, ITEM, TOMBO, LOCAL, ESTADO DE CONSERVAÇÃO</p>
+                            <textarea id="replace-data" rows="8" class="w-full p-2 border rounded-lg font-mono text-xs" placeholder="Copie as colunas do Excel e cole aqui..."></textarea>
+                        </div>
+                        <button id="preview-replace-btn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Visualizar Dados</button>
+
+                        <div id="replace-results" class="hidden mt-6 border-t pt-4">
+                            <h3 class="font-bold text-slate-700 mb-2">Pré-visualização dos Itens a Serem Criados (<span id="replace-preview-count">0</span>)</h3>
+                            <div id="replace-preview-list" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg"></div>
+                            <div class="mt-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                                <div class="flex items-start">
+                                    <input type="checkbox" id="replace-confirm-checkbox" class="mt-1 h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                                    <label for="replace-confirm-checkbox" class="ml-3 block text-sm font-medium text-red-800">
+                                        Eu entendo que <strong class="font-bold">TODOS OS ITENS</strong> da unidade selecionada serão <strong class="font-bold">PERMANENTEMENTE APAGADOS</strong> e substituídos por esta nova lista.
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <button id="confirm-replace-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 disabled:bg-slate-400" disabled>Confirmar e Substituir Inventário</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-Aba: Importar em Massa (funcionalidade antiga) -->
+                    <div id="subtab-content-massa" class="hidden">
+                         <h2 class="text-xl font-bold text-slate-800 mb-2">Importar Itens por Tombamento (GIAP)</h2>
+                         <p class="text-sm text-slate-600 mb-4">Cole uma lista de tombamentos, escolha a unidade de destino e o sistema criará os itens baseado nos dados da planilha GIAP.</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="mass-transfer-tombos" class="block text-sm font-medium mb-1">Números de Tombamento (separados por vírgula)</label>
+                                <textarea id="mass-transfer-tombos" rows="4" class="w-full p-2 border rounded-lg" placeholder="140230, 14233, 12345..."></textarea>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="mass-transfer-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
+                                    <select id="mass-transfer-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
+                                </div>
+                                <div>
+                                    <label for="mass-transfer-unit" class="block text-sm font-medium mb-1">Unidade de Destino</label>
+                                    <select id="mass-transfer-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
+                                </div>
+                            </div>
+                            <button id="mass-transfer-search-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar Tombamentos</button>
+                        </div>
+                        <div id="mass-transfer-results" class="hidden mt-6 border-t pt-4">
+                            <h3 class="font-bold text-slate-700 mb-2">Itens a serem criados</h3>
+                            <div class="flex items-center gap-4 mb-4">
+                                 <label for="mass-transfer-set-all-status" class="block text-sm font-medium">Definir Estado para Todos:</label>
+                                 <select id="mass-transfer-set-all-status" class="p-2 border rounded-lg bg-white">
+                                    <option>Novo</option>
+                                    <option>Bom</option>
+                                    <option>Regular</option>
+                                    <option>Avariado</option>
+                                 </select>
+                            </div>
+                            <div id="mass-transfer-list" class="space-y-2"></div>
+                            <div class="mt-6">
+                                <button id="mass-transfer-confirm-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Confirmar Criação em Massa</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -445,9 +508,9 @@
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
         
-        // Estado para a nova aba de conciliação
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
+        let itemsToReplace = [];
 
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
@@ -469,14 +532,6 @@
         const saveMappingBtn = document.getElementById('save-mapping-btn');
         const savedMappingsContainer = document.getElementById('saved-mappings-container');
         const pendingTransfersContainer = document.getElementById('pending-transfers-container');
-        const massTransferTombos = document.getElementById('mass-transfer-tombos');
-        const massTransferTipo = document.getElementById('mass-transfer-tipo');
-        const massTransferUnit = document.getElementById('mass-transfer-unit');
-        const massTransferSearchBtn = document.getElementById('mass-transfer-search-btn');
-        const massTransferResults = document.getElementById('mass-transfer-results');
-        const massTransferSetAllStatus = document.getElementById('mass-transfer-set-all-status');
-        const massTransferList = document.getElementById('mass-transfer-list');
-        const massTransferConfirmBtn = document.getElementById('mass-transfer-confirm-btn');
         const giapTableBody = document.getElementById('giap-table-body');
         const fullPageOverlay = document.getElementById('full-page-overlay');
         const overlayMessage = document.getElementById('overlay-message');
@@ -592,7 +647,7 @@
             populateUnitMappingTab();
             populateReconciliationTab_Optimized();
             populatePendingTransfersTab();
-            populateMassTransferTab();
+            populateImportAndReplaceTab();
             populateGiapTab();
         }
 
@@ -726,12 +781,16 @@
             giapTableBody.innerHTML = giapInventory.map(item => `<tr class="border-b">${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}</tr>`).join('');
         }
         
-        function populateMassTransferTab() {
+        function populateImportAndReplaceTab() {
             const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
+            
+            // For Mass Transfer (by GIAP tombo)
+            const massTransferTipo = document.getElementById('mass-transfer-tipo');
             massTransferTipo.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
             
             massTransferTipo.addEventListener('change', () => {
                 const selectedTipo = massTransferTipo.value;
+                const massTransferUnit = document.getElementById('mass-transfer-unit');
                 if (!selectedTipo) {
                     massTransferUnit.innerHTML = '';
                     massTransferUnit.disabled = true;
@@ -741,10 +800,25 @@
                 massTransferUnit.innerHTML = unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
                 massTransferUnit.disabled = false;
             });
+
+            // For Replace Unit Inventory
+            const replaceTipo = document.getElementById('replace-tipo');
+            replaceTipo.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+
+            replaceTipo.addEventListener('change', () => {
+                const selectedTipo = replaceTipo.value;
+                const replaceUnit = document.getElementById('replace-unit');
+                if (!selectedTipo) {
+                    replaceUnit.innerHTML = '';
+                    replaceUnit.disabled = true;
+                    return;
+                }
+                const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
+                replaceUnit.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                replaceUnit.disabled = false;
+            });
         }
        
-        // --- NOVA LÓGICA DAS ABAS OTIMIZADAS ---
-
         function populateReconciliationTab_Optimized() {
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             const sel = document.getElementById('filter-tipo');
@@ -864,7 +938,7 @@
             const giapFilterText = normalizeStr(document.getElementById('giap-list-filter').value);
 
             const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-            const mappedGiapUnits = unitMapping[unidade] || [];
+            const mappedGiapUnits = unitMapping[unidade] || [unidade];
 
             const items = fullInventory.filter(i => 
                 i.Unidade === unidade && 
@@ -983,7 +1057,6 @@
                 }
             });
 
-            // Listener para o botão de adicionar na aba de edição
             document.getElementById('add-item-to-unit-btn').addEventListener('click', () => {
                 openAddItemModal({
                     Tipo: document.getElementById('edit-filter-tipo').value,
@@ -991,7 +1064,6 @@
                 });
             });
 
-            // Listeners do novo modal de adicionar item
             document.getElementById('add-item-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const newItem = {
@@ -1000,16 +1072,10 @@
                     Estado: document.getElementById('add-item-estado').value,
                     Unidade: document.getElementById('add-item-unidade').value,
                     Tipo: document.getElementById('add-item-tipo').value,
-                    Localização: '',
-                    Fornecedor: '',
-                    NF: '',
-                    'Origem da Doação': '',
-                    Quantidade: 1,
+                    Localização: '', Fornecedor: '', NF: '', 'Origem da Doação': '', Quantidade: 1,
                     Observação: 'Adicionado via edição rápida.',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
+                    createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                 };
-
                 try {
                     showOverlay('Salvando novo item...');
                     await addDoc(collection(db, 'patrimonio'), newItem);
@@ -1024,7 +1090,6 @@
             });
 
             document.querySelectorAll('.js-close-modal-add').forEach(btn => btn.addEventListener('click', closeAddItemModal));
-
 
             mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
             mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
@@ -1057,8 +1122,6 @@
                 }
             });
             
-            // --- LISTENERS PARA ABAS OTIMIZADAS ---
-
             document.getElementById('filter-tipo').addEventListener('change', () => {
                 const tipo = document.getElementById('filter-tipo').value;
                 const unidades = [...new Set(fullInventory
@@ -1072,7 +1135,7 @@
                 const unidade = document.getElementById('filter-unidade').value;
                 if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
                 
-                const mappedGiapUnits = unitMapping[unidade] || [];
+                const mappedGiapUnits = unitMapping[unidade] || [unidade];
                 if(mappedGiapUnits.length === 0) {
                     showNotification('Esta unidade não está mapeada. Vá para a aba "Ligar Unidades".', 'warning');
                 }
@@ -1113,10 +1176,8 @@
                     if (systemId && tombamento && giapItem) {
                         const docRef = doc(db, 'patrimonio', systemId);
                         batch.update(docRef, {
-                            Tombamento: tombamento,
-                            Descrição: giapItem.Descrição || giapItem.Espécie,
-                            Fornecedor: giapItem['Nome Fornecedor'],
-                            NF: giapItem['NF'],
+                            Tombamento: tombamento, Descrição: giapItem.Descrição || giapItem.Espécie,
+                            Fornecedor: giapItem['Nome Fornecedor'], NF: giapItem['NF'],
                             updatedAt: serverTimestamp()
                         });
                     }
@@ -1149,19 +1210,11 @@
                 giapItemsForImport.forEach(giapItem => {
                     const newItemRef = doc(collection(db, 'patrimonio'));
                     const newItem = {
-                        Tombamento: giapItem.TOMBAMENTO || '',
-                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
-                        Tipo: tipo,
-                        Unidade: unidade,
-                        Localização: '',
-                        Fornecedor: giapItem['Nome Fornecedor'] || '',
-                        NF: giapItem.NF || '',
-                        'Origem da Doação': '',
-                        Estado: estado,
-                        Quantidade: 1,
-                        Observação: `Importado do GIAP. Unidade original: ${giapItem.Unidade || 'N/A'}`,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
+                        Tombamento: giapItem.TOMBAMENTO || '', Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                        Tipo: tipo, Unidade: unidade, Localização: '',
+                        Fornecedor: giapItem['Nome Fornecedor'] || '', NF: giapItem.NF || '', 'Origem da Doação': '',
+                        Estado: estado, Quantidade: 1, Observação: `Importado do GIAP. Unidade original: ${giapItem.Unidade || 'N/A'}`,
+                        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItem);
                 });
@@ -1204,25 +1257,33 @@
                  showNotification(`${sob.length} tombos sobrando listados.`, 'success');
             });
             
+            // --- LISTENERS PARA ABA DE IMPORTAÇÃO E SUBSTITUIÇÃO ---
+            const subNavButtons = document.querySelectorAll('#content-importacao .sub-nav-btn');
+            subNavButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const subTab = e.currentTarget.dataset.subtab;
+                    subNavButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.subtab === subTab));
+                    document.getElementById('subtab-content-substituir').classList.toggle('hidden', subTab !== 'substituir');
+                    document.getElementById('subtab-content-massa').classList.toggle('hidden', subTab !== 'massa');
+                });
+            });
+            
+            // Listeners para a funcionalidade antiga (agora em sub-aba)
+            const massTransferSearchBtn = document.getElementById('mass-transfer-search-btn');
             massTransferSearchBtn.addEventListener('click', () => {
-                 const tombosInput = massTransferTombos.value;
+                const tombosInput = document.getElementById('mass-transfer-tombos').value;
                 const tombos = tombosInput.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
                 const existingTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()));
-                const foundItems = [];
-                const notFound = [];
-
+                const foundItems = []; const notFound = [];
                 tombos.forEach(tombo => {
                     const giapItem = giapMap.get(tombo);
-                    if (giapItem && !existingTombos.has(tombo)) {
-                        foundItems.push(giapItem);
-                    } else {
-                        notFound.push(tombo);
-                    }
+                    if (giapItem && !existingTombos.has(tombo)) foundItems.push(giapItem);
+                    else notFound.push(tombo);
                 });
-
                 if (notFound.length > 0) showNotification(`Não encontrados ou já existem: ${notFound.join(', ')}`, 'warning');
-
+                const massTransferResults = document.getElementById('mass-transfer-results');
                 if (foundItems.length > 0) {
+                    const massTransferList = document.getElementById('mass-transfer-list');
                     const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
                     massTransferList.innerHTML = foundItems.map(item => `
                         <div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center">
@@ -1234,18 +1295,16 @@
                     massTransferResults.classList.add('hidden');
                 }
             });
-            
-            massTransferSetAllStatus.addEventListener('change', (e) => {
+            document.getElementById('mass-transfer-set-all-status').addEventListener('change', (e) => {
                 document.querySelectorAll('.mass-transfer-status').forEach(select => select.value = e.target.value);
             });
-
-            massTransferConfirmBtn.addEventListener('click', async () => {
+            document.getElementById('mass-transfer-confirm-btn').addEventListener('click', async () => {
+                const massTransferUnit = document.getElementById('mass-transfer-unit');
+                const massTransferTipo = document.getElementById('mass-transfer-tipo');
                 const destinationUnit = massTransferUnit.value;
                 if (!destinationUnit) return showNotification('Selecione uma unidade de destino.', 'warning');
-                
                 const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status'));
                 if (itemsToCreate.length === 0) return;
-
                 showOverlay(`Criando ${itemsToCreate.length} itens...`);
                 const batch = writeBatch(db);
                 itemsToCreate.forEach(select => {
@@ -1254,19 +1313,11 @@
                     if (giapItem) {
                         const newItemRef = doc(collection(db, 'patrimonio'));
                         const newItem = {
-                            Tombamento: tombo,
-                            Descrição: giapItem.Descrição || giapItem.Espécie || '',
-                            Tipo: massTransferTipo.value || '',
-                            Unidade: destinationUnit,
-                            Localização: '',
-                            Fornecedor: giapItem['Nome Fornecedor'] || '',
-                            NF: giapItem.NF || '',
-                            'Origem da Doação': '',
-                            Estado: select.value,
-                            Quantidade: 1,
-                            Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`,
-                            createdAt: serverTimestamp(),
-                            updatedAt: serverTimestamp()
+                            Tombamento: tombo, Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                            Tipo: massTransferTipo.value || '', Unidade: destinationUnit, Localização: '',
+                            Fornecedor: giapItem['Nome Fornecedor'] || '', NF: giapItem.NF || '', 'Origem da Doação': '',
+                            Estado: select.value, Quantidade: 1, Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`,
+                            createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                         };
                         batch.set(newItemRef, newItem);
                     }
@@ -1279,6 +1330,94 @@
                 } catch (e) {
                     hideOverlay();
                     showNotification('Erro ao criar itens em massa.', 'error'); 
+                    console.error(e);
+                }
+            });
+
+            // Listeners para a nova funcionalidade de Substituir Inventário
+            const previewBtn = document.getElementById('preview-replace-btn');
+            previewBtn.addEventListener('click', () => {
+                const data = document.getElementById('replace-data').value;
+                const unit = document.getElementById('replace-unit').value;
+                if (!unit) return showNotification('Selecione uma unidade de destino primeiro.', 'warning');
+                if (!data) return showNotification('Cole os dados da planilha na área de texto.', 'warning');
+
+                Papa.parse(data, {
+                    header: false,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        itemsToReplace = results.data.map(row => ({
+                            UNIDADE_EXCEL: row[0],
+                            ITEM: row[1],
+                            TOMBO: row[2],
+                            LOCAL: row[3],
+                            ESTADO: row[4]
+                        }));
+                        
+                        const previewList = document.getElementById('replace-preview-list');
+                        document.getElementById('replace-preview-count').textContent = itemsToReplace.length;
+                        previewList.innerHTML = itemsToReplace.map(item => `
+                            <div class="p-2 border-b text-xs">
+                                <strong>${escapeHtml(item.ITEM)}</strong> (Tombo: ${escapeHtml(item.TOMBO) || 'S/T'})<br>
+                                Local: ${escapeHtml(item.LOCAL)} | Estado: ${escapeHtml(item.ESTADO)}
+                            </div>
+                        `).join('');
+                        document.getElementById('replace-results').classList.remove('hidden');
+                    },
+                    error: (err) => {
+                        showNotification('Erro ao processar os dados. Verifique o formato.', 'error');
+                        console.error(err);
+                    }
+                });
+            });
+
+            const confirmCheckbox = document.getElementById('replace-confirm-checkbox');
+            confirmCheckbox.addEventListener('change', () => {
+                document.getElementById('confirm-replace-btn').disabled = !confirmCheckbox.checked;
+            });
+            
+            document.getElementById('confirm-replace-btn').addEventListener('click', async () => {
+                const tipo = document.getElementById('replace-tipo').value;
+                const unidade = document.getElementById('replace-unit').value;
+
+                if (!unidade || itemsToReplace.length === 0) return showNotification('Dados inválidos ou unidade não selecionada.', 'error');
+
+                showOverlay(`Substituindo inventário de ${unidade}...`);
+                const itemsToDelete = fullInventory.filter(item => item.Unidade === unidade);
+                
+                const batch = writeBatch(db);
+
+                // 1. Deletar itens antigos
+                itemsToDelete.forEach(item => {
+                    const docRef = doc(db, 'patrimonio', item.id);
+                    batch.delete(docRef);
+                });
+
+                // 2. Criar itens novos
+                itemsToReplace.forEach(item => {
+                    const newItemRef = doc(collection(db, 'patrimonio'));
+                    const newItemData = {
+                        Unidade: unidade,
+                        Tipo: tipo,
+                        Descrição: item.ITEM || '',
+                        Tombamento: item.TOMBO || 'S/T',
+                        Localização: item.LOCAL || '',
+                        Estado: item.ESTADO || 'Regular',
+                        Quantidade: 1,
+                        Fornecedor: '', NF: '', 'Origem da Doação': '', Observação: 'Importado via substituição de planilha.',
+                        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                    };
+                    batch.set(newItemRef, newItemData);
+                });
+
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear();
+                    showNotification(`Inventário de ${unidade} substituído com sucesso! Recarregando...`, 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } catch(e) {
+                    hideOverlay();
+                    showNotification('Erro ao substituir o inventário.', 'error');
                     console.error(e);
                 }
             });
