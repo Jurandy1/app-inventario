@@ -10,7 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <!-- Dexie.js para Cache no IndexedDB -->
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -77,13 +78,8 @@
         .nav-btn:hover { background-color: #f8fafc; }
         .nav-btn.active { color: var(--secondary-blue); border-bottom-color: var(--secondary-blue); }
         
-        .modal {
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        .modal-container {
-             transition: all 0.3s ease;
-             max-height: 90vh;
-        }
+        .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal-container { transition: all 0.3s ease; max-height: 90vh; }
 
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -98,6 +94,25 @@
             margin: auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- Sistema de Notificação (Toast/Snackbar) --- */
+        .notification-toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.4s ease-in-out;
+            z-index: 1000;
+        }
+        .notification-toast.show { transform: translateX(-50%) translateY(0); }
+        .notification-toast.success { background-color: #10b981; }
+        .notification-toast.error { background-color: #ef4444; }
+        .notification-toast.info { background-color: #3b82f6; }
 
     </style>
 </head>
@@ -127,8 +142,8 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.11 (Auto-Save & Histórico)</span></h2>
-            <div id="connectionStatus" class="flex items-center gap-2 font-semibold text-sm"></div>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.12 (Cache Otimizado)</span></h2>
+            <div id="status-feedback" class="flex items-center gap-2 font-semibold text-sm text-slate-600">Carregando...</div>
         </div>
     </div>
 
@@ -138,7 +153,6 @@
             <div id="main-nav" class="flex space-x-1 overflow-x-auto">
                 <button class="nav-btn active" data-tab="dashboard">📊 Dashboard</button>
                 <button class="nav-btn" data-tab="patrimonio">💼 Patrimônio</button>
-                <button id="nav-nf" class="nav-btn" data-tab="notas-fiscais">🧾 Notas Fiscais</button>
                 <button id="nav-history" class="nav-btn hidden" data-tab="historico">📜 Histórico</button>
                 <a id="nav-edit-link" href="edit.html" target="_blank" class="nav-btn hidden">✏️ Auditoria e Edição</a>
             </div>
@@ -173,17 +187,13 @@
                     </div>
                     <div class="mt-4 border-t pt-4">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="md:col-span-2"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida (Descrição)</label><input type="text" id="filtro-busca" placeholder="Buscar por descrição..." class="w-full p-2 border rounded-lg"></div>
-                            <div><label class="block text-sm font-medium mb-1">&nbsp;</label><button type="button" id="toggle-advanced-filters-btn" class="w-full btn btn-secondary">Filtros Avançados</button></div>
-                        </div>
-                         <div id="advanced-filters-container" class="hidden mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div><label for="filtro-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="filtro-tombamento" placeholder="Buscar por n° de tombamento..." class="w-full p-2 border rounded-lg"></div>
-                            <div><label for="filtro-localizacao" class="block text-sm font-medium mb-1">Localização na Unidade</label><input type="text" id="filtro-localizacao" placeholder="Buscar por sala, setor..." class="w-full p-2 border rounded-lg"></div>
+                             <div class="md:col-span-2"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida (Descrição, Tombamento, Localização)</label><input type="text" id="filtro-busca" placeholder="Digite para buscar..." class="w-full p-2 border rounded-lg"></div>
+                             <div><label class="block text-sm font-medium mb-1">&nbsp;</label><button type="button" id="reset-filters-btn" class="w-full btn btn-secondary">Limpar Filtros</button></div>
                         </div>
                     </div>
                  </form>
                 <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <button id="reset-filters-btn" class="w-full sm:w-auto btn btn-secondary">Limpar Filtros</button>
+                    <div id="pagination-summary" class="text-sm font-semibold text-slate-600"></div>
                     <div id="admin-actions-patrimonio" class="hidden w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                         <button id="open-export-modal-btn" class="w-full sm:w-auto btn btn-success">Exportar PDF</button>
                         <button id="open-add-modal-btn" class="w-full sm:w-auto btn btn-primary">Adicionar Item</button>
@@ -208,18 +218,16 @@
                         <tbody id="inventory-table-body"></tbody>
                     </table>
                 </div>
-                <div id="pagination-controls" class="flex items-center justify-between mt-6"></div>
+                <div id="pagination-controls" class="flex items-center justify-center mt-6"></div>
             </main>
-        </div>
-
-        <!-- Notas Fiscais -->
-        <div id="content-notas-fiscais" class="hidden fade-in">
-            <!-- Conteúdo de Notas Fiscais aqui -->
         </div>
         
         <!-- Histórico -->
         <div id="content-historico" class="hidden fade-in">
-            <!-- Conteúdo do Histórico aqui -->
+             <div class="card">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Histórico de Alterações</h3>
+                <div id="history-container" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+             </div>
         </div>
 
     </main>
@@ -247,18 +255,27 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        
+        // Otimização: Configuração do Cache com Dexie.js
+        const idb = new Dexie('InventoryDB');
+        idb.version(1).stores({
+            patrimonio: '++id, Tombamento, Unidade, Estado, Tipo', // Indexa campos para filtros rápidos
+            metadata: 'key'
+        });
+        const CACHE_DURATION_MS = 2 * 60 * 60 * 1000; // Cache de 2 horas
 
         // --- ESTADO DA APLICAÇÃO ---
         let patrimonioFullList = [], historicoFullList = [];
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
         let patrimonioFilteredList = [], patrimonioCurrentPage = 1;
-        const patrimonioItemsPerPage = 20;
+        const patrimonioItemsPerPage = 25; // Aumentado para melhor visualização
 
         // --- ELEMENTOS DO DOM ---
-        const connectionStatusEl = document.getElementById('connectionStatus');
+        const statusFeedbackEl = document.getElementById('status-feedback');
         const tableBodyEl = document.getElementById('inventory-table-body');
         const paginationControlsEl = document.getElementById('pagination-controls');
+        const paginationSummaryEl = document.getElementById('pagination-summary');
         const filtroTipoUnidadeEl = document.getElementById('filtro-tipo-unidade');
         const filtroUnidadeEl = document.getElementById('filtro-unidade');
         const filtroEstadoEl = document.getElementById('filtro-estado');
@@ -280,20 +297,32 @@
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
         const navButtons = document.querySelectorAll('#main-nav > .nav-btn, #main-nav > a.nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
-
-        const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
+        const historyContainer = document.getElementById('history-container');
         
+        // --- FUNÇÕES UTILITÁRIAS ---
+        const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
+        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
+        
+        function showNotification(message, type = 'info', duration = 3000) {
+            const notification = document.createElement('div');
+            notification.className = `notification-toast ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 10);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 500);
+            }, duration);
+        }
+
         const getNormalizedEstado = (estadoStr) => {
-            const normalized = normalizeStr(estadoStr).replace(/ç/g, 'c').replace(/ã/g, 'a').normalize('NFD').replace(/[\u0300-\u036f]/g, '');  // Enhanced: Remove accents and normalize ç/ã for better matching (e.g., "não" -> "nao")
-            // Expanded 'Avariado' keywords based on your examples
-            if (['avariado', 'avariada', 'quebrado', 'quebrada', 'defeito', 'com defeito', 'defeituoso', 'danificado', 'danificada', 'nao funciona', 'nao esta funcionando', 'precisa de manutencao', 'manutencao', 'ruim', 'velho', 'inutilizavel', 'fora de uso'].some(k => normalized.includes(k))) {
-                return 'Avariado';
-            }
-            // Positive states: Strict matches with variations
-            if (normalized === 'novo' || normalized === 'nova') return 'Novo';
-            if (['bom', 'otimo', 'ótimo'].includes(normalized)) return 'Bom';  // Already handles "otimo" variations
+            const normalized = normalizeStr(estadoStr);
+            if (['avariado', 'quebrado', 'defeito', 'danificado', 'ruim'].some(k => normalized.includes(k))) return 'Avariado';
+            if (normalized === 'novo') return 'Novo';
+            if (normalized === 'bom' || normalized === 'otimo') return 'Bom';
             if (normalized === 'regular') return 'Regular';
-            // Default to 'Avariado' for anything else (e.g., empty, unknown, or ambiguous)
             return 'Avariado';
         };
 
@@ -311,41 +340,55 @@
                     user: auth.currentUser.email,
                     timestamp: serverTimestamp()
                 });
-            } catch (error) {
-                console.error("Falha ao registrar ação no histórico:", error);
-            }
+            } catch (error) { console.error("Falha ao registrar ação no histórico:", error); }
         }
 
-        async function loadAllPatrimonio() {
-            tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando patrimônio...</p></td></tr>`;
-            const cacheKey = 'patrimonioCache_fullList';
-            const cachedData = localStorage.getItem(cacheKey);
+        async function loadAllData() {
+            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando patrimônio...</p></td></tr>`;
+            
+            const metadata = await idb.metadata.get('lastFetch');
+            const isCacheStale = !metadata || (Date.now() - metadata.timestamp > CACHE_DURATION_MS);
 
-            if (cachedData) {
-                const data = JSON.parse(cachedData);
-                if (Date.now() - data.timestamp < 28800000) { // Cache de 8 horas
-                    patrimonioFullList = data.items;
-                    initializeUI();
-                    return;
+            if (!isCacheStale) {
+                statusFeedbackEl.textContent = 'Carregando dados do cache local...';
+                patrimonioFullList = await idb.patrimonio.toArray();
+                 showNotification('Dados carregados do cache.', 'info');
+            } else {
+                statusFeedbackEl.textContent = 'Buscando dados atualizados do servidor...';
+                try {
+                    const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
+                    const freshData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    // Ordena no cliente para evitar índices complexos no Firebase
+                    freshData.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
+                    patrimonioFullList = freshData;
+
+                    await idb.transaction('rw', idb.patrimonio, idb.metadata, async () => {
+                        await idb.patrimonio.clear();
+                        await idb.patrimonio.bulkAdd(patrimonioFullList);
+                        await idb.metadata.put({ key: 'lastFetch', timestamp: Date.now() });
+                    });
+                    showNotification('Dados atualizados com sucesso!', 'success');
+                } catch (error) {
+                     console.error("Erro ao carregar patrimônio: ", error);
+                     statusFeedbackEl.textContent = 'Erro ao carregar dados.';
+                     showNotification('Falha ao carregar dados do servidor.', 'error');
+                     patrimonioFullList = await idb.patrimonio.toArray(); // Fallback para o cache antigo
                 }
             }
+            statusFeedbackEl.textContent = `Pronto. ${patrimonioFullList.length} itens carregados.`;
+            initializeUI();
+        }
 
+        async function loadHistory() {
+            if(!isLoggedIn) return;
             try {
-                const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
-                patrimonioFullList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                // Ordena os dados no lado do cliente para evitar problemas de índice no Firestore
-                patrimonioFullList.sort((a, b) => {
-                    const descA = a.Descrição || '';
-                    const descB = b.Descrição || '';
-                    return descA.localeCompare(descB);
-                });
-
-                localStorage.setItem(cacheKey, JSON.stringify({ items: patrimonioFullList, timestamp: Date.now() }));
-                initializeUI();
-            } catch (error) {
-                 console.error("Erro ao carregar patrimônio: ", error);
-                 tableBodyEl.innerHTML = `<tr><td colspan="6" class="text-center p-10 text-red-500">Falha ao carregar dados.</td></tr>`;
+                const q = query(collection(db, "historico"), orderBy("timestamp", "desc"), limit(100));
+                const querySnapshot = await getDocs(q);
+                historicoFullList = querySnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                renderHistory();
+            } catch(e){
+                console.error("Error loading history: ", e);
             }
         }
         
@@ -360,7 +403,8 @@
         onAuthStateChanged(auth, (user) => {
             isLoggedIn = !!user;
             updateUIVisibility();
-            loadAllPatrimonio(); // Carrega os dados independente do login para visualização
+            loadAllData();
+            if (isLoggedIn) loadHistory();
         });
 
         function updateUIVisibility() {
@@ -390,11 +434,20 @@
         
         function applyPatrimonioFiltersAndRender() {
             if(!patrimonioFullList) return;
+            const tipo = filtroTipoUnidadeEl.value;
+            const unidade = filtroUnidadeEl.value;
+            const estado = filtroEstadoEl.value;
+            const busca = normalizeStr(filtroBuscaEl.value);
+
             patrimonioFilteredList = patrimonioFullList.filter(item => {
-                return (!filtroTipoUnidadeEl.value || item.Tipo === filtroTipoUnidadeEl.value) &&
-                       (!filtroUnidadeEl.value || item.Unidade === filtroUnidadeEl.value) &&
-                       (!filtroEstadoEl.value || getNormalizedEstado(item.Estado) === filtroEstadoEl.value) &&
-                       (!filtroBuscaEl.value || normalizeStr(item.Descrição).includes(normalizeStr(filtroBuscaEl.value)));
+                const descMatch = !busca || normalizeStr(item.Descrição).includes(busca);
+                const tomboMatch = !busca || normalizeStr(item.Tombamento).includes(busca);
+                const localMatch = !busca || normalizeStr(item.Localização).includes(busca);
+
+                return (!tipo || item.Tipo === tipo) &&
+                       (!unidade || item.Unidade === unidade) &&
+                       (!estado || getNormalizedEstado(item.Estado) === estado) &&
+                       (descMatch || tomboMatch || localMatch);
             });
             patrimonioCurrentPage = 1;
             renderPatrimonioTable();
@@ -407,7 +460,7 @@
             const actionButtonsHTML = (itemId) => !isLoggedIn ? '' : `<td class="px-3 py-2 space-x-2"><button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button><button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button><button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></td>`;
 
             tableBodyEl.innerHTML = itemsToDisplay.length === 0 
-                ? `<tr><td colspan="${isLoggedIn ? 7 : 6}" class="text-center py-10 text-slate-500">Nenhum item encontrado.</td></tr>`
+                ? `<tr><td colspan="${isLoggedIn ? 7 : 6}" class="text-center py-10 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`
                 : itemsToDisplay.map(item => `
                     <tr class="border-b border-slate-200 hover:bg-slate-50">
                         <td class="px-3 py-2 font-mono text-xs">${item.Tombamento || 'S/T'}</td>
@@ -423,55 +476,39 @@
         
         function renderPatrimonioPagination() {
             const totalPages = Math.ceil(patrimonioFilteredList.length / patrimonioItemsPerPage);
-            paginationControlsEl.innerHTML = totalPages <= 1 ? '' : `<span class="text-sm text-slate-600">Página ${patrimonioCurrentPage} de ${totalPages}</span> <div class="inline-flex"><button data-page="${patrimonioCurrentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg" ${patrimonioCurrentPage === 1 ? 'disabled' : ''}>Anterior</button><button data-page="${patrimonioCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg" ${patrimonioCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button></div>`;
+            const startItem = (patrimonioCurrentPage - 1) * patrimonioItemsPerPage + 1;
+            const endItem = Math.min(startItem + patrimonioItemsPerPage - 1, patrimonioFilteredList.length);
+            
+            paginationSummaryEl.textContent = patrimonioFilteredList.length > 0 ? `Mostrando ${startItem}-${endItem} de ${patrimonioFilteredList.length} itens.` : 'Nenhum item para exibir.';
+
+            paginationControlsEl.innerHTML = totalPages <= 1 ? '' : `<div class="inline-flex"><button data-page="${patrimonioCurrentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg" ${patrimonioCurrentPage === 1 ? 'disabled' : ''}>Anterior</button><button data-page="${patrimonioCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg" ${patrimonioCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button></div>`;
         }
         
         const openModal = (modalEl) => {
             if (!modalEl) return;
-            const overlay = modalEl.querySelector('.modal-overlay');
-            const container = modalEl.querySelector('.modal-container');
-            
             modalEl.classList.remove('hidden');
-            // Use um timeout para permitir que a propriedade display seja aplicada antes de iniciar a transição
             setTimeout(() => {
-                overlay?.classList.remove('opacity-0');
-                container?.classList.remove('opacity-0', 'scale-95');
+                modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0');
+                modalEl.querySelector('.modal-container')?.classList.remove('opacity-0', 'scale-95');
             }, 10);
         };
         const closeModal = (modalEl) => {
             if (!modalEl) return;
-            const overlay = modalEl.querySelector('.modal-overlay');
-            const container = modalEl.querySelector('.modal-container');
-
-            overlay?.classList.add('opacity-0');
-            container?.classList.add('opacity-0', 'scale-95');
-
-            // Espere a transição terminar antes de esconder o elemento
-            setTimeout(() => {
-                modalEl.classList.add('hidden');
-            }, 300); // Deve corresponder à duração da transição no CSS
+            modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0');
+            modalEl.querySelector('.modal-container')?.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => { modalEl.classList.add('hidden'); }, 300);
         };
 
         function openItemModal(item = null) {
             itemForm.reset();
             document.getElementById('modal-title').textContent = item ? 'Editar Item' : 'Adicionar Novo Item';
-
+            document.getElementById('item-id').value = item ? item.id : '';
             if (item) {
-                // Mapeamento explícito e seguro dos campos do Firestore para os campos do formulário
-                document.getElementById('item-id').value = item.id || '';
-                document.getElementById('item-tombamento').value = item.Tombamento || '';
-                document.getElementById('item-tipo').value = item.Tipo || '';
-                document.getElementById('item-descricao').value = item.Descrição || '';
-                document.getElementById('item-unidade').value = item.Unidade || '';
-                document.getElementById('item-quantidade').value = item.Quantidade || 1;
-                document.getElementById('item-localizacao').value = item.Localização || '';
-                document.getElementById('item-estado').value = item.Estado || 'Bom';
-                document.getElementById('item-fornecedor').value = item.Fornecedor || '';
-                document.getElementById('item-origem-da-doacao').value = item['Origem da Doação'] || '';
-                document.getElementById('item-observacao').value = item.Observação || '';
-            } else {
-                // Limpa o ID para garantir que é um novo item
-                document.getElementById('item-id').value = '';
+                Object.keys(item).forEach(key => {
+                    const formKey = `item-${key.toLowerCase().replace(/\s/g, '-').replace('ç', 'c').replace('ã', 'a')}`;
+                    const element = document.getElementById(formKey);
+                    if (element) element.value = item[key];
+                });
             }
             openModal(itemModal);
         }
@@ -487,9 +524,9 @@
                 else { itemData.createdAt = serverTimestamp(); await addDoc(collection(db, 'patrimonio'), itemData); }
                 logAction(action, { itemId: id || 'novo', itemDesc: itemData['Descrição'], details: `Item ${id ? 'editado' : 'criado'}: ${itemData['Descrição']}` });
                 closeModal(itemModal);
-                localStorage.removeItem('patrimonioCache_fullList'); 
-                loadAllPatrimonio();
-            } catch (error) { console.error("Erro ao salvar o item: ", error); }
+                await idb.metadata.clear(); // Invalida o cache
+                loadAllData();
+            } catch (error) { console.error("Erro ao salvar o item: ", error); showNotification('Erro ao salvar!', 'error');}
         }
         
         function openDeleteModal(id) {
@@ -508,9 +545,9 @@
                 await deleteDoc(doc(db, 'patrimonio', id));
                 logAction('Exclusão', { itemId: id, itemDesc: item.Descrição, details: `Item excluído: ${item.Descrição}` });
                 closeModal(deleteConfirmModal);
-                localStorage.removeItem('patrimonioCache_fullList');
-                loadAllPatrimonio();
-            } catch(error) { console.error("Erro ao excluir item: ", error); }
+                await idb.metadata.clear(); // Invalida o cache
+                loadAllData();
+            } catch(error) { console.error("Erro ao excluir item: ", error); showNotification('Erro ao excluir!', 'error'); }
         }
 
         function openTransferModal(id) {
@@ -542,17 +579,35 @@
                 await updateDoc(doc(db, 'patrimonio', id), updatedData);
                 logAction('Transferência', { itemId: id, itemDesc: originalItem.Descrição, details: `De '${originalItem.Unidade}' para '${newUnidade}'` });
                 closeModal(transferModal);
-                localStorage.removeItem('patrimonioCache_fullList');
-                loadAllPatrimonio();
-            } catch (error) { console.error("Erro ao transferir item:", error); }
+                await idb.metadata.clear(); // Invalida o cache
+                loadAllData();
+            } catch (error) { console.error("Erro ao transferir item:", error); showNotification('Erro ao transferir!', 'error');}
         }
         
         function switchTab(tabName) {
             if(tabName === 'edit') return;
             navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
-            if (tabName === 'dashboard') renderDashboard(patrimonioFullList);
+            if (tabName === 'dashboard' && patrimonioFullList.length > 0) renderDashboard(patrimonioFullList);
+            if (tabName === 'historico') renderHistory();
         }
+        
+        function renderHistory() {
+            if(!isLoggedIn) {
+                historyContainer.innerHTML = `<p class="text-slate-500">Acesso negado.</p>`;
+                return;
+            }
+            historyContainer.innerHTML = historicoFullList.length > 0 
+                ? historicoFullList.map(h => `
+                    <div class="p-3 border rounded-md bg-slate-50 text-sm">
+                        <p><strong>${h.action}:</strong> ${h.itemDesc || ''} <span class="text-xs text-slate-500">(${h.itemId || ''})</span></p>
+                        <p class="text-xs text-slate-600">${h.details}</p>
+                        <div class="text-right text-xs text-slate-400 mt-1">${h.user} em ${h.timestamp ? new Date(h.timestamp.seconds * 1000).toLocaleString() : ''}</div>
+                    </div>
+                `).join('')
+                : `<p class="text-slate-500">Nenhum histórico encontrado.</p>`;
+        }
+
 
         function renderDashboard(items) {
             if (!items || items.length === 0) return;
@@ -575,31 +630,20 @@
             dashboardTipoChart = new Chart(tipoCtx, { type: 'bar', data: { labels: sortedUnidades.map(u => u[0]), datasets: [{ label: 'Itens', data: sortedUnidades.map(u => u[1]), backgroundColor: '#3b82f6' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false } });
         }
 
-        // BUG FIX: Adicionado tratamento de erro detalhado para o login
         async function handleLogin(e) {
             e.preventDefault();
             const loginErrorEl = loginForm.querySelector('#login-error');
-            loginErrorEl.classList.add('hidden'); // Esconde erros anteriores
-
+            loginErrorEl.classList.add('hidden');
             try {
                 await signInWithEmailAndPassword(auth, loginForm.email.value, loginForm.password.value);
                 closeModal(loginModal);
             } catch (error) {
                 let errorMessage = "Ocorreu um erro desconhecido. Tente novamente.";
-                // Traduz os códigos de erro comuns do Firebase para mensagens amigáveis
                 switch (error.code) {
-                    case 'auth/user-not-found':
-                        errorMessage = "Nenhum usuário encontrado com este e-mail.";
-                        break;
-                    case 'auth/wrong-password':
-                        errorMessage = "Senha incorreta. Por favor, tente novamente.";
-                        break;
-                    case 'auth/invalid-email':
-                        errorMessage = "O formato do e-mail é inválido.";
-                        break;
-                    case 'auth/invalid-credential':
-                         errorMessage = "As credenciais fornecidas são inválidas.";
-                         break;
+                    case 'auth/user-not-found': errorMessage = "Nenhum usuário encontrado com este e-mail."; break;
+                    case 'auth/wrong-password': errorMessage = "Senha incorreta. Por favor, tente novamente."; break;
+                    case 'auth/invalid-email': errorMessage = "O formato do e-mail é inválido."; break;
+                    case 'auth/invalid-credential': errorMessage = "As credenciais fornecidas são inválidas."; break;
                 }
                 console.error("Erro no login:", error.code, error.message);
                 loginErrorEl.textContent = errorMessage;
@@ -608,13 +652,12 @@
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-            const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
-            
-            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 400);
+            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 300); // Debounce para filtros
             filtroTipoUnidadeEl.addEventListener('change', () => { updateUnidadeFilter(filtroTipoUnidadeEl, filtroUnidadeEl); debouncedFilter(); });
-            [filtroUnidadeEl, filtroEstadoEl, filtroBuscaEl].forEach(el => el.addEventListener('input', debouncedFilter));
+            [filtroUnidadeEl, filtroEstadoEl].forEach(el => el.addEventListener('change', debouncedFilter));
+            filtroBuscaEl.addEventListener('input', debouncedFilter);
 
-            resetFiltersBtn.addEventListener('click', () => { document.getElementById('patrimonio-filters-form').reset(); applyPatrimonioFiltersAndRender(); });
+            resetFiltersBtn.addEventListener('click', () => { document.getElementById('patrimonio-filters-form').reset(); filtroUnidadeEl.disabled = true; applyPatrimonioFiltersAndRender(); });
             paginationControlsEl.addEventListener('click', (e) => { if(e.target.dataset.page) { patrimonioCurrentPage = parseInt(e.target.dataset.page); renderPatrimonioTable(); }});
             tableBodyEl.addEventListener('click', (e) => {
                 const btn = e.target.closest('button'); if (!btn || !isLoggedIn) return;
@@ -637,21 +680,12 @@
                 if(e.currentTarget.tagName === 'BUTTON') switchTab(button.dataset.tab);
             }));
 
-            // Listener centralizado para fechar modais
             document.addEventListener('click', (e) => {
-                // Fecha ao clicar em botões com a classe 'js-close-modal'
-                if (e.target.matches('.js-close-modal')) {
-                    const modal = e.target.closest('.modal');
-                    if (modal) closeModal(modal);
-                }
-                // Fecha ao clicar no fundo escuro (overlay)
-                if (e.target.matches('.modal-overlay')) {
-                    const modal = e.target.closest('.modal');
-                    if (modal) closeModal(modal);
+                if (e.target.matches('.js-close-modal') || e.target.matches('.modal-overlay')) {
+                    closeModal(e.target.closest('.modal'));
                 }
             });
         });
     </script>
 </body>
 </html>
-
