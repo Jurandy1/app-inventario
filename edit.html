@@ -442,8 +442,8 @@
             <div id="content-notas_fiscais" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
-                    <p class="text-sm text-slate-600 mb-4">Notas fiscais agrupadas por fornecedor, da mais recente para a mais antiga. Clique para expandir e ver os itens.</p>
-                    <div id="notas-fiscais-container" class="mt-4 space-y-2"></div>
+                    <p class="text-sm text-slate-600 mb-4">Notas fiscais agrupadas por fornecedor. Clique para expandir e ver os itens de cada nota.</p>
+                    <div id="notas-fiscais-container" class="mt-4 space-y-3"></div>
                 </div>
             </div>
 
@@ -782,8 +782,6 @@
             });
         }
         
-        function populatePermutaTab(){}
-        
         function initializeUI() {
             populateEditableInventoryTab();
             populateUnitMappingTab();
@@ -1017,8 +1015,8 @@
                                         <div class="py-2 flex justify-between items-center">
                                             <label class="flex items-center text-sm font-medium"><input type="checkbox" class="h-4 w-4 mr-2 select-all-in-unit">Selecionar Todos</label>
                                             <div class="flex gap-2">
-                                                <button class="transfer-selected-btn text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200">Transferir Selecionados</button>
                                                 <button class="keep-selected-btn text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-md hover:bg-yellow-200">Manter na Unidade</button>
+                                                <button class="transfer-selected-btn text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200">Transferir Selecionados</button>
                                             </div>
                                         </div>
                                         ${itemsHtml}
@@ -1033,6 +1031,80 @@
                 }).join('');
             }
         }
+        
+        // --- INÍCIO: Correção Aba Notas Fiscais ---
+        function populateNfTab() {
+            const container = document.getElementById('notas-fiscais-container');
+            container.innerHTML = '';
+
+            const itemsWithNf = fullInventory.filter(item => item.Fornecedor && item.NF);
+
+            if (itemsWithNf.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhum item com Fornecedor e Nota Fiscal preenchidos.</p>`;
+                return;
+            }
+
+            const groupedByFornecedor = itemsWithNf.reduce((acc, item) => {
+                const fornecedor = item.Fornecedor.trim();
+                if (!acc[fornecedor]) {
+                    acc[fornecedor] = [];
+                }
+                acc[fornecedor].push(item);
+                return acc;
+            }, {});
+
+            const sortedFornecedores = Object.keys(groupedByFornecedor).sort((a, b) => a.localeCompare(b));
+
+            sortedFornecedores.forEach(fornecedor => {
+                const fornecedorDetails = document.createElement('details');
+                fornecedorDetails.className = 'bg-white rounded-lg shadow-sm border';
+
+                const fornecedorSummary = document.createElement('summary');
+                fornecedorSummary.className = 'p-4 font-semibold cursor-pointer flex justify-between items-center hover:bg-slate-50';
+                fornecedorSummary.innerHTML = `
+                    <span>${escapeHtml(fornecedor)}</span>
+                    <span class="text-sm font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">${groupedByFornecedor[fornecedor].length} iten(s)</span>
+                `;
+                fornecedorDetails.appendChild(fornecedorSummary);
+
+                const groupedByNf = groupedByFornecedor[fornecedor].reduce((acc, item) => {
+                    const nf = item.NF.trim();
+                    if (!acc[nf]) {
+                        acc[nf] = [];
+                    }
+                    acc[nf].push(item);
+                    return acc;
+                }, {});
+
+                const sortedNfs = Object.keys(groupedByNf).sort((a,b) => a.localeCompare(b));
+
+                sortedNfs.forEach(nf => {
+                    const nfDetails = document.createElement('details');
+                    nfDetails.className = 'mx-4 mb-2 border rounded-md';
+                    
+                    const nfSummary = document.createElement('summary');
+                    nfSummary.className = 'p-3 font-medium cursor-pointer bg-slate-50 hover:bg-slate-100 flex justify-between items-center';
+                    nfSummary.innerHTML = `
+                        <span>Nota Fiscal: <strong>${escapeHtml(nf)}</strong></span>
+                        <span class="text-xs font-bold bg-slate-200 px-2 py-1 rounded-full">${groupedByNf[nf].length} iten(s)</span>
+                    `;
+                    nfDetails.appendChild(nfSummary);
+
+                    const itemsList = document.createElement('div');
+                    itemsList.className = 'p-3 space-y-2';
+                    itemsList.innerHTML = groupedByNf[nf].map(item => `
+                        <div class="text-sm border-b pb-1">
+                           <p><strong>${escapeHtml(item.Descrição)}</strong> (T: ${escapeHtml(item.Tombamento)})</p>
+                           <p class="text-xs text-slate-500">Unidade: ${escapeHtml(item.Unidade)} | Estado: ${escapeHtml(item.Estado)}</p>
+                        </div>
+                    `).join('');
+                    nfDetails.appendChild(itemsList);
+                    fornecedorDetails.appendChild(nfDetails);
+                });
+                container.appendChild(fornecedorDetails);
+            });
+        }
+        // --- FIM: Correção Aba Notas Fiscais ---
 
         function populateGiapTab() {
             const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie'];
@@ -1339,7 +1411,8 @@
                     syncUpdateAllBtn.dataset.docId = docId;
                     syncKeepDescBtn.dataset.docId = docId;
 
-                    openModal(syncConfirmModal);
+                    syncConfirmModal.classList.remove('hidden');
+
                 } else {
                     showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
                 }
@@ -1381,13 +1454,13 @@
                 row.classList.add('is-dirty');
                 saveAllChangesBtn.disabled = false;
                 
-                closeModal(syncConfirmModal);
+                syncConfirmModal.classList.add('hidden');
                 showNotification(`Dados do Tombo ${tomboValue} sincronizados!`, 'success');
             };
 
             syncUpdateAllBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, true));
             syncKeepDescBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, false));
-            syncCancelBtn.addEventListener('click', () => closeModal(syncConfirmModal));
+            syncCancelBtn.addEventListener('click', () => syncConfirmModal.classList.add('hidden'));
 
 
             document.getElementById('add-item-to-unit-btn').addEventListener('click', () => {
@@ -1461,6 +1534,72 @@
                     } catch (error) { showNotification(`Erro ao remover.`, 'error'); console.error(error); }
                 }
             });
+
+            // --- INÍCIO: Correção Aba Transferências ---
+            pendingTransfersContainer.addEventListener('click', async (e) => {
+                const target = e.target;
+                
+                // Lógica para "Selecionar Todos"
+                if (target.classList.contains('select-all-in-unit')) {
+                    const detailsContent = target.closest('details');
+                    const checkboxes = detailsContent.querySelectorAll('.transfer-item-checkbox');
+                    checkboxes.forEach(cb => cb.checked = target.checked);
+                    return;
+                }
+
+                const actionButton = target.closest('.keep-selected-btn, .transfer-selected-btn');
+                if (!actionButton) return;
+
+                const detailsContent = actionButton.closest('details');
+                const selectedCheckboxes = detailsContent.querySelectorAll('.transfer-item-checkbox:checked');
+                
+                if (selectedCheckboxes.length === 0) {
+                    showNotification('Nenhum item selecionado para a ação.', 'warning');
+                    return;
+                }
+
+                const batch = writeBatch(db);
+                let actionDescription = '';
+
+                if (actionButton.classList.contains('keep-selected-btn')) {
+                    actionDescription = `Mantendo ${selectedCheckboxes.length} iten(s) na unidade de origem...`;
+                    selectedCheckboxes.forEach(cb => {
+                        const docRef = doc(db, 'patrimonio', cb.dataset.id);
+                        batch.update(docRef, { 
+                            Observação: 'Transferência GIAP ignorada manualmente.',
+                            updatedAt: serverTimestamp()
+                        });
+                    });
+                } else if (actionButton.classList.contains('transfer-selected-btn')) {
+                    actionDescription = `Transferindo ${selectedCheckboxes.length} iten(s)...`;
+                    selectedCheckboxes.forEach(cb => {
+                        const docRef = doc(db, 'patrimonio', cb.dataset.id);
+                        const newUnit = cb.dataset.giapUnit;
+                        const giapItem = giapInventory.find(item => item.Unidade === newUnit);
+                        const newTipo = giapItem ? (fullInventory.find(i => i.Unidade === newUnit)?.Tipo || 'N/A') : 'N/A';
+
+                        batch.update(docRef, {
+                            Unidade: newUnit,
+                            Tipo: newTipo, 
+                            Observação: 'Item transferido para unidade correta via auditoria.',
+                            updatedAt: serverTimestamp()
+                        });
+                    });
+                }
+                
+                showOverlay(actionDescription);
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear(); 
+                    showNotification('Ação concluída com sucesso! A página será recarregada.', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch (error) {
+                    hideOverlay();
+                    showNotification('Ocorreu um erro ao processar a solicitação.', 'error');
+                    console.error("Erro na ação de transferência:", error);
+                }
+            });
+            // --- FIM: Correção Aba Transferências ---
             
             document.getElementById('filter-tipo').addEventListener('change', () => {
                 const tipo = document.getElementById('filter-tipo').value;
@@ -1809,4 +1948,3 @@
     </script>
 </body>
 </html>
-
