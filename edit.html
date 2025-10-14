@@ -542,6 +542,45 @@
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         
+        function parseEstadoEOrigem(texto) {
+            const textoCru = (texto || '').trim();
+            if (!textoCru) return { estado: 'Regular', origem: '' };
+
+            const validEstados = ['Novo', 'Bom', 'Regular', 'Avariado'];
+            let estadoFinal = 'Regular';
+            let origemFinal = '';
+
+            for (const estado of validEstados) {
+                if (normalizeStr(textoCru).startsWith(normalizeStr(estado))) {
+                    estadoFinal = estado;
+                    let resto = textoCru.substring(estado.length).trim();
+                    
+                    if ((resto.startsWith('(') && resto.endsWith(')')) || (resto.startsWith('[') && resto.endsWith(']'))) {
+                        resto = resto.substring(1, resto.length - 1).trim();
+                    } else if (resto.startsWith('-')) {
+                        resto = resto.substring(1).trim();
+                    }
+
+                    if (resto) {
+                        const restoNormalizado = normalizeStr(resto);
+                        if (restoNormalizado.startsWith('doação') || restoNormalizado.startsWith('doacao')) {
+                            origemFinal = resto.replace(/^(doação|doacao)\s*/i, '').trim();
+                        }
+                    }
+                    return { estado: estadoFinal, origem: origemFinal };
+                }
+            }
+            
+            for (const estado of validEstados) {
+                if (normalizeStr(textoCru) === normalizeStr(estado)) {
+                    return { estado: estado, origem: '' };
+                }
+            }
+            
+            return { estado: 'Regular', origem: '' };
+        }
+
+
         function showNotification(message, type = 'info', duration = 3000) {
             const notification = document.createElement('div');
             notification.className = `notification-toast ${type}`;
@@ -1449,15 +1488,16 @@
                     batch.delete(docRef);
                 });
 
-                const validEstados = ['Novo', 'Bom', 'Regular', 'Avariado'];
                 itemsToReplace.forEach(item => {
                     const newItemRef = doc(collection(db, 'patrimonio'));
-                    const estadoValue = validEstados.find(e => normalizeStr(e) === normalizeStr(item.ESTADO)) || 'Regular';
+                    const { estado, origem } = parseEstadoEOrigem(item.ESTADO);
                     const newItemData = {
                         Unidade: unidade, Tipo: tipo,
                         Descrição: item.ITEM || '', Tombamento: item.TOMBO || 'S/T',
-                        Localização: item.LOCAL || '', Estado: estadoValue,
-                        Quantidade: 1, Fornecedor: '', NF: '', 'Origem da Doação': '', 
+                        Localização: item.LOCAL || '', 
+                        Estado: estado,
+                        'Origem da Doação': origem,
+                        Quantidade: 1, Fornecedor: '', NF: '', 
                         Observação: 'Importado via substituição de planilha.',
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
