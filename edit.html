@@ -14,7 +14,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 420px); }
-        .reconciliation-container { max-height: calc(100vh - 400px); }
+        .reconciliation-container { max-height: calc(100vh - 450px); }
         .nav-btn {
             padding: 0.75rem 1rem;
             border-bottom: 3px solid transparent;
@@ -40,10 +40,12 @@
         select[multiple] { height: 150px; }
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-container { transition: all 0.3s ease; max-height: 90vh; }
+        
+        /* Estilos para a nova aba de conciliação */
         .reconciliation-list-item { cursor: pointer; transition: background-color 0.2s; }
         .reconciliation-list-item:hover { background-color: #eff6ff; }
-        .reconciliation-list-item.selected { background-color: #dbeafe; border-left: 4px solid #3b82f6; }
-        .reconciliation-list-item.linked { background-color: #f0fdf4; opacity: 0.6; pointer-events: none; }
+        .reconciliation-list-item.selected { background-color: #dbeafe; border-left: 4px solid #3b82f6; font-weight: 600; }
+        .reconciliation-list-item.linked { background-color: #dcfce7; color: #166534; pointer-events: none; border-left: 4px solid #22c55e; }
         
         /* --- Sistema de Notificação (Toast/Snackbar) --- */
         .notification-toast {
@@ -181,45 +183,71 @@
                 </div>
             </div>
             
-            <!-- ABA: Conciliar Itens -->
+            <!-- ABA: Conciliar Itens (NOVA VERSÃO OTIMIZADA) -->
             <div id="content-conciliar" class="fade-in">
-                 <div class="card">
-                    <h2 class="text-xl font-bold text-slate-800 mb-2">Conciliar Itens Sem Tombamento</h2>
-                    <p class="text-sm text-slate-600 mb-4">Selecione uma unidade mapeada. O sistema mostrará os itens sem tombo e os tombamentos disponíveis para você vincular.</p>
-                    <div class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="card">
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
+                    <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo. Salve os vínculos no final.</p>
+                    <div class="flex flex-wrap items-end gap-2 mb-4">
                         <div class="flex-grow">
-                            <label for="recon-unit-select" class="block text-sm font-medium mb-1">Selecione a Unidade do Sistema para Conciliar</label>
-                            <select id="recon-unit-select" class="w-full p-2 border rounded-lg bg-white max-w-md"></select>
+                            <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
+                            <select id="filter-tipo" class="w-full border p-2 rounded-lg mt-1">
+                                <option value="">Todos os Tipos</option>
+                            </select>
                         </div>
-                        <button id="link-selected-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Ligar e Salvar Selecionados</button>
+                        <div class="flex-grow">
+                            <label for="filter-unidade" class="text-sm font-medium">Unidade</label>
+                            <select id="filter-unidade" class="w-full border p-2 rounded-lg mt-1">
+                                <option value="">Selecione o Tipo Primeiro</option>
+                            </select>
+                        </div>
+                        <button id="load-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            Carregar
+                        </button>
                     </div>
-                    <div id="reconciliation-workspace" class="hidden mt-6">
-                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <h3 class="font-bold mb-2">Itens sem Tombamento no Sistema (<span id="recon-system-count">0</span>)</h3>
-                                <input type="text" id="recon-system-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                <div id="recon-system-items-list" class="reconciliation-container overflow-y-auto border rounded-lg bg-slate-50"></div>
-                            </div>
-                            <div>
-                                <h3 class="font-bold mb-2">Tombamentos Disponíveis na Planilha (<span id="recon-giap-count">0</span>)</h3>
-                                <input type="text" id="recon-giap-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                <div id="recon-giap-items-list" class="reconciliation-container overflow-y-auto border rounded-lg bg-slate-50"></div>
-                            </div>
-                         </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento no Sistema</h3>
+                            <div id="system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-2">Tombos Disponíveis (GIAP)</h3>
+                            <div id="giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                        </div>
                     </div>
-                 </div>
+                    <div id="quick-actions" class="mt-6 border-t pt-4 hidden">
+                        <h3 class="font-semibold text-slate-800 mb-2">Vínculos Criados</h3>
+                        <div id="created-links" class="space-y-2 mb-4"></div>
+                        <div class="flex items-center gap-2">
+                            <button id="save-links" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Vínculos</button>
+                            <button id="clear-selections" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Limpar Seleções</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- ABA: Tombos Sobrando -->
+            <!-- ABA: Tombos Sobrando (NOVA VERSÃO OTIMIZADA) -->
             <div id="content-sobrando" class="hidden fade-in">
                 <div class="card">
                      <h2 class="text-xl font-bold text-slate-800 mb-2">Tombamentos da Planilha Sem Vínculo</h2>
-                     <p class="text-sm text-slate-600 mb-4">Tombamentos da planilha que ainda não foram associados a nenhum item. Use "Sugerir" para encontrar possíveis correspondências.</p>
-                      <div>
-                        <label for="leftover-filter-desc" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
-                        <input type="text" id="leftover-filter-desc" class="w-full p-2 border rounded-lg max-w-sm" placeholder="Filtre a lista de sobras...">
+                     <p class="text-sm text-slate-600 mb-4">Tombamentos da planilha que ainda não foram associados a nenhum item. Use os filtros para encontrar possíveis correspondências.</p>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                          <label for="leftover-keyword" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
+                          <input type="text" id="leftover-keyword" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira, mesa...">
+                        </div>
+                        <div>
+                          <label for="leftover-tombo" class="block text-sm font-medium mb-1">Filtrar por Tombamento</label>
+                          <input type="text" id="leftover-tombo" class="w-full p-2 border rounded-lg" placeholder="Ex: 14023...">
+                        </div>
+                        <div class="self-end">
+                          <button id="suggest-sobrando" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar Sobrando</button>
+                        </div>
                       </div>
-                     <div id="leftover-tombos-container" class="reconciliation-container overflow-y-auto space-y-2 mt-4"></div>
+                     <div class="mt-4 border-t pt-4">
+                        <h3 class="font-bold">Resultados (<span id="total-sobrando">0</span>)</h3>
+                        <div id="sobrando-list" class="reconciliation-container overflow-y-auto space-y-2 mt-2"></div>
+                     </div>
                 </div>
             </div>
 
@@ -337,14 +365,13 @@
         
         const GIAP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaVN5Oiv5eDmdJpsCCys-0TQb9q-QaOeTqakTE6wBYup2sJYnPf2_uNIYkmrI7FIvis1aUxv21vB_k/pub?output=csv';
 
-        // Otimização: Schema Dexie aprimorado e cache mais curto
         const idb = new Dexie('InventoryDB');
         idb.version(3).stores({
-            patrimonio: 'id, Tombamento, *Unidade, *Tipo, *Estado', // Índices para filtros
+            patrimonio: 'id, Tombamento, *Unidade, *Tipo, *Estado',
             giap: '++_id, TOMBAMENTO, *Unidade',
             metadata: 'key' 
         });
-        const CACHE_DURATION_MS = 2 * 60 * 60 * 1000; // Cache de 2 horas
+        const CACHE_DURATION_MS = 2 * 60 * 60 * 1000;
 
         let fullInventory = [], giapInventory = [];
         let giapMap = new Map();
@@ -352,6 +379,9 @@
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
         
+        // Estado para a nova aba de conciliação
+        let selSys = null, selGiap = null;
+
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
@@ -361,33 +391,18 @@
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         
+        // ... (elementos das abas antigas)
         const editTableBody = document.getElementById('edit-table-body');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
         const editFilterUnidade = document.getElementById('edit-filter-unidade');
         const editFilterDescricao = document.getElementById('edit-filter-descricao');
-
         const mapFilterTipo = document.getElementById('map-filter-tipo');
         const mapSystemUnitSelect = document.getElementById('map-system-unit-select');
         const mapGiapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
         const saveMappingBtn = document.getElementById('save-mapping-btn');
         const savedMappingsContainer = document.getElementById('saved-mappings-container');
-
-        const reconUnitSelect = document.getElementById('recon-unit-select');
-        const linkSelectedBtn = document.getElementById('link-selected-btn');
-        const reconciliationWorkspace = document.getElementById('reconciliation-workspace');
-        const reconSystemCount = document.getElementById('recon-system-count');
-        const reconSystemFilter = document.getElementById('recon-system-filter');
-        const reconSystemItemsList = document.getElementById('recon-system-items-list');
-        const reconGiapCount = document.getElementById('recon-giap-count');
-        const reconGiapFilter = document.getElementById('recon-giap-filter');
-        const reconGiapItemsList = document.getElementById('recon-giap-items-list');
-
-        const leftoverFilterDesc = document.getElementById('leftover-filter-desc');
-        const leftoverTombosContainer = document.getElementById('leftover-tombos-container');
-        
         const pendingTransfersContainer = document.getElementById('pending-transfers-container');
-
         const massTransferTombos = document.getElementById('mass-transfer-tombos');
         const massTransferTipo = document.getElementById('mass-transfer-tipo');
         const massTransferUnit = document.getElementById('mass-transfer-unit');
@@ -396,13 +411,12 @@
         const massTransferSetAllStatus = document.getElementById('mass-transfer-set-all-status');
         const massTransferList = document.getElementById('mass-transfer-list');
         const massTransferConfirmBtn = document.getElementById('mass-transfer-confirm-btn');
-        
         const giapTableBody = document.getElementById('giap-table-body');
         const suggestionModal = document.getElementById('suggestion-modal');
         const fullPageOverlay = document.getElementById('full-page-overlay');
         const overlayMessage = document.getElementById('overlay-message');
 
-        // --- Funções Utilitárias Otimizadas ---
+        // --- Funções Utilitárias ---
         const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -509,15 +523,18 @@
         }
         
         function initializeUI() {
+            // Inicializa todas as abas
             populateEditableInventoryTab();
             populateUnitMappingTab();
-            populateReconciliationTab();
-            populateLeftoverTombosTab();
+            populateReconciliationTab_Optimized(); // Nova função para a aba otimizada
+            // populateLeftoverTombosTab();
             populatePendingTransfersTab();
             populateMassTransferTab();
             populateGiapTab();
         }
         
+        // --- LÓGICA DAS ABAS ANTIGAS (Mantida) ---
+
         function populateEditableInventoryTab() {
             const updateUnidades = () => {
                 const selectedTipo = editFilterTipo.value;
@@ -606,31 +623,6 @@
                 </div>`).join('') : `<p class="text-sm text-slate-500">Nenhuma ligação salva ainda.</p>`;
         }
         
-        function populateReconciliationTab() {
-            const mappedSystemUnits = Object.keys(unitMapping).filter(key => unitMapping[key]?.length > 0).sort();
-            reconUnitSelect.innerHTML = '<option value="">Selecione uma Unidade Mapeada</option>' + mappedSystemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-        }
-        
-        const debouncedPopulateLeftover = debounce(populateLeftoverTombosTab, 300);
-        function populateLeftoverTombosTab() {
-            const descFilter = leftoverFilterDesc.value.toLowerCase();
-            const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-            const leftoverItems = giapInventory.filter(item => {
-                const tombo = (item.TOMBAMENTO || '').trim();
-                const desc = (item.Descrição || item.Espécie || '').toLowerCase();
-                return tombo && !usedTombamentos.has(tombo) && !tombo.toLowerCase().includes('permuta') && (!descFilter || desc.includes(descFilter));
-            });
-            leftoverTombosContainer.innerHTML = leftoverItems.length > 0 ? leftoverItems.map(item => `
-                <div class="p-3 border rounded-md bg-white flex justify-between items-center gap-4">
-                    <div>
-                        <strong class="font-mono">${escapeHtml(item.TOMBAMENTO)}</strong>
-                        <p class="text-sm text-slate-600">${escapeHtml(item.Descrição || item.Espécie)}</p>
-                        <p class="text-xs text-slate-400">Unidade GIAP: ${escapeHtml(item.Unidade)} | Valor: ${escapeHtml(item['Valor NF'])}</p>
-                    </div>
-                    <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}">Sugerir Vínculo</button>
-                </div>`).join('') : `<p class="text-slate-500 text-center p-4">Nenhum tombamento sobrando.</p>`;
-        }
-        
         function populatePendingTransfersTab() {
             const pendingTransfers = fullInventory.filter(item => {
                 const tombo = item.Tombamento?.trim();
@@ -665,288 +657,350 @@
                 massTransferUnit.disabled = false;
             });
         }
-        
-        function handleReconSelection(e) {
-            const itemEl = e.target.closest('.reconciliation-list-item');
-            if (!itemEl) return;
-            itemEl.classList.toggle('selected');
-            const systemSelected = document.querySelectorAll('#recon-system-items-list .selected').length;
-            const giapSelected = document.querySelectorAll('#recon-giap-items-list .selected').length;
-            reconSystemCount.textContent = systemSelected;
-            reconGiapCount.textContent = giapSelected;
-            linkSelectedBtn.disabled = !(systemSelected > 0 && systemSelected === giapSelected);
+       
+        // --- NOVA LÓGICA DAS ABAS OTIMIZADAS ---
+
+        function populateReconciliationTab_Optimized() {
+            const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
+            const sel = document.getElementById('filter-tipo');
+            sel.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
-        function renderReconciliationWorkspace() {
-            const systemUnit = reconUnitSelect.value;
-            if (!systemUnit) { reconciliationWorkspace.classList.add('hidden'); return; }
-            
-            const mappedGiapUnits = unitMapping[systemUnit] || [];
-            const systemFilterText = reconSystemFilter.value.toLowerCase();
-            const giapFilterText = reconGiapFilter.value.toLowerCase();
-            const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-
-            let systemItems = fullInventory.filter(i => i.Unidade === systemUnit && !i.Tombamento?.trim() && (i.Descrição || '').toLowerCase().includes(systemFilterText));
-            let giapItems = giapInventory.filter(i => {
-                const tombo = i.TOMBAMENTO?.trim();
-                const desc = (i.Descrição || i.Espécie || '').toLowerCase();
-                return mappedGiapUnits.includes(i.Unidade) && tombo && !usedTombamentos.has(tombo) && desc.includes(giapFilterText);
+        function renderList(containerId, arr, keyField, labelField) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            if (!arr || arr.length === 0) {
+                container.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado.</p>`;
+                return;
+            }
+            arr.forEach(item => {
+                const id = item[keyField];
+                const div = document.createElement('div');
+                div.className = 'reconciliation-list-item card p-2 text-sm';
+                div.textContent = item[labelField] || id;
+                div.dataset.id = id;
+                div.onclick = (event) => handleSelect(containerId, id, item, event.currentTarget);
+                container.append(div);
             });
-
-            systemItems.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
-            giapItems.sort((a, b) => (a.Descrição || a.Espécie || '').localeCompare(b.Descrição || b.Espécie || ''));
-
-            const renderItem = (item, type) => {
-                if (type === 'system') {
-                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${item.id}"><strong>${escapeHtml(item.Descrição)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Local: ${escapeHtml(item.Localização || 'N/A')}</p></div>`;
-                } else {
-                    return `<div class="reconciliation-list-item p-3 border-b" data-id="${escapeHtml(item.TOMBAMENTO)}"><strong>${escapeHtml(item.TOMBAMENTO)} - ${escapeHtml(item.Descrição || item.Espécie)}</strong><p class="text-xs text-slate-500">Fornecedor: ${escapeHtml(item['Nome Fornecedor'] || 'N/D')}</p></div>`;
-                }
-            };
-            reconSystemItemsList.innerHTML = systemItems.map(item => renderItem(item, 'system')).join('') || `<p class="p-4 text-slate-500">Nenhum item sem tombo.</p>`;
-            reconGiapItemsList.innerHTML = giapItems.map(item => renderItem(item, 'giap')).join('') || `<p class="p-4 text-slate-500">Nenhum tombo disponível.</p>`;
-            reconSystemCount.textContent = '0';
-            reconGiapCount.textContent = '0';
-            linkSelectedBtn.disabled = true;
-            reconciliationWorkspace.classList.remove('hidden');
         }
 
-        // --- Event Listeners ---
-        forceRefreshBtn.addEventListener('click', () => { showNotification('Forçando atualização do servidor...', 'info'); loadData(true); });
-        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+        function handleSelect(containerId, id, obj, element) {
+            if (element.classList.contains('linked')) return;
+
+            if (containerId === 'system-list') {
+                selSys = { id, obj };
+                document.querySelectorAll('#system-list .selected').forEach(el => el.classList.remove('selected'));
+                element.classList.add('selected');
+            } else { // 'giap-list'
+                selGiap = { tomb: id, obj };
+                document.querySelectorAll('#giap-list .selected').forEach(el => el.classList.remove('selected'));
+                element.classList.add('selected');
+            }
+
+            if (selSys && selGiap) {
+                createLink();
+            }
+        }
         
-        navButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                const tabName = e.currentTarget.dataset.tab;
-                navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
-                contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName)));
+        function createLink() {
+            const div = document.createElement('div');
+            div.className = 'card link-success p-2 text-sm bg-green-50 border-l-4 border-green-500';
+            div.textContent = `VINCULADO: ${selSys.obj.Descrição} ↔ ${selGiap.tomb}`;
+            div.dataset.systemId = selSys.id;
+            div.dataset.tombamento = selGiap.tomb;
+
+            document.getElementById('created-links').append(div);
+            
+            document.querySelector(`#system-list div[data-id='${selSys.id}']`).classList.add('linked');
+            document.querySelector(`#giap-list div[data-id='${selGiap.tomb}']`).classList.add('linked');
+
+            selSys = selGiap = null;
+            document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
+        }
+        
+        // --- EVENT LISTENERS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            forceRefreshBtn.addEventListener('click', () => { showNotification('Forçando atualização do servidor...', 'info'); loadData(true); });
+            logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+            
+            navButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const tabName = e.currentTarget.dataset.tab;
+                    navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+                    contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName)));
+                });
             });
-        });
-        
-        saveAllChangesBtn.addEventListener('click', async () => {
-            if (dirtyItems.size === 0) return;
-            const btnSpinner = document.getElementById('save-btn-spinner');
-            const btnText = document.getElementById('save-btn-text');
             
-            saveAllChangesBtn.disabled = true;
-            btnSpinner.classList.remove('hidden');
-            btnText.textContent = `Salvando ${dirtyItems.size} itens...`;
-
-            const batch = writeBatch(db);
-            dirtyItems.forEach((item, id) => {
-                const docRef = doc(db, 'patrimonio', id);
-                batch.update(docRef, {...item, updatedAt: serverTimestamp()});
-            });
-
-            try {
-                await batch.commit();
-                showNotification(`${dirtyItems.size} alterações salvas com sucesso!`, 'success');
-                dirtyItems.clear();
-                saveAllChangesBtn.disabled = true;
-                document.querySelectorAll('.is-dirty').forEach(row => row.classList.remove('is-dirty'));
-                await idb.metadata.clear();
-            } catch (error) {
-                console.error("Erro ao salvar alterações em lote:", error);
-                showNotification('Erro ao salvar alterações.', 'error');
-            } finally {
-                btnSpinner.classList.add('hidden');
-                btnText.textContent = 'Salvar Alterações';
-            }
-        });
-        
-        document.getElementById('edit-table-body').addEventListener('change', (e) => {
-            const input = e.target.closest('input, select');
-            if (!input) return;
-            
-            const row = input.closest('tr');
-            const docId = row.dataset.docId;
-            const field = input.dataset.field;
-            const value = input.type === 'number' ? Number(input.value) : input.value;
-            const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
-            const updatedItem = { ...currentItem, [field]: value };
-            
-            dirtyItems.set(docId, updatedItem);
-            row.classList.add('is-dirty');
-            saveAllChangesBtn.disabled = false;
-            
-            if (field === 'Tombamento' && value.trim()) {
-                const giapItem = giapMap.get(value.trim());
-                if (giapItem) {
-                    showNotification('Tombamento encontrado na planilha GIAP!', 'info');
-                    const descriptionToShow = giapItem.Descrição || giapItem.Espécie || 'N/A';
-                    updatedItem.Descrição = descriptionToShow;
-                    updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
-                    updatedItem.NF = giapItem.NF || '';
-                    row.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
-                    row.querySelector('[data-field="Fornecedor"]').value = updatedItem.Fornecedor;
-                    row.querySelector('[data-field="NF"]').value = updatedItem.NF;
-                    dirtyItems.set(docId, updatedItem);
-                }
-            }
-        });
-
-        mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
-        mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
-        saveMappingBtn.addEventListener('click', async () => {
-            const systemUnit = mapSystemUnitSelect.value;
-            if (!systemUnit) return showNotification("Selecione uma Unidade do Sistema.", "warning");
-            const giapUnits = Array.from(mapGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
-            unitMapping[systemUnit] = giapUnits;
-            try {
-                feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Salvando...`;
-                await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
-                showNotification('Mapeamento salvo!', 'success');
-                feedbackStatus.textContent = `Mapeamento salvo!`;
-                populateUnitMappingTab();
-                populateReconciliationTab();
-            } catch (error) { showNotification(`Erro ao salvar.`, 'error'); console.error(error); }
-        });
-        
-        savedMappingsContainer.addEventListener('click', async (e) => {
-            const deleteBtn = e.target.closest('.delete-mapping-btn');
-            if (deleteBtn) {
-                const systemUnit = deleteBtn.dataset.systemUnit;
-                delete unitMapping[systemUnit];
-                try {
-                    feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Removendo...`;
-                    await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
-                    showNotification(`Ligação removida.`, 'success');
-                    feedbackStatus.textContent = `Ligação removida.`;
-                    populateUnitMappingTab();
-                    populateReconciliationTab();
-                } catch (error) { showNotification(`Erro ao remover.`, 'error'); console.error(error); }
-            }
-        });
-        
-        reconUnitSelect.addEventListener('change', renderReconciliationWorkspace);
-        reconSystemFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
-        reconGiapFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
-
-        reconSystemItemsList.addEventListener('click', handleReconSelection);
-        reconGiapItemsList.addEventListener('click', handleReconSelection);
-        
-        linkSelectedBtn.addEventListener('click', async () => {
-            const selectedSystemNodes = document.querySelectorAll('#recon-system-items-list .selected');
-            const selectedGiapNodes = document.querySelectorAll('#recon-giap-items-list .selected');
-            if (selectedSystemNodes.length === 0) return;
-
-            showOverlay(`Ligando e salvando ${selectedSystemNodes.length} item(s)...`);
-            const batch = writeBatch(db);
-
-            selectedSystemNodes.forEach((systemNode, index) => {
-                const giapNode = selectedGiapNodes[index];
-                const systemId = systemNode.dataset.id;
-                const giapTombo = giapNode.dataset.id;
-                const systemItem = fullInventory.find(i => i.id === systemId);
-                const giapItem = giapMap.get(giapTombo);
+            saveAllChangesBtn.addEventListener('click', async () => {
+                if (dirtyItems.size === 0) return;
+                const btnSpinner = document.getElementById('save-btn-spinner');
+                const btnText = document.getElementById('save-btn-text');
                 
-                if(systemItem && giapItem) {
-                    const docRef = doc(db, 'patrimonio', systemId);
-                    const updatedData = {
-                        Tombamento: giapItem.TOMBAMENTO,
-                        Descrição: giapItem.Descrição || giapItem.Espécie || systemItem.Descrição || '',
-                        Fornecedor: giapItem['Nome Fornecedor'] || systemItem.Fornecedor || '',
-                        NF: giapItem.NF || systemItem.NF || '',
-                        updatedAt: serverTimestamp()
-                    };
-                    batch.update(docRef, updatedData);
+                saveAllChangesBtn.disabled = true;
+                btnSpinner.classList.remove('hidden');
+                btnText.textContent = `Salvando ${dirtyItems.size} itens...`;
+
+                const batch = writeBatch(db);
+                dirtyItems.forEach((item, id) => {
+                    const docRef = doc(db, 'patrimonio', id);
+                    batch.update(docRef, {...item, updatedAt: serverTimestamp()});
+                });
+
+                try {
+                    await batch.commit();
+                    showNotification(`${dirtyItems.size} alterações salvas com sucesso!`, 'success');
+                    dirtyItems.clear();
+                    saveAllChangesBtn.disabled = true;
+                    document.querySelectorAll('.is-dirty').forEach(row => row.classList.remove('is-dirty'));
+                    await idb.metadata.clear();
+                } catch (error) {
+                    console.error("Erro ao salvar alterações em lote:", error);
+                    showNotification('Erro ao salvar alterações.', 'error');
+                } finally {
+                    btnSpinner.classList.add('hidden');
+                    btnText.textContent = 'Salvar Alterações';
                 }
             });
-
-            try {
-                await batch.commit();
-                await idb.metadata.clear();
-                showNotification(`${selectedSystemNodes.length} item(s) vinculados com sucesso!`, 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            } catch (error) {
-                hideOverlay();
-                showNotification('Erro ao salvar vínculos.', 'error');
-                console.error(error);
-            }
-        });
-        
-        leftoverFilterDesc.addEventListener('input', debouncedPopulateLeftover);
-        
-        massTransferSearchBtn.addEventListener('click', () => {
-             const tombosInput = massTransferTombos.value;
-            const tombos = tombosInput.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
-            const existingTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()));
-            const foundItems = [];
-            const notFound = [];
-
-            tombos.forEach(tombo => {
-                const giapItem = giapMap.get(tombo);
-                if (giapItem && !existingTombos.has(tombo)) {
-                    foundItems.push(giapItem);
-                } else {
-                    notFound.push(tombo);
-                }
-            });
-
-            if (notFound.length > 0) showNotification(`Não encontrados ou já existem: ${notFound.join(', ')}`, 'warning');
-
-            if (foundItems.length > 0) {
-                const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
-                massTransferList.innerHTML = foundItems.map(item => `
-                    <div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center">
-                        <div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição || item.Espécie)}</div>
-                        <div><select data-tombo="${escapeHtml(item.TOMBAMENTO)}" class="mass-transfer-status w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option>${opt}</option>`).join('')}</select></div>
-                    </div>`).join('');
-                massTransferResults.classList.remove('hidden');
-            } else {
-                massTransferResults.classList.add('hidden');
-            }
-        });
-        
-        massTransferSetAllStatus.addEventListener('change', (e) => {
-            document.querySelectorAll('.mass-transfer-status').forEach(select => select.value = e.target.value);
-        });
-
-        massTransferConfirmBtn.addEventListener('click', async () => {
-            const destinationUnit = massTransferUnit.value;
-            if (!destinationUnit) return showNotification('Selecione uma unidade de destino.', 'warning');
             
-            const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status'));
-            if (itemsToCreate.length === 0) return;
-
-            showOverlay(`Criando ${itemsToCreate.length} itens...`);
-            const batch = writeBatch(db);
-            itemsToCreate.forEach(select => {
-                const tombo = select.dataset.tombo;
-                const giapItem = giapMap.get(tombo);
-                if (giapItem) {
-                    const newItemRef = doc(collection(db, 'patrimonio'));
-                    const newItem = {
-                        Tombamento: tombo,
-                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
-                        Tipo: massTransferTipo.value || '',
-                        Unidade: destinationUnit,
-                        Localização: '',
-                        Fornecedor: giapItem['Nome Fornecedor'] || '',
-                        NF: giapItem.NF || '',
-                        'Origem da Doação': '',
-                        Estado: select.value,
-                        Quantidade: 1,
-                        Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    };
-                    batch.set(newItemRef, newItem);
+            document.getElementById('edit-table-body').addEventListener('change', (e) => {
+                const input = e.target.closest('input, select');
+                if (!input) return;
+                
+                const row = input.closest('tr');
+                const docId = row.dataset.docId;
+                const field = input.dataset.field;
+                const value = input.type === 'number' ? Number(input.value) : input.value;
+                const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
+                const updatedItem = { ...currentItem, [field]: value };
+                
+                dirtyItems.set(docId, updatedItem);
+                row.classList.add('is-dirty');
+                saveAllChangesBtn.disabled = false;
+                
+                if (field === 'Tombamento' && value.trim()) {
+                    const giapItem = giapMap.get(value.trim());
+                    if (giapItem) {
+                        showNotification('Tombamento encontrado na planilha GIAP!', 'info');
+                        const descriptionToShow = giapItem.Descrição || giapItem.Espécie || 'N/A';
+                        updatedItem.Descrição = descriptionToShow;
+                        updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
+                        updatedItem.NF = giapItem.NF || '';
+                        row.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
+                        row.querySelector('[data-field="Fornecedor"]').value = updatedItem.Fornecedor;
+                        row.querySelector('[data-field="NF"]').value = updatedItem.NF;
+                        dirtyItems.set(docId, updatedItem);
+                    }
                 }
             });
-            try {
-                await batch.commit();
-                await idb.metadata.clear();
-                showNotification(`${itemsToCreate.length} itens criados com sucesso!`, 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            } catch (e) {
-                hideOverlay();
-                showNotification('Erro ao criar itens em massa.', 'error'); 
-                console.error(e);
-            }
-        });
 
+            mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
+            mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
+            saveMappingBtn.addEventListener('click', async () => {
+                const systemUnit = mapSystemUnitSelect.value;
+                if (!systemUnit) return showNotification("Selecione uma Unidade do Sistema.", "warning");
+                const giapUnits = Array.from(mapGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
+                unitMapping[systemUnit] = giapUnits;
+                try {
+                    feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Salvando...`;
+                    await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
+                    showNotification('Mapeamento salvo!', 'success');
+                    feedbackStatus.textContent = `Mapeamento salvo!`;
+                    populateUnitMappingTab();
+                } catch (error) { showNotification(`Erro ao salvar.`, 'error'); console.error(error); }
+            });
+            
+            savedMappingsContainer.addEventListener('click', async (e) => {
+                const deleteBtn = e.target.closest('.delete-mapping-btn');
+                if (deleteBtn) {
+                    const systemUnit = deleteBtn.dataset.systemUnit;
+                    delete unitMapping[systemUnit];
+                    try {
+                        feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Removendo...`;
+                        await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
+                        showNotification(`Ligação removida.`, 'success');
+                        feedbackStatus.textContent = `Ligação removida.`;
+                        populateUnitMappingTab();
+                    } catch (error) { showNotification(`Erro ao remover.`, 'error'); console.error(error); }
+                }
+            });
+            
+            // --- LISTENERS PARA ABAS OTIMIZADAS ---
+
+            document.getElementById('filter-tipo').addEventListener('change', () => {
+                const tipo = document.getElementById('filter-tipo').value;
+                const unidades = [...new Set(fullInventory
+                    .filter(i => !tipo || i.Tipo === tipo)
+                    .map(i => i.Unidade).filter(Boolean))].sort();
+                const selU = document.getElementById('filter-unidade');
+                selU.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option>${u}</option>`).join('');
+            });
+
+            document.getElementById('load-conciliar').addEventListener('click', () => {
+                const unidade = document.getElementById('filter-unidade').value;
+                if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
+                
+                const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
+
+                const items = fullInventory.filter(i => i.Unidade === unidade && !i.Tombamento);
+                const tombos = giapInventory.filter(g =>
+                    !usedTombamentos.has(g.TOMBAMENTO?.trim()) && g.Unidade === unidade
+                );
+                
+                renderList('system-list', items, 'id', 'Descrição');
+                renderList('giap-list', tombos, 'TOMBAMENTO', 'Descrição');
+                document.getElementById('quick-actions').classList.remove('hidden');
+                document.getElementById('created-links').innerHTML = ''; // Limpa links anteriores
+                selSys = selGiap = null; // Reseta seleções
+            });
+
+            document.getElementById('clear-selections').addEventListener('click', () => {
+                selSys = selGiap = null;
+                document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
+                showNotification('Seleções limpas.', 'info');
+            });
+            
+            document.getElementById('save-links').addEventListener('click', async () => {
+                const linkedItems = document.querySelectorAll('#created-links .link-success');
+                if (linkedItems.length === 0) return showNotification('Nenhum novo link para salvar.', 'info');
+
+                showOverlay(`Salvando ${linkedItems.length} links...`);
+                const batch = writeBatch(db);
+
+                linkedItems.forEach(div => {
+                    const systemId = div.dataset.systemId;
+                    const tombamento = div.dataset.tombamento;
+                    const giapItem = giapMap.get(tombamento);
+
+                    if (systemId && tombamento && giapItem) {
+                        const docRef = doc(db, 'patrimonio', systemId);
+                        batch.update(docRef, {
+                            Tombamento: tombamento,
+                            Descrição: giapItem.Descrição || giapItem.Espécie,
+                            Fornecedor: giapItem['Nome Fornecedor'],
+                            NF: giapItem['NF'],
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                });
+
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear();
+                    showNotification(`${linkedItems.length} links salvos! A página será recarregada.`, 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } catch (error) {
+                    hideOverlay();
+                    showNotification('Erro ao salvar os links.', 'error');
+                    console.error("Erro ao salvar links:", error);
+                }
+            });
+            
+            document.getElementById('suggest-sobrando').addEventListener('click', () => {
+                 const kw = document.getElementById('leftover-keyword').value.toLowerCase();
+                 const tfilter = document.getElementById('leftover-tombo').value;
+                 const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
+                 const sob = giapInventory.filter(g =>
+                   !usedTombamentos.has(g.TOMBAMENTO?.trim()) &&
+                   (!tfilter || (g.TOMBAMENTO || '').includes(tfilter)) &&
+                   (!kw || (g.Descrição || '').toLowerCase().includes(kw) || (g.Espécie || '').toLowerCase().includes(kw))
+                 );
+                 document.getElementById('total-sobrando').textContent = sob.length;
+                 const list = document.getElementById('sobrando-list');
+                 list.innerHTML = '';
+                 if (sob.length > 0) {
+                     sob.forEach(g => {
+                         const d = document.createElement('div');
+                         d.className = 'card p-2 mb-1 text-sm';
+                         d.textContent = `Tombo: ${g.TOMBAMENTO} - ${g.Descrição || g.Espécie} (Unidade GIAP: ${g.Unidade})`;
+                         list.append(d);
+                     });
+                 } else {
+                    list.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado.</p>`;
+                 }
+                 showNotification(`${sob.length} tombos sobrando listados.`, 'success');
+            });
+            
+            // --- Listeners de abas antigas (mantidos) ---
+            massTransferSearchBtn.addEventListener('click', () => {
+                 const tombosInput = massTransferTombos.value;
+                const tombos = tombosInput.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
+                const existingTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()));
+                const foundItems = [];
+                const notFound = [];
+
+                tombos.forEach(tombo => {
+                    const giapItem = giapMap.get(tombo);
+                    if (giapItem && !existingTombos.has(tombo)) {
+                        foundItems.push(giapItem);
+                    } else {
+                        notFound.push(tombo);
+                    }
+                });
+
+                if (notFound.length > 0) showNotification(`Não encontrados ou já existem: ${notFound.join(', ')}`, 'warning');
+
+                if (foundItems.length > 0) {
+                    const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
+                    massTransferList.innerHTML = foundItems.map(item => `
+                        <div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center">
+                            <div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição || item.Espécie)}</div>
+                            <div><select data-tombo="${escapeHtml(item.TOMBAMENTO)}" class="mass-transfer-status w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option>${opt}</option>`).join('')}</select></div>
+                        </div>`).join('');
+                    massTransferResults.classList.remove('hidden');
+                } else {
+                    massTransferResults.classList.add('hidden');
+                }
+            });
+            
+            massTransferSetAllStatus.addEventListener('change', (e) => {
+                document.querySelectorAll('.mass-transfer-status').forEach(select => select.value = e.target.value);
+            });
+
+            massTransferConfirmBtn.addEventListener('click', async () => {
+                const destinationUnit = massTransferUnit.value;
+                if (!destinationUnit) return showNotification('Selecione uma unidade de destino.', 'warning');
+                
+                const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status'));
+                if (itemsToCreate.length === 0) return;
+
+                showOverlay(`Criando ${itemsToCreate.length} itens...`);
+                const batch = writeBatch(db);
+                itemsToCreate.forEach(select => {
+                    const tombo = select.dataset.tombo;
+                    const giapItem = giapMap.get(tombo);
+                    if (giapItem) {
+                        const newItemRef = doc(collection(db, 'patrimonio'));
+                        const newItem = {
+                            Tombamento: tombo,
+                            Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                            Tipo: massTransferTipo.value || '',
+                            Unidade: destinationUnit,
+                            Localização: '',
+                            Fornecedor: giapItem['Nome Fornecedor'] || '',
+                            NF: giapItem.NF || '',
+                            'Origem da Doação': '',
+                            Estado: select.value,
+                            Quantidade: 1,
+                            Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`,
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        };
+                        batch.set(newItemRef, newItem);
+                    }
+                });
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear();
+                    showNotification(`${itemsToCreate.length} itens criados com sucesso!`, 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch (e) {
+                    hideOverlay();
+                    showNotification('Erro ao criar itens em massa.', 'error'); 
+                    console.error(e);
+                }
+            });
+
+        });
     </script>
 </body>
 </html>
-
