@@ -8,6 +8,7 @@
     <!-- Scripts e Links -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
     <!-- Dexie.js para Cache no IndexedDB -->
@@ -263,15 +264,30 @@
 
         <!-- Notas Fiscais -->
         <div id="content-notas" class="tab-content hidden fade-in">
-          <div class="card">
-              <h2 class="text-2xl font-bold text-slate-800 mb-4">📋 Notas Fiscais</h2>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 border-b pb-4">
-                <input type="text" id="filter-nf" placeholder="Filtrar por Nº NF" class="w-full p-2 border rounded-lg" />
-                <input type="date" id="filter-data" class="w-full p-2 border rounded-lg" />
-                <button id="clear-filters-nf" class="btn btn-secondary">Limpar filtros</button>
-              </div>
-              <div id="lista-notas" class="space-y-2"></div>
-          </div>
+            <div class="card">
+                <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
+                <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, ordenadas pela data de cadastro mais recente. Verifique quais itens já foram alocados no inventário.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b">
+                    <div>
+                        <label for="nf-search" class="block text-sm font-medium mb-1">Pesquisar por NF</label>
+                        <input type="text" id="nf-search" placeholder="Digite o número da NF..." class="w-full p-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label for="nf-date-start" class="block text-sm font-medium mb-1">Data de Início (Cadastro)</label>
+                        <input type="date" id="nf-date-start" class="w-full p-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label for="nf-date-end" class="block text-sm font-medium mb-1">Data de Fim (Cadastro)</label>
+                        <input type="date" id="nf-date-end" class="w-full p-2 border rounded-lg">
+                    </div>
+                    <div class="self-end">
+                         <button id="clear-filters-nf" class="btn btn-secondary w-full">Limpar Filtros</button>
+                    </div>
+                </div>
+
+                <div id="lista-notas" class="mt-4 space-y-3"></div>
+            </div>
         </div>
 
     </main>
@@ -300,17 +316,19 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // Otimização: Configuração do Cache com Dexie.js
+        const GIAP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaVN5Oiv5eDmdJpsCCys-0TQb9q-QaOeTqakTE6wBYup2sJYnPf2_uNIYkmrI7FIvis1aUxv21vB_k/pub?output=csv';
+
         const idb = new Dexie('InventoryDB');
-        idb.version(1).stores({
-            patrimonio: '++id, Tombamento, Unidade, Estado, Tipo', // Indexa campos para filtros rápidos
+        idb.version(2).stores({
+            patrimonio: '++id, Tombamento, Unidade, Estado, Tipo',
+            giap: '++_id, TOMBAMENTO',
             metadata: 'key'
         });
-        const CACHE_DURATION_MS = 2 * 60 * 60 * 1000; // Cache de 2 horas
+        const CACHE_DURATION_MS = 2 * 60 * 60 * 1000;
 
         // --- ESTADO DA APLICAÇÃO ---
-        let patrimonioFullList = [], historicoFullList = [];
-        let notasFiscais = []; // Nova variável para armazenar notas
+        let patrimonioFullList = [], historicoFullList = [], giapInventory = [];
+        let processedNfData = {};
         let isLoggedIn = false;
         let dashboardEstadoChart, dashboardTipoChart;
         let patrimonioFilteredList = [], patrimonioCurrentPage = 1;
@@ -353,15 +371,14 @@
                 timer = setTimeout(() => func.apply(this, args), delay);
             };
         };
+        const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         
         function showNotification(message, type = 'info', duration = 3000) {
             const notification = document.createElement('div');
             notification.className = `notification-toast ${type}`;
             notification.textContent = message;
             document.body.appendChild(notification);
-            
             setTimeout(() => notification.classList.add('show'), 10);
-            
             setTimeout(() => {
                 notification.classList.remove('show');
                 setTimeout(() => notification.remove(), 500);
@@ -394,36 +411,59 @@
             } catch (error) { console.error("Falha ao registrar ação no histórico:", error); }
         }
 
+        function loadGiapInventory() {
+            return new Promise((resolve, reject) => {
+                Papa.parse(GIAP_SHEET_URL, {
+                    download: true, header: true, skipEmptyLines: true,
+                    transformHeader: header => header.trim(),
+                    complete: r => resolve(r.data), error: e => reject(e)
+                });
+            });
+        }
+
         async function loadAllData(forceRefresh = false) {
-            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando patrimônio...</p></td></tr>`;
+            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
             
             const metadata = await idb.metadata.get('lastFetch');
             const isCacheStale = !metadata || (Date.now() - metadata.timestamp > CACHE_DURATION_MS);
 
             if (!forceRefresh && !isCacheStale) {
                 statusFeedbackEl.textContent = 'Carregando dados do cache local...';
-                patrimonioFullList = await idb.patrimonio.toArray();
-                 showNotification('Dados carregados do cache.', 'info');
+                [patrimonioFullList, giapInventory] = await Promise.all([
+                    idb.patrimonio.toArray(),
+                    idb.giap.toArray()
+                ]);
+                showNotification('Dados carregados do cache.', 'info');
             } else {
                 statusFeedbackEl.textContent = 'Buscando dados atualizados do servidor...';
                 try {
-                    const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
-                    const freshData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
-                    freshData.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
-                    patrimonioFullList = freshData;
+                    const [patrimonioSnapshot, freshGiapData] = await Promise.all([
+                        getDocs(query(collection(db, 'patrimonio'))),
+                        loadGiapInventory()
+                    ]);
 
-                    await idb.transaction('rw', idb.patrimonio, idb.metadata, async () => {
+                    const freshPatrimonio = patrimonioSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    freshPatrimonio.sort((a, b) => (a.Descrição || '').localeCompare(b.Descrição || ''));
+                    
+                    patrimonioFullList = freshPatrimonio;
+                    giapInventory = freshGiapData;
+
+                    await idb.transaction('rw', idb.patrimonio, idb.giap, idb.metadata, async () => {
                         await idb.patrimonio.clear();
+                        await idb.giap.clear();
                         await idb.patrimonio.bulkAdd(patrimonioFullList);
+                        await idb.giap.bulkAdd(giapInventory);
                         await idb.metadata.put({ key: 'lastFetch', timestamp: Date.now() });
                     });
                     showNotification('Dados atualizados com sucesso!', 'success');
                 } catch (error) {
-                     console.error("Erro ao carregar patrimônio: ", error);
+                     console.error("Erro ao carregar dados: ", error);
                      statusFeedbackEl.textContent = 'Erro ao carregar dados.';
                      showNotification('Falha ao carregar dados do servidor.', 'error');
-                     patrimonioFullList = await idb.patrimonio.toArray(); // Fallback
+                     [patrimonioFullList, giapInventory] = await Promise.all([
+                        idb.patrimonio.toArray(),
+                        idb.giap.toArray()
+                     ]);
                 }
             }
             statusFeedbackEl.textContent = `Pronto. ${patrimonioFullList.length} itens carregados.`;
@@ -450,48 +490,117 @@
             }
             if (isLoggedIn) {
                 document.getElementById('tab-notas').style.display = 'inline-block';
-                carregarNotasFiscais();
+                populateNfTab();
             }
         }
 
         // --- Funções da Aba Notas Fiscais ---
-        function isUserLoggedIn() {
-            return !!auth.currentUser;
+        function parsePtBrDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return new Date(0);
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                return new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+            return new Date(0);
         }
 
-        function carregarNotasFiscais() {
-          // Exemplo: Buscar notas do cache ou Firebase.
-          // Por enquanto, vamos usar dados mocados para demonstração.
-          notasFiscais = [
-            { nf: '12345', data: '2023-10-26', descricao: 'Cadeira de Escritório' },
-            { nf: '67890', data: '2023-10-25', descricao: 'Mesa de Reunião' },
-            { nf: '11223', data: '2023-10-25', descricao: 'Computador Dell' },
-          ];
-          renderNotas();
+        function populateNfTab() {
+            if (giapInventory.length === 0) return;
+            const giapWithNf = giapInventory
+                .filter(item => item.NF && item.NF.trim() !== '')
+                .sort((a, b) => parsePtBrDate(b.Cadastro) - parsePtBrDate(a.Cadastro));
+            processedNfData = giapWithNf.reduce((acc, item) => {
+                const nf = item.NF.trim();
+                if (!acc[nf]) {
+                    acc[nf] = {
+                        items: [],
+                        fornecedor: item['Nome Fornecedor'] || 'Não especificado',
+                        tipoEntrada: item['Tipo Entrada'] || 'N/A',
+                        dataCadastro: item.Cadastro
+                    };
+                }
+                acc[nf].items.push(item);
+                return acc;
+            }, {});
+            renderNfList();
         }
 
-        function renderNotas() {
-          const nfFiltro = document.getElementById('filter-nf').value.toLowerCase();
-          const dataFiltro = document.getElementById('filter-data').value;
-          const lista = document.getElementById('lista-notas');
-          lista.innerHTML = '';
+        function renderNfList() {
+            const container = document.getElementById('lista-notas');
+            container.innerHTML = '';
+            const tomboMap = new Map(patrimonioFullList.map(item => [item.Tombamento?.trim(), item]));
+            
+            const nfSearchTerm = document.getElementById('nf-search').value.toLowerCase();
+            const startDateStr = document.getElementById('nf-date-start').value;
+            const endDateStr = document.getElementById('nf-date-end').value;
 
-          const filtradas = notasFiscais.filter(n => 
-              (!nfFiltro || n.nf.toLowerCase().includes(nfFiltro)) &&
-              (!dataFiltro || n.data === dataFiltro)
-          );
+            const startDate = startDateStr ? new Date(startDateStr) : null;
+            const endDate = endDateStr ? new Date(endDateStr) : null;
+            if (endDate) endDate.setHours(23, 59, 59, 999);
+            if (startDate) startDate.setHours(0, 0, 0, 0);
 
-          if (filtradas.length === 0) {
-            lista.innerHTML = '<p class="text-slate-500 text-center">Nenhuma nota fiscal encontrada.</p>';
-            return;
-          }
+            const filteredNfs = Object.keys(processedNfData).filter(nf => {
+                const nfGroup = processedNfData[nf];
+                if (nfSearchTerm && !nf.toLowerCase().includes(nfSearchTerm)) return false;
+                const nfDate = parsePtBrDate(nfGroup.dataCadastro);
+                if (startDate && nfDate < startDate) return false;
+                if (endDate && nfDate > endDate) return false;
+                return true;
+            });
 
-          filtradas.forEach(nota => {
-            const div = document.createElement('div');
-            div.className = 'p-3 border rounded-md bg-slate-50';
-            div.textContent = `NF: ${nota.nf} - Data: ${nota.data} - Desc: ${nota.descricao}`;
-            lista.appendChild(div);
-          });
+            if (filteredNfs.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhuma nota fiscal encontrada com os filtros aplicados.</p>`;
+                return;
+            }
+
+            filteredNfs.forEach(nf => {
+                const nfGroup = processedNfData[nf];
+                const nfDetails = document.createElement('details');
+                nfDetails.className = 'bg-white rounded-lg shadow-sm border mb-3';
+                nfDetails.open = false;
+                const itemSummaryText = nfGroup.items.slice(0, 2).map(i => escapeHtml(i.Descrição || i.Espécie)).join(', ') + (nfGroup.items.length > 2 ? '...' : '');
+                const tipoEntradaClass = normalizeStr(nfGroup.tipoEntrada).includes('doacao') ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
+                const nfSummary = document.createElement('summary');
+                nfSummary.className = 'p-4 font-semibold cursor-pointer grid grid-cols-1 md:grid-cols-4 gap-4 items-center hover:bg-slate-50';
+                nfSummary.innerHTML = `
+                    <div class="md:col-span-2">
+                        <p class="text-xs text-slate-500">NF: <strong class="text-blue-700 text-sm">${escapeHtml(nf)}</strong> | Fornecedor: <strong>${escapeHtml(nfGroup.fornecedor)}</strong></p>
+                        <p class="text-xs text-slate-500 mt-1 truncate">Itens: ${itemSummaryText}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Data Cadastro</p>
+                        <strong>${escapeHtml(nfGroup.dataCadastro)}</strong>
+                    </div>
+                    <div class="text-right">
+                         <span class="px-2 py-1 text-xs font-bold ${tipoEntradaClass} rounded-full">${escapeHtml(nfGroup.tipoEntrada)}</span>
+                    </div>`;
+                nfDetails.appendChild(nfSummary);
+                const itemsListContainer = document.createElement('div');
+                itemsListContainer.className = 'p-4 border-t border-slate-200 space-y-2';
+                nfGroup.items.forEach(item => {
+                    const tombo = item.TOMBAMENTO?.trim();
+                    const allocatedItem = tombo ? tomboMap.get(tombo) : undefined;
+                    let allocationHtml = `<span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Não Alocado</span>`;
+                    if (allocatedItem) {
+                        allocationHtml = `
+                            <div>
+                                <span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado</span>
+                                <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(allocatedItem.Unidade)}</strong> (${escapeHtml(allocatedItem.Tipo)})</p>
+                            </div>`;
+                    }
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'p-3 border rounded-md flex justify-between items-center bg-slate-50/50';
+                    itemDiv.innerHTML = `
+                        <div class="flex-1">
+                            <p class="font-bold text-slate-800">${escapeHtml(item.Descrição || item.Espécie)}</p>
+                            <p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p>
+                        </div>
+                        <div class="text-right ml-4">${allocationHtml}</div>`;
+                    itemsListContainer.appendChild(itemDiv);
+                });
+                nfDetails.appendChild(itemsListContainer);
+                container.appendChild(nfDetails);
+            });
         }
         // --- Fim Funções Notas Fiscais ---
 
@@ -503,7 +612,6 @@
             if (isLoggedIn) {
                 loadHistory();
                 document.getElementById('tab-notas').style.display = 'inline-block';
-                carregarNotasFiscais();
             } else {
                  document.getElementById('tab-notas').style.display = 'none';
             }
@@ -692,7 +800,7 @@
             contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
             if (tabName === 'dashboard' && patrimonioFullList.length > 0) renderDashboard(patrimonioFullList);
             if (tabName === 'historico') renderHistory();
-            if (tabName === 'notas') renderNotas();
+            if (tabName === 'notas') renderNfList();
         }
         
         function renderHistory() {
@@ -767,12 +875,15 @@
             filtroBuscaEl.addEventListener('input', debouncedFilter);
 
             // Event Listeners para Aba Notas Fiscais
-            document.getElementById('filter-nf').addEventListener('input', renderNotas);
-            document.getElementById('filter-data').addEventListener('change', renderNotas);
+            const debouncedRenderNf = debounce(renderNfList, 300);
+            document.getElementById('nf-search').addEventListener('input', debouncedRenderNf);
+            document.getElementById('nf-date-start').addEventListener('change', debouncedRenderNf);
+            document.getElementById('nf-date-end').addEventListener('change', debouncedRenderNf);
             document.getElementById('clear-filters-nf').addEventListener('click', () => {
-              document.getElementById('filter-nf').value = '';
-              document.getElementById('filter-data').value = '';
-              renderNotas();
+              document.getElementById('nf-search').value = '';
+              document.getElementById('nf-date-start').value = '';
+              document.getElementById('nf-date-end').value = '';
+              renderNfList();
             });
 
             resetFiltersBtn.addEventListener('click', () => { document.getElementById('patrimonio-filters-form').reset(); filtroUnidadeEl.disabled = true; applyPatrimonioFiltersAndRender(); });
@@ -818,3 +929,4 @@
     </script>
 </body>
 </html>
+
