@@ -713,11 +713,12 @@
                 } else { // giap-list com mais detalhes
                     const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
                     const dataCadastro = escapeHtml(item.Cadastro || 'N/D');
+                    const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
                     const tombo = escapeHtml(item[keyField]);
                     detailsHtml = `
                         <strong>${tombo} - ${descricao}</strong>
                         <p class="text-xs text-slate-500 mt-1">
-                            Data Cadastro: <strong>${dataCadastro}</strong>
+                            Cadastro: <strong>${dataCadastro}</strong> | Fornecedor: <strong>${fornecedor}</strong>
                         </p>
                     `;
                 }
@@ -1086,4 +1087,5 @@
     </script>
 </body>
 </html>
+
 
