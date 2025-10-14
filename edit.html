@@ -156,9 +156,10 @@
                 </div>
                 <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1800px]">
+                        <table class="w-full text-sm min-w-[1900px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
+                                    <th class="p-3 text-left font-semibold">Ações</th>
                                     <th class="p-3 text-left font-semibold">Tombamento</th>
                                     <th class="p-3 text-left font-semibold">Descrição</th>
                                     <th class="p-3 text-left font-semibold">Tipo</th>
@@ -677,19 +678,31 @@
                 
                 const itemsToRender = filtered.slice(0, 200);
 
-                const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+                const headers = ['Ações', 'Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
                 const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
+                
                 editTableBody.innerHTML = itemsToRender.map(item => {
                     const itemData = dirtyItems.get(item.id) || item;
                     const isDirty = dirtyItems.has(item.id);
                     const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
-                    return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${headers.map(h => {
+                    
+                    const cells = headers.map(h => {
+                        if (h === 'Ações') {
+                            return `<td class="p-2 border-b">
+                                        <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
+                                        </button>
+                                    </td>`;
+                        }
                         if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
                         const value = escapeHtml(itemData[h]);
                         const inputType = (h === 'Quantidade') ? 'number' : 'text';
                         return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
-                    }).join('')}</tr>`;
+                    }).join('');
+
+                    return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${cells}</tr>`;
                 }).join('');
+
                 if(filtered.length > 200) {
                      editTableBody.innerHTML += `<tr><td colspan="${headers.length}" class="text-center p-4 font-semibold text-orange-600">Apenas os primeiros 200 de ${filtered.length} resultados são exibidos. Refine sua busca.</td></tr>`;
                 }
@@ -784,7 +797,6 @@
         function populateImportAndReplaceTab() {
             const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
             
-            // For Mass Transfer (by GIAP tombo)
             const massTransferTipo = document.getElementById('mass-transfer-tipo');
             massTransferTipo.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
             
@@ -801,7 +813,6 @@
                 massTransferUnit.disabled = false;
             });
 
-            // For Replace Unit Inventory
             const replaceTipo = document.getElementById('replace-tipo');
             replaceTipo.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
 
@@ -959,7 +970,6 @@
             renderList('giap-list', tombos, 'TOMBAMENTO', 'Descrição');
         }
 
-        // --- Funções para o novo Modal de Adicionar Item ---
         function openAddItemModal(defaults = {}) {
             const modal = document.getElementById('add-item-modal');
             const form = document.getElementById('add-item-form');
@@ -1056,6 +1066,56 @@
                     }
                 }
             });
+
+            document.getElementById('edit-table-body').addEventListener('click', (e) => {
+                const syncBtn = e.target.closest('.sync-giap-btn');
+                if (!syncBtn) return;
+
+                const docId = syncBtn.dataset.docId;
+                const row = document.getElementById(`row-${docId}`);
+                if (!row) return;
+
+                const tomboInput = row.querySelector('[data-field="Tombamento"]');
+                const tomboValue = tomboInput.value.trim();
+
+                if (!tomboValue) {
+                    showNotification('O campo Tombamento está vazio.', 'warning');
+                    return;
+                }
+                const giapItem = giapMap.get(tomboValue);
+
+                if (giapItem) {
+                    const descInput = row.querySelector('[data-field="Descrição"]');
+                    const fornInput = row.querySelector('[data-field="Fornecedor"]');
+                    const nfInput = row.querySelector('[data-field="NF"]');
+
+                    const newDesc = giapItem.Descrição || giapItem.Espécie || '';
+                    const newForn = giapItem['Nome Fornecedor'] || '';
+                    const newNf = giapItem.NF || '';
+
+                    descInput.value = newDesc;
+                    fornInput.value = newForn;
+                    nfInput.value = newNf;
+
+                    const currentItem = dirtyItems.get(docId) || JSON.parse(JSON.stringify(fullInventory.find(i => i.id === docId)));
+                    const updatedItem = {
+                        ...currentItem,
+                        Tombamento: tomboValue,
+                        Descrição: newDesc,
+                        Fornecedor: newForn,
+                        NF: newNf
+                    };
+                    
+                    dirtyItems.set(docId, updatedItem);
+                    row.classList.add('is-dirty');
+                    saveAllChangesBtn.disabled = false;
+                    
+                    showNotification(`Dados do Tombo ${tomboValue} sincronizados!`, 'success');
+                } else {
+                    showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
+                }
+            });
+
 
             document.getElementById('add-item-to-unit-btn').addEventListener('click', () => {
                 openAddItemModal({
@@ -1257,7 +1317,6 @@
                  showNotification(`${sob.length} tombos sobrando listados.`, 'success');
             });
             
-            // --- LISTENERS PARA ABA DE IMPORTAÇÃO E SUBSTITUIÇÃO ---
             const subNavButtons = document.querySelectorAll('#content-importacao .sub-nav-btn');
             subNavButtons.forEach(button => {
                 button.addEventListener('click', (e) => {
@@ -1268,7 +1327,6 @@
                 });
             });
             
-            // Listeners para a funcionalidade antiga (agora em sub-aba)
             const massTransferSearchBtn = document.getElementById('mass-transfer-search-btn');
             massTransferSearchBtn.addEventListener('click', () => {
                 const tombosInput = document.getElementById('mass-transfer-tombos').value;
@@ -1334,7 +1392,6 @@
                 }
             });
 
-            // Listeners para a nova funcionalidade de Substituir Inventário
             const previewBtn = document.getElementById('preview-replace-btn');
             previewBtn.addEventListener('click', () => {
                 const data = document.getElementById('replace-data').value;
@@ -1347,11 +1404,11 @@
                     skipEmptyLines: true,
                     complete: (results) => {
                         itemsToReplace = results.data.map(row => ({
-                            UNIDADE_EXCEL: row[0],
-                            ITEM: row[1],
-                            TOMBO: row[2],
-                            LOCAL: row[3],
-                            ESTADO: row[4]
+                            UNIDADE_EXCEL: (row[0] || '').trim(),
+                            ITEM: (row[1] || '').trim(),
+                            TOMBO: (row[2] || '').trim(),
+                            LOCAL: (row[3] || '').trim(),
+                            ESTADO: (row[4] || '').trim()
                         }));
                         
                         const previewList = document.getElementById('replace-preview-list');
@@ -1387,24 +1444,21 @@
                 
                 const batch = writeBatch(db);
 
-                // 1. Deletar itens antigos
                 itemsToDelete.forEach(item => {
                     const docRef = doc(db, 'patrimonio', item.id);
                     batch.delete(docRef);
                 });
 
-                // 2. Criar itens novos
+                const validEstados = ['Novo', 'Bom', 'Regular', 'Avariado'];
                 itemsToReplace.forEach(item => {
                     const newItemRef = doc(collection(db, 'patrimonio'));
+                    const estadoValue = validEstados.find(e => normalizeStr(e) === normalizeStr(item.ESTADO)) || 'Regular';
                     const newItemData = {
-                        Unidade: unidade,
-                        Tipo: tipo,
-                        Descrição: item.ITEM || '',
-                        Tombamento: item.TOMBO || 'S/T',
-                        Localização: item.LOCAL || '',
-                        Estado: item.ESTADO || 'Regular',
-                        Quantidade: 1,
-                        Fornecedor: '', NF: '', 'Origem da Doação': '', Observação: 'Importado via substituição de planilha.',
+                        Unidade: unidade, Tipo: tipo,
+                        Descrição: item.ITEM || '', Tombamento: item.TOMBO || 'S/T',
+                        Localização: item.LOCAL || '', Estado: estadoValue,
+                        Quantidade: 1, Fornecedor: '', NF: '', 'Origem da Doação': '', 
+                        Observação: 'Importado via substituição de planilha.',
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItemData);
