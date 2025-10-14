@@ -39,7 +39,21 @@
         .is-dirty { background-color: #fef9c3 !important; }
         
         #map-system-unit-select, #map-giap-unit-multiselect {
+            height: 100%; 
+            min-width: 500px;
+        }
+
+        .select-container {
             height: 450px;
+            overflow: auto;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            background-color: white;
+        }
+        
+        .select-container select {
+            border: none;
+            padding: 0.5rem;
         }
 
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
@@ -194,15 +208,15 @@
                             <label for="map-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo (Sistema)</label>
                             <select id="map-filter-tipo" class="w-full p-2 border rounded-lg bg-white mb-4"></select>
                             <label for="map-system-unit-select" class="block text-sm font-medium mb-1">Unidade(s) do Sistema</label>
-                            <div class="overflow-auto border rounded-lg bg-white h-[450px]">
-                                <select id="map-system-unit-select" multiple class="p-2 border-none w-full h-full" style="min-width: 500px;"></select>
+                            <div class="select-container">
+                                <select id="map-system-unit-select" multiple></select>
                             </div>
                         </div>
                         <div>
                              <label for="map-giap-unit-multiselect" class="block text-sm font-medium mb-1">Unidade(s) da Planilha GIAP</label>
                              <input type="text" id="map-giap-filter" class="w-full p-2 border rounded-lg my-2" placeholder="Pesquisar unidade da planilha...">
-                            <div class="overflow-auto border rounded-lg bg-white h-[450px]">
-                                <select id="map-giap-unit-multiselect" multiple class="w-full p-2 border-none h-full" style="min-width: 500px;"></select>
+                            <div class="select-container">
+                                <select id="map-giap-unit-multiselect" multiple></select>
                             </div>
                         </div>
                     </div>
@@ -845,7 +859,6 @@
 
             const selectedSystemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value);
             
-            // Exclude already mapped units, except for those mapped to the current selection
             const allLinkedGiapUnits = new Set(Object.values(unitMapping).flat());
             const currentMapping = new Set();
             selectedSystemUnits.forEach(unit => {
@@ -853,8 +866,6 @@
                     unitMapping[unit].forEach(giapUnit => currentMapping.add(giapUnit));
                 }
             });
-
-            allGiapUnits = allGiapUnits.filter(unit => !allLinkedGiapUnits.has(unit) || currentMapping.has(unit));
 
             if (filterText) {
                 allGiapUnits = allGiapUnits.filter(unit => normalizeStr(unit).includes(filterText));
@@ -866,33 +877,30 @@
             });
 
             const suggestions = [];
-            const others = [];
+            const available = [];
+            const usedByOthers = [];
             
             allGiapUnits.forEach(unit => {
-                const normalizedUnit = normalizeStr(unit);
-                let isSuggestion = false;
-                
-                if (!filterText && keywords.size > 0) {
-                    for (const keyword of keywords) {
-                        if (keyword && normalizedUnit.includes(keyword)) {
-                            isSuggestion = true;
-                            break;
-                        }
-                    }
-                }
-                
                 const optionHtml = `<option value="${escapeHtml(unit)}">${escapeHtml(unit)}</option>`;
-                if (isSuggestion) {
-                    suggestions.push(optionHtml);
+                const isSuggestion = keywords.size > 0 && Array.from(keywords).some(kw => kw && normalizeStr(unit).includes(kw));
+
+                if (!allLinkedGiapUnits.has(unit) || currentMapping.has(unit)) {
+                    if (isSuggestion && !filterText) {
+                        suggestions.push(optionHtml);
+                    } else {
+                        available.push(optionHtml);
+                    }
                 } else {
-                    others.push(optionHtml);
+                    usedByOthers.push(optionHtml);
                 }
             });
 
             const suggestionHeader = suggestions.length > 0 ? `<optgroup label="Sugestões">` : '';
             const suggestionFooter = suggestions.length > 0 ? `</optgroup>` : '';
+            const usedHeader = usedByOthers.length > 0 ? `<optgroup label="Já Mapeadas (em outras unidades)">` : '';
+            const usedFooter = usedByOthers.length > 0 ? `</optgroup>` : '';
 
-            mapGiapUnitMultiselect.innerHTML = suggestionHeader + suggestions.join('') + suggestionFooter + others.join('');
+            mapGiapUnitMultiselect.innerHTML = suggestionHeader + suggestions.join('') + suggestionFooter + available.join('') + usedHeader + usedByOthers.join('') + usedFooter;
         }
 
 
