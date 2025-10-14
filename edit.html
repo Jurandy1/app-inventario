@@ -514,7 +514,32 @@
     </div>
     
     <!-- Modals -->
-    <!-- Modal para Adicionar Item Rápido -->
+    <div id="sync-confirm-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
+        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
+             <div class="p-4 border-b">
+                <h3 class="text-xl font-semibold">Confirmar Sincronização</h3>
+             </div>
+             <div class="p-6 space-y-4">
+                <p>O item <strong id="sync-item-tombo" class="font-mono"></strong> foi encontrado na planilha GIAP. Deseja atualizar a descrição?</p>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Descrição Atual no Sistema:</p>
+                    <p id="sync-current-desc" class="p-2 bg-gray-100 rounded-md text-sm"></p>
+                </div>
+                 <div>
+                    <p class="text-sm font-medium text-green-700">Nova Descrição da Planilha:</p>
+                    <p id="sync-new-desc" class="p-2 bg-green-50 rounded-md text-sm font-semibold"></p>
+                </div>
+                <p class="text-sm text-slate-600">Os campos "Fornecedor" e "NF" serão atualizados em ambos os casos.</p>
+             </div>
+             <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
+                <button type="button" id="sync-cancel-btn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancelar</button>
+                <button type="button" id="sync-keep-desc-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Manter Descrição Atual</button>
+                <button type="button" id="sync-update-all-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Sim, Atualizar Tudo</button>
+             </div>
+        </div>
+    </div>
+
     <div id="add-item-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
         <div class="modal-overlay absolute inset-0 bg-black/60"></div>
         <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
@@ -634,6 +659,12 @@
         const giapTableBody = document.getElementById('giap-table-body');
         const fullPageOverlay = document.getElementById('full-page-overlay');
         const overlayMessage = document.getElementById('overlay-message');
+
+        const syncConfirmModal = document.getElementById('sync-confirm-modal');
+        const syncUpdateAllBtn = document.getElementById('sync-update-all-btn');
+        const syncKeepDescBtn = document.getElementById('sync-keep-desc-btn');
+        const syncCancelBtn = document.getElementById('sync-cancel-btn');
+
 
         // --- Funções Utilitárias ---
         const normalizeStr = (str) => (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
@@ -1410,36 +1441,65 @@
                 const giapItem = giapMap.get(tomboValue);
 
                 if (giapItem) {
-                    const descInput = row.querySelector('[data-field="Descrição"]');
-                    const fornInput = row.querySelector('[data-field="Fornecedor"]');
-                    const nfInput = row.querySelector('[data-field="NF"]');
-
+                    const currentDesc = row.querySelector('[data-field="Descrição"]').value;
                     const newDesc = giapItem.Descrição || giapItem.Espécie || '';
-                    const newForn = giapItem['Nome Fornecedor'] || '';
-                    const newNf = giapItem.NF || '';
-
-                    descInput.value = newDesc;
-                    fornInput.value = newForn;
-                    nfInput.value = newNf;
-
-                    const currentItem = dirtyItems.get(docId) || JSON.parse(JSON.stringify(fullInventory.find(i => i.id === docId)));
-                    const updatedItem = {
-                        ...currentItem,
-                        Tombamento: tomboValue,
-                        Descrição: newDesc,
-                        Fornecedor: newForn,
-                        NF: newNf
-                    };
                     
-                    dirtyItems.set(docId, updatedItem);
-                    row.classList.add('is-dirty');
-                    saveAllChangesBtn.disabled = false;
+                    document.getElementById('sync-item-tombo').textContent = tomboValue;
+                    document.getElementById('sync-current-desc').textContent = currentDesc;
+                    document.getElementById('sync-new-desc').textContent = newDesc;
                     
-                    showNotification(`Dados do Tombo ${tomboValue} sincronizados!`, 'success');
+                    syncUpdateAllBtn.dataset.docId = docId;
+                    syncKeepDescBtn.dataset.docId = docId;
+
+                    openModal(syncConfirmModal);
                 } else {
                     showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
                 }
             });
+
+            const handleSync = (docId, updateDescription) => {
+                 const row = document.getElementById(`row-${docId}`);
+                 if (!row) return;
+
+                const tomboValue = row.querySelector('[data-field="Tombamento"]').value.trim();
+                const giapItem = giapMap.get(tomboValue);
+                if (!giapItem) return;
+
+                const descInput = row.querySelector('[data-field="Descrição"]');
+                const fornInput = row.querySelector('[data-field="Fornecedor"]');
+                const nfInput = row.querySelector('[data-field="NF"]');
+
+                const newDesc = giapItem.Descrição || giapItem.Espécie || '';
+                const newForn = giapItem['Nome Fornecedor'] || '';
+                const newNf = giapItem.NF || '';
+
+                if (updateDescription) {
+                    descInput.value = newDesc;
+                }
+                fornInput.value = newForn;
+                nfInput.value = newNf;
+                
+                const currentItem = dirtyItems.get(docId) || JSON.parse(JSON.stringify(fullInventory.find(i => i.id === docId)));
+                const updatedItem = {
+                    ...currentItem,
+                    Fornecedor: newForn,
+                    NF: newNf
+                };
+                if (updateDescription) {
+                    updatedItem.Descrição = newDesc;
+                }
+                
+                dirtyItems.set(docId, updatedItem);
+                row.classList.add('is-dirty');
+                saveAllChangesBtn.disabled = false;
+                
+                closeModal(syncConfirmModal);
+                showNotification(`Dados do Tombo ${tomboValue} sincronizados!`, 'success');
+            };
+
+            syncUpdateAllBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, true));
+            syncKeepDescBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, false));
+            syncCancelBtn.addEventListener('click', () => closeModal(syncConfirmModal));
 
 
             document.getElementById('add-item-to-unit-btn').addEventListener('click', () => {
