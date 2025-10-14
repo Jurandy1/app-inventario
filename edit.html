@@ -334,8 +334,9 @@
             <div id="content-importacao" class="hidden fade-in">
                 <div class="card">
                     <div class="flex border-b mb-6">
-                        <button class="sub-nav-btn active" data-subtab="substituir">Substituir Inventário da Unidade</button>
-                        <button class="sub-nav-btn" data-subtab="massa">Importar por Tombamento (GIAP)</button>
+                        <button class="sub-nav-btn active" data-subtab="substituir">Substituir Inventário</button>
+                        <button class="sub-nav-btn" data-subtab="massa">Importar por Tombamento</button>
+                        <button class="sub-nav-btn" data-subtab="add_giap">Adicionar Unidade GIAP</button>
                     </div>
             
                     <!-- Sub-Aba: Substituir Inventário -->
@@ -416,6 +417,19 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Sub-Aba: Adicionar Unidade GIAP -->
+                     <div id="subtab-content-add_giap" class="hidden">
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">Adicionar Nova Unidade (Padrão GIAP)</h2>
+                        <p class="text-sm text-slate-600 mb-4">Adicione aqui uma nova unidade que ainda não existe na planilha GIAP. Ela ficará disponível na aba "Ligar Unidades".</p>
+                        <div class="space-y-4 max-w-md">
+                            <div>
+                                <label for="add-giap-name" class="block text-sm font-medium mb-1">Nome da Nova Unidade</label>
+                                <input type="text" id="add-giap-name" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS VILA ESPERANÇA (NOVO)" required>
+                            </div>
+                            <button id="save-giap-unit-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Salvar Nova Unidade</button>
+                        </div>
+                     </div>
                 </div>
             </div>
 
@@ -581,7 +595,7 @@
         });
         const CACHE_DURATION_MS = 2 * 60 * 60 * 1000;
 
-        let fullInventory = [], giapInventory = [];
+        let fullInventory = [], giapInventory = [], customGiapUnits = [];
         let giapMap = new Map();
         let unitMapping = {};
         let dirtyItems = new Map();
@@ -696,19 +710,21 @@
 
             if (!forceRefresh && !isCacheStale) {
                 feedbackStatus.textContent = 'Carregando dados do cache local...';
-                [fullInventory, giapInventory, unitMapping] = await Promise.all([
+                [fullInventory, giapInventory, unitMapping, customGiapUnits] = await Promise.all([
                     idb.patrimonio.toArray(), 
                     idb.giap.toArray(), 
-                    loadUnitMappingFromFirestore()
+                    loadUnitMappingFromFirestore(),
+                    loadCustomGiapUnits()
                 ]);
                 showNotification('Dados carregados do cache.', 'info');
             } else {
                 feedbackStatus.textContent = 'Buscando dados atualizados do servidor...';
                 try {
-                    [fullInventory, giapInventory, unitMapping] = await Promise.all([
+                    [fullInventory, giapInventory, unitMapping, customGiapUnits] = await Promise.all([
                         loadFirebaseInventory(), 
                         loadGiapInventory(), 
-                        loadUnitMappingFromFirestore()
+                        loadUnitMappingFromFirestore(),
+                        loadCustomGiapUnits()
                     ]);
                     await idb.transaction('rw', idb.patrimonio, idb.giap, idb.metadata, async () => {
                         await idb.patrimonio.clear(); await idb.patrimonio.bulkAdd(fullInventory);
@@ -745,6 +761,14 @@
                 const docSnap = await getDoc(docRef);
                 return docSnap.exists() ? docSnap.data().mappings || {} : {};
             } catch (error) { console.error("Error loading unit mapping:", error); return {}; }
+        }
+        
+        async function loadCustomGiapUnits() {
+             try {
+                const docRef = doc(db, 'config', 'customGiapUnits');
+                const docSnap = await getDoc(docRef);
+                return docSnap.exists() ? docSnap.data().names || [] : [];
+            } catch (error) { console.error("Error loading custom GIAP units:", error); return []; }
         }
 
         async function loadFirebaseInventory() {
@@ -963,7 +987,8 @@
 
         function updateGiapUnitOptions() {
             const filterText = normalizeStr(mapGiapFilter.value);
-            let allGiapUnits = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
+            let allGiapUnitsFromSheet = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))];
+            let allGiapUnits = [...new Set([...allGiapUnitsFromSheet, ...customGiapUnits])].sort();
 
             const selectedSystemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value);
             
@@ -1639,6 +1664,7 @@
                     subNavButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.subtab === subTab));
                     document.getElementById('subtab-content-substituir').classList.toggle('hidden', subTab !== 'substituir');
                     document.getElementById('subtab-content-massa').classList.toggle('hidden', subTab !== 'massa');
+                    document.getElementById('subtab-content-add_giap').classList.toggle('hidden', subTab !== 'add_giap');
                 });
             });
             
@@ -1789,6 +1815,38 @@
                     hideOverlay();
                     showNotification('Erro ao substituir o inventário.', 'error');
                     console.error(e);
+                }
+            });
+
+            document.getElementById('save-giap-unit-btn').addEventListener('click', async () => {
+                const newUnitName = document.getElementById('add-giap-name').value.trim();
+                if (!newUnitName) {
+                    return showNotification('O nome da unidade não pode ser vazio.', 'warning');
+                }
+                
+                const normalizedNewName = normalizeStr(newUnitName);
+                const allGiapUnitNames = new Set(giapInventory.map(i => normalizeStr(i.Unidade)).filter(Boolean));
+                const allCustomUnitNames = new Set(customGiapUnits.map(u => normalizeStr(u)));
+                
+                if (allGiapUnitNames.has(normalizedNewName) || allCustomUnitNames.has(normalizedNewName)) {
+                    return showNotification('Esta unidade já existe.', 'error');
+                }
+
+                showOverlay('Salvando nova unidade...');
+                const updatedCustomUnits = [...customGiapUnits, newUnitName];
+
+                try {
+                    const docRef = doc(db, 'config', 'customGiapUnits');
+                    await setDoc(docRef, { names: updatedCustomUnits });
+                    customGiapUnits.push(newUnitName);
+                    showNotification('Nova unidade salva com sucesso!', 'success');
+                    document.getElementById('add-giap-name').value = '';
+                    updateGiapUnitOptions(); // Refresh the list
+                } catch(e) {
+                    showNotification('Erro ao salvar a nova unidade.', 'error');
+                    console.error(e);
+                } finally {
+                    hideOverlay();
                 }
             });
             
