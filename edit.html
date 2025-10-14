@@ -37,7 +37,7 @@
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .is-dirty { background-color: #fef9c3 !important; }
-        select[multiple] { height: 350px; }
+        select[multiple] { height: 450px; }
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-container { transition: all 0.3s ease; max-height: 90vh; }
         
@@ -702,7 +702,7 @@
                 if (item.Unidade) {
                     const normalized = normalizeStr(item.Unidade);
                     if (!normalizedSystemUnits.has(normalized)) {
-                        normalizedSystemUnits.set(normalized, item.Unidade);
+                        normalizedSystemUnits.set(normalized, item.Unidade.trim());
                     }
                 }
             });
@@ -835,14 +835,26 @@
             const filterText = normalizeStr(mapGiapFilter.value);
             let allGiapUnits = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))].sort();
 
+            const selectedSystemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value);
+            
+            // Exclude already mapped units, except for those mapped to the current selection
+            const allLinkedGiapUnits = new Set(Object.values(unitMapping).flat());
+            const currentMapping = new Set();
+            selectedSystemUnits.forEach(unit => {
+                if (unitMapping[unit]) {
+                    unitMapping[unit].forEach(giapUnit => currentMapping.add(giapUnit));
+                }
+            });
+
+            allGiapUnits = allGiapUnits.filter(unit => !allLinkedGiapUnits.has(unit) || currentMapping.has(unit));
+
             if (filterText) {
                 allGiapUnits = allGiapUnits.filter(unit => normalizeStr(unit).includes(filterText));
             }
 
-            const selectedSystemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value);
             const keywords = new Set();
             selectedSystemUnits.forEach(unit => {
-                unit.split('/').forEach(part => keywords.add(normalizeStr(part)));
+                unit.split('/').forEach(part => keywords.add(normalizeStr(part.trim())));
             });
 
             const suggestions = [];
@@ -854,7 +866,7 @@
                 
                 if (!filterText && keywords.size > 0) {
                     for (const keyword of keywords) {
-                        if (normalizedUnit.includes(keyword)) {
+                        if (keyword && normalizedUnit.includes(keyword)) {
                             isSuggestion = true;
                             break;
                         }
