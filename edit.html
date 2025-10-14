@@ -45,6 +45,7 @@
         .reconciliation-list-item { cursor: pointer; transition: background-color 0.2s; }
         .reconciliation-list-item:hover { background-color: #eff6ff; }
         .reconciliation-list-item.selected { background-color: #dbeafe; border-left: 4px solid #3b82f6; font-weight: 600; }
+        .reconciliation-list-item.selected-for-import { background-color: #e0e7ff; border-left: 4px solid #4f46e5; }
         .reconciliation-list-item.linked { background-color: #dcfce7; color: #166534; pointer-events: none; border-left: 4px solid #22c55e; }
         
         /* --- Sistema de Notificação (Toast/Snackbar) --- */
@@ -97,9 +98,9 @@
         <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
             <div class="container mx-auto px-4">
                 <div id="edit-nav" class="flex space-x-1 overflow-x-auto">
-                    <button class="nav-btn" data-tab="edicao">✏️ Inventário Editável</button>
+                    <button class="nav-btn active" data-tab="edicao">✏️ Inventário Editável</button>
                     <button class="nav-btn" data-tab="unidades">🔗 Ligar Unidades</button>
-                    <button class="nav-btn active" data-tab="conciliar">🤝 Conciliar Itens</button>
+                    <button class="nav-btn" data-tab="conciliar">🤝 Conciliar Itens</button>
                     <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
                     <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
                     <button class="nav-btn" data-tab="transferencia-massa">✈️ Transf. em Massa</button>
@@ -111,7 +112,7 @@
         <main class="container mx-auto p-4">
             
             <!-- ABA: Inventário Editável -->
-            <div id="content-edicao" class="hidden fade-in">
+            <div id="content-edicao" class="fade-in">
                  <div class="card">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
@@ -121,6 +122,12 @@
                         <div>
                             <label for="edit-filter-unidade" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
                             <select id="edit-filter-unidade" class="w-full p-2 border rounded-lg bg-white"></select>
+                             <div class="flex justify-between items-center mt-1">
+                                <p id="unit-item-count" class="text-sm font-semibold text-slate-600"></p>
+                                <button type="button" id="add-item-to-unit-btn" class="hidden text-sm bg-green-100 text-green-700 px-3 py-1 rounded-md hover:bg-green-200">
+                                    + Adicionar Item
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label for="edit-filter-descricao" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
@@ -184,7 +191,7 @@
             </div>
             
             <!-- ABA: Conciliar Itens (NOVA VERSÃO OTIMIZADA) -->
-            <div id="content-conciliar" class="fade-in">
+            <div id="content-conciliar" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
                     <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo. Salve os vínculos no final.</p>
@@ -223,6 +230,23 @@
                         <div class="flex items-center gap-2">
                             <button id="save-links" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Vínculos</button>
                             <button id="clear-selections" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Limpar Seleções</button>
+                        </div>
+                    </div>
+                    <!-- Seção de Importação GIAP -->
+                    <div id="giap-import-section" class="mt-6 border-t pt-4">
+                        <h3 class="font-semibold text-slate-800 mb-2">📥 Importar Tombos do GIAP para esta Unidade</h3>
+                        <p class="text-sm text-slate-600 mb-4">Selecione um ou mais itens da lista "Tombos Disponíveis" (sem selecionar um item da lista à esquerda) para importá-los diretamente.</p>
+                        <div class="flex items-end gap-4">
+                            <div>
+                                <label for="import-estado-select" class="block text-sm font-medium mb-1">Estado dos Itens a Importar</label>
+                                <select id="import-estado-select" class="w-full p-2 border rounded-lg bg-white">
+                                    <option>Novo</option>
+                                    <option>Bom</option>
+                                    <option>Regular</option>
+                                    <option>Avariado</option>
+                                </select>
+                            </div>
+                            <button id="import-giap-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-slate-400" disabled>Importar <span id="giap-import-count">0</span> Selecionados</button>
                         </div>
                     </div>
                 </div>
@@ -330,9 +354,49 @@
     </div>
     
     <!-- Modals -->
-    <div id="suggestion-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
-        <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div>
-        <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"></div>
+    <!-- Modal para Adicionar Item Rápido -->
+    <div id="add-item-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
+        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
+            <form id="add-item-form">
+                <div class="flex items-center justify-between p-4 border-b">
+                    <h3 id="add-modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3>
+                    <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal-add">&times;</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label for="add-item-unidade" class="block text-sm font-medium mb-1">Unidade</label>
+                        <input type="text" id="add-item-unidade" class="w-full p-2 border rounded-lg bg-slate-100" readonly>
+                    </div>
+                    <div>
+                        <label for="add-item-tipo" class="block text-sm font-medium mb-1">Tipo</label>
+                        <input type="text" id="add-item-tipo" class="w-full p-2 border rounded-lg bg-slate-100" readonly>
+                    </div>
+                    <hr>
+                    <div>
+                        <label for="add-item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label>
+                        <input type="text" id="add-item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T">
+                    </div>
+                    <div>
+                        <label for="add-item-descricao" class="block text-sm font-medium mb-1">Descrição</label>
+                        <input type="text" id="add-item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória" required>
+                    </div>
+                    <div>
+                        <label for="add-item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label>
+                        <select id="add-item-estado" class="w-full p-2 border rounded-lg bg-white" required>
+                            <option>Novo</option>
+                            <option>Bom</option>
+                            <option>Regular</option>
+                            <option>Avariado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
+                    <button type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 js-close-modal-add">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar Item</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <!-- Full Page Overlay for saving -->
@@ -349,7 +413,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -383,6 +447,7 @@
         
         // Estado para a nova aba de conciliação
         let selSys = null, selGiap = null;
+        let giapItemsForImport = [];
 
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
@@ -393,7 +458,6 @@
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         
-        // ... (elementos das abas antigas)
         const editTableBody = document.getElementById('edit-table-body');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
@@ -414,7 +478,6 @@
         const massTransferList = document.getElementById('mass-transfer-list');
         const massTransferConfirmBtn = document.getElementById('mass-transfer-confirm-btn');
         const giapTableBody = document.getElementById('giap-table-body');
-        const suggestionModal = document.getElementById('suggestion-modal');
         const fullPageOverlay = document.getElementById('full-page-overlay');
         const overlayMessage = document.getElementById('overlay-message');
 
@@ -525,7 +588,6 @@
         }
         
         function initializeUI() {
-            // Inicializa todas as abas
             populateEditableInventoryTab();
             populateUnitMappingTab();
             populateReconciliationTab_Optimized();
@@ -533,8 +595,6 @@
             populateMassTransferTab();
             populateGiapTab();
         }
-        
-        // --- LÓGICA DAS ABAS ANTIGAS (Mantida) ---
 
         function populateEditableInventoryTab() {
             const updateUnidades = () => {
@@ -547,11 +607,18 @@
                 const tipo = editFilterTipo.value;
                 const unidade = editFilterUnidade.value;
                 const desc = editFilterDescricao.value.toLowerCase();
+                
                 const filtered = fullInventory.filter(item => 
                     (!tipo || item.Tipo === tipo) &&
                     (!unidade || item.Unidade === unidade) &&
                     (!desc || (item.Descrição || '').toLowerCase().includes(desc))
                 );
+
+                const filteredCount = filtered.length;
+                document.getElementById('unit-item-count').textContent = unidade ? `${filteredCount} iten(s)` : '';
+
+                const addItemBtn = document.getElementById('add-item-to-unit-btn');
+                addItemBtn.classList.toggle('hidden', !unidade);
                 
                 const itemsToRender = filtered.slice(0, 200);
 
@@ -699,7 +766,6 @@
 
                 let detailsHtml = '';
                 if (containerId === 'system-list') {
-                    // Itens do Sistema com mais detalhes
                     const fornecedor = escapeHtml(item.Fornecedor || 'N/D');
                     const estado = escapeHtml(item.Estado || 'N/A');
                     const obs = escapeHtml(item.Observação || 'Nenhuma');
@@ -710,7 +776,7 @@
                         </p>
                         <p class="text-xs text-slate-400 mt-1">Obs: ${obs}</p>
                     `;
-                } else { // giap-list com mais detalhes
+                } else { // giap-list
                     const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
                     const dataCadastro = escapeHtml(item.Cadastro || 'N/D');
                     const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
@@ -733,18 +799,41 @@
             if (element.classList.contains('linked')) return;
 
             if (containerId === 'system-list') {
+                clearGiapImportSelection();
                 selSys = { id, obj };
-                document.querySelectorAll('#system-list .selected').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
-            } else { // 'giap-list'
-                selGiap = { tomb: id, obj };
-                document.querySelectorAll('#giap-list .selected').forEach(el => el.classList.remove('selected'));
-                element.classList.add('selected');
-            }
+                if (selGiap) createLink();
 
-            if (selSys && selGiap) {
+            } else if (containerId === 'giap-list' && selSys) {
+                selGiap = { tomb: id, obj };
+                document.querySelectorAll('#giap-list .selected, #giap-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
+                element.classList.add('selected');
                 createLink();
+
+            } else if (containerId === 'giap-list' && !selSys) {
+                element.classList.toggle('selected-for-import');
+                const index = giapItemsForImport.findIndex(item => item.TOMBAMENTO === id);
+                if (index > -1) {
+                    giapItemsForImport.splice(index, 1);
+                } else {
+                    giapItemsForImport.push(obj);
+                }
+                updateImportButton();
             }
+        }
+
+        function updateImportButton() {
+            const count = giapItemsForImport.length;
+            const btn = document.getElementById('import-giap-btn');
+            document.getElementById('giap-import-count').textContent = count;
+            btn.disabled = count === 0;
+        }
+
+        function clearGiapImportSelection() {
+            giapItemsForImport = [];
+            document.querySelectorAll('#giap-list .selected-for-import').forEach(el => el.classList.remove('selected-for-import'));
+            updateImportButton();
         }
         
         function createLink() {
@@ -794,6 +883,29 @@
             
             renderList('system-list', items, 'id', 'Descrição');
             renderList('giap-list', tombos, 'TOMBAMENTO', 'Descrição');
+        }
+
+        // --- Funções para o novo Modal de Adicionar Item ---
+        function openAddItemModal(defaults = {}) {
+            const modal = document.getElementById('add-item-modal');
+            const form = document.getElementById('add-item-form');
+            form.reset();
+            
+            document.getElementById('add-item-unidade').value = defaults.Unidade || '';
+            document.getElementById('add-item-tipo').value = defaults.Tipo || '';
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.querySelector('.modal-overlay')?.classList.remove('opacity-0');
+                modal.querySelector('.modal-container')?.classList.remove('opacity-0', 'scale-95');
+            }, 10);
+        }
+
+        function closeAddItemModal() {
+            const modal = document.getElementById('add-item-modal');
+            modal.querySelector('.modal-overlay')?.classList.add('opacity-0');
+            modal.querySelector('.modal-container')?.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
 
         // --- EVENT LISTENERS ---
@@ -871,6 +983,49 @@
                 }
             });
 
+            // Listener para o botão de adicionar na aba de edição
+            document.getElementById('add-item-to-unit-btn').addEventListener('click', () => {
+                openAddItemModal({
+                    Tipo: document.getElementById('edit-filter-tipo').value,
+                    Unidade: document.getElementById('edit-filter-unidade').value
+                });
+            });
+
+            // Listeners do novo modal de adicionar item
+            document.getElementById('add-item-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newItem = {
+                    Tombamento: document.getElementById('add-item-tombamento').value,
+                    Descrição: document.getElementById('add-item-descricao').value,
+                    Estado: document.getElementById('add-item-estado').value,
+                    Unidade: document.getElementById('add-item-unidade').value,
+                    Tipo: document.getElementById('add-item-tipo').value,
+                    Localização: '',
+                    Fornecedor: '',
+                    NF: '',
+                    'Origem da Doação': '',
+                    Quantidade: 1,
+                    Observação: 'Adicionado via edição rápida.',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                };
+
+                try {
+                    showOverlay('Salvando novo item...');
+                    await addDoc(collection(db, 'patrimonio'), newItem);
+                    await idb.metadata.clear();
+                    showNotification('Item adicionado com sucesso! Recarregando...', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch (error) {
+                    hideOverlay();
+                    showNotification('Erro ao adicionar item.', 'error');
+                    console.error("Erro ao adicionar item:", error);
+                }
+            });
+
+            document.querySelectorAll('.js-close-modal-add').forEach(btn => btn.addEventListener('click', closeAddItemModal));
+
+
             mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
             mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
             saveMappingBtn.addEventListener('click', async () => {
@@ -926,6 +1081,7 @@
                 document.getElementById('giap-list-filter').value = '';
 
                 renderConciliationLists();
+                clearGiapImportSelection();
 
                 document.getElementById('quick-actions').classList.remove('hidden');
                 document.getElementById('created-links').innerHTML = '';
@@ -977,6 +1133,51 @@
                     console.error("Erro ao salvar links:", error);
                 }
             });
+
+            document.getElementById('import-giap-btn').addEventListener('click', async () => {
+                if (giapItemsForImport.length === 0) return showNotification('Nenhum item GIAP selecionado para importar.', 'warning');
+                
+                const tipo = document.getElementById('filter-tipo').value;
+                const unidade = document.getElementById('filter-unidade').value;
+                if (!unidade || !tipo) return showNotification('Selecione um Tipo e uma Unidade de destino nos filtros acima.', 'warning');
+                
+                const estado = document.getElementById('import-estado-select').value;
+
+                showOverlay(`Importando ${giapItemsForImport.length} itens...`);
+                const batch = writeBatch(db);
+
+                giapItemsForImport.forEach(giapItem => {
+                    const newItemRef = doc(collection(db, 'patrimonio'));
+                    const newItem = {
+                        Tombamento: giapItem.TOMBAMENTO || '',
+                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                        Tipo: tipo,
+                        Unidade: unidade,
+                        Localização: '',
+                        Fornecedor: giapItem['Nome Fornecedor'] || '',
+                        NF: giapItem.NF || '',
+                        'Origem da Doação': '',
+                        Estado: estado,
+                        Quantidade: 1,
+                        Observação: `Importado do GIAP. Unidade original: ${giapItem.Unidade || 'N/A'}`,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    };
+                    batch.set(newItemRef, newItem);
+                });
+
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear();
+                    showNotification(`${giapItemsForImport.length} itens importados com sucesso! A página será recarregada.`, 'success');
+                    clearGiapImportSelection();
+                    setTimeout(() => window.location.reload(), 2000);
+                } catch (e) {
+                    hideOverlay();
+                    showNotification('Erro ao importar itens.', 'error'); 
+                    console.error(e);
+                }
+            });
             
             document.getElementById('suggest-sobrando').addEventListener('click', () => {
                  const kw = document.getElementById('leftover-keyword').value.toLowerCase();
@@ -1003,7 +1204,6 @@
                  showNotification(`${sob.length} tombos sobrando listados.`, 'success');
             });
             
-            // --- Listeners de abas antigas (mantidos) ---
             massTransferSearchBtn.addEventListener('click', () => {
                  const tombosInput = massTransferTombos.value;
                 const tombos = tombosInput.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
@@ -1087,5 +1287,4 @@
     </script>
 </body>
 </html>
-
 
