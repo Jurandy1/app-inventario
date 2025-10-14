@@ -443,6 +443,22 @@
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
                     <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, ordenadas pela data de cadastro mais recente. Verifique quais itens já foram alocados no inventário.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-4 border-b">
+                        <div>
+                            <label for="nf-search" class="block text-sm font-medium mb-1">Pesquisar por NF</label>
+                            <input type="text" id="nf-search" placeholder="Digite o número da NF..." class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label for="nf-date-start" class="block text-sm font-medium mb-1">Data de Início (Cadastro)</label>
+                            <input type="date" id="nf-date-start" class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label for="nf-date-end" class="block text-sm font-medium mb-1">Data de Fim (Cadastro)</label>
+                            <input type="date" id="nf-date-end" class="w-full p-2 border rounded-lg">
+                        </div>
+                    </div>
+
                     <div id="notas-fiscais-container" class="mt-4 space-y-3"></div>
                 </div>
             </div>
@@ -594,6 +610,7 @@
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
         let itemsToReplace = [];
+        let processedNfData = {}; // To store processed NF data
 
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
@@ -1044,60 +1061,106 @@
         }
 
         function populateNfTab() {
-            const container = document.getElementById('notas-fiscais-container');
-            container.innerHTML = '';
-
-            // 1. Create a lookup map from the main inventory for quick access
+            // This function will now only do the initial data processing and set up event listeners
             const tomboMap = new Map(fullInventory.map(item => [item.Tombamento?.trim(), item]));
 
-            // 2. Filter GIAP data for items with an NF and then sort by date
             const giapWithNf = giapInventory
                 .filter(item => item.NF && item.NF.trim() !== '')
-                .sort((a, b) => {
-                    const dateA = parsePtBrDate(a.Cadastro);
-                    const dateB = parsePtBrDate(b.Cadastro);
-                    return dateB - dateA; // Sort descending (most recent first)
-                });
+                .sort((a, b) => parsePtBrDate(b.Cadastro) - parsePtBrDate(a.Cadastro));
 
-            if (giapWithNf.length === 0) {
-                container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhum item com Nota Fiscal encontrada na Planilha GIAP.</p>`;
-                return;
-            }
-
-            // 3. Group the sorted items by Nota Fiscal
-            const groupedByNf = giapWithNf.reduce((acc, item) => {
+            processedNfData = giapWithNf.reduce((acc, item) => {
                 const nf = item.NF.trim();
                 if (!acc[nf]) {
                     acc[nf] = {
                         items: [],
-                        fornecedor: item['Nome Fornecedor'] || 'Não especificado'
+                        fornecedor: item['Nome Fornecedor'] || 'Não especificado',
+                        tipoEntrada: item['Tipo Entrada'] || 'N/A',
+                        dataCadastro: item.Cadastro
                     };
                 }
                 acc[nf].items.push(item);
                 return acc;
             }, {});
 
-            // 4. Generate and render the HTML
-            const nfs = Object.keys(groupedByNf);
+            renderNfList(); // Initial render
 
-            nfs.forEach(nf => {
-                const nfGroup = groupedByNf[nf];
+            const debouncedRender = debounce(renderNfList, 300);
+            document.getElementById('nf-search').addEventListener('input', debouncedRender);
+            document.getElementById('nf-date-start').addEventListener('change', debouncedRender);
+            document.getElementById('nf-date-end').addEventListener('change', debouncedRender);
+        }
+
+        function renderNfList() {
+            const container = document.getElementById('notas-fiscais-container');
+            container.innerHTML = '';
+
+            const tomboMap = new Map(fullInventory.map(item => [item.Tombamento?.trim(), item]));
+            
+            // Get filter values
+            const nfSearchTerm = document.getElementById('nf-search').value.toLowerCase();
+            const startDateStr = document.getElementById('nf-date-start').value;
+            const endDateStr = document.getElementById('nf-date-end').value;
+
+            // JS Date objects from yyyy-mm-dd format are UTC midnight. Add 1 to day for endDate to include the whole day.
+            const startDate = startDateStr ? new Date(startDateStr) : null;
+            const endDate = endDateStr ? new Date(endDateStr) : null;
+             if (endDate) { // Set to end of day
+                endDate.setHours(23, 59, 59, 999);
+            }
+            if (startDate) { // Set to start of day
+                startDate.setHours(0, 0, 0, 0);
+            }
+
+
+            const filteredNfs = Object.keys(processedNfData).filter(nf => {
+                const nfGroup = processedNfData[nf];
+                
+                // Filter by NF number
+                if (nfSearchTerm && !nf.toLowerCase().includes(nfSearchTerm)) {
+                    return false;
+                }
+
+                // Filter by date
+                const nfDate = parsePtBrDate(nfGroup.dataCadastro);
+                if (startDate && nfDate < startDate) {
+                    return false;
+                }
+                if (endDate && nfDate > endDate) {
+                    return false;
+                }
+                
+                return true;
+            });
+
+            if (filteredNfs.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhuma nota fiscal encontrada com os filtros aplicados.</p>`;
+                return;
+            }
+
+            filteredNfs.forEach(nf => {
+                const nfGroup = processedNfData[nf];
                 const nfDetails = document.createElement('details');
                 nfDetails.className = 'bg-white rounded-lg shadow-sm border mb-3';
-                nfDetails.open = false; // Start collapsed
+                nfDetails.open = false;
+
+                const itemSummaryText = nfGroup.items.slice(0, 2).map(i => escapeHtml(i.Descrição || i.Espécie)).join(', ') + (nfGroup.items.length > 2 ? '...' : '');
+                
+                const tipoEntradaClass = normalizeStr(nfGroup.tipoEntrada).includes('doacao') ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
 
                 const nfSummary = document.createElement('summary');
-                nfSummary.className = 'p-4 font-semibold cursor-pointer flex flex-wrap justify-between items-center hover:bg-slate-50 gap-2';
+                nfSummary.className = 'p-4 font-semibold cursor-pointer grid grid-cols-1 md:grid-cols-4 gap-4 items-center hover:bg-slate-50';
                 nfSummary.innerHTML = `
-                    <div class="flex-grow">
-                        <p class="text-xs text-slate-500">Nota Fiscal</p>
-                        <strong class="text-blue-700">${escapeHtml(nf)}</strong>
+                    <div class="md:col-span-2">
+                        <p class="text-xs text-slate-500">NF: <strong class="text-blue-700 text-sm">${escapeHtml(nf)}</strong> | Fornecedor: <strong>${escapeHtml(nfGroup.fornecedor)}</strong></p>
+                        <p class="text-xs text-slate-500 mt-1 truncate">Itens: ${itemSummaryText}</p>
                     </div>
-                    <div class="flex-grow">
-                        <p class="text-xs text-slate-500">Fornecedor</p>
-                        <strong>${escapeHtml(nfGroup.fornecedor)}</strong>
+                    <div>
+                        <p class="text-xs text-slate-500">Data Cadastro</p>
+                        <strong>${escapeHtml(nfGroup.dataCadastro)}</strong>
                     </div>
-                    <span class="text-sm font-bold text-slate-600 bg-slate-200 px-3 py-1 rounded-full">${nfGroup.items.length} ${nfGroup.items.length > 1 ? 'itens' : 'item'}</span>
+                    <div class="text-right">
+                         <span class="px-2 py-1 text-xs font-bold ${tipoEntradaClass} rounded-full">${escapeHtml(nfGroup.tipoEntrada)}</span>
+                    </div>
                 `;
                 nfDetails.appendChild(nfSummary);
 
@@ -1124,7 +1187,6 @@
                         <div class="flex-1">
                             <p class="font-bold text-slate-800">${escapeHtml(item.Descrição || item.Espécie)}</p>
                             <p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p>
-                             <p class="text-xs text-slate-400">Cadastro: ${escapeHtml(item.Cadastro || 'N/D')}</p>
                         </div>
                         <div class="text-right ml-4">
                             ${allocationHtml}
@@ -1137,6 +1199,7 @@
                 container.appendChild(nfDetails);
             });
         }
+
 
         function populateGiapTab() {
             const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie'];
