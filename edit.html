@@ -398,14 +398,18 @@
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">🔎 Caça Permuta</h2>
                     <p class="text-sm text-slate-600 mb-4">Encontre itens marcados como "Permuta" e edite suas informações em massa.</p>
-                    <div class="flex items-end gap-2 mb-4">
-                        <div class="flex-grow">
-                            <label for="permuta-search-term" class="text-sm font-medium">Buscar por nome do item</label>
-                            <input type="text" id="permuta-search-term" class="w-full p-2 border rounded-lg mt-1" placeholder="Ex: Cadeira, longarina, mesa...">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4">
+                        <div>
+                            <label for="permuta-search-desc" class="text-sm font-medium">Buscar por nome do item</label>
+                            <input type="text" id="permuta-search-desc" class="w-full p-2 border rounded-lg mt-1" placeholder="Ex: Cadeira, longarina...">
+                        </div>
+                        <div>
+                            <label for="permuta-search-forn" class="text-sm font-medium">Buscar por fornecedor</label>
+                            <input type="text" id="permuta-search-forn" class="w-full p-2 border rounded-lg mt-1" placeholder="Ex: Marelli...">
                         </div>
                         <button id="permuta-search-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar</button>
                     </div>
-
+            
                     <div id="permuta-results-area" class="hidden mt-6">
                         <div class="flex justify-between items-center mb-2">
                              <h3 class="font-bold text-slate-700">Resultados da Busca (<span id="permuta-count">0</span>)</h3>
@@ -415,7 +419,7 @@
                         
                         <h3 class="font-bold text-slate-700 mb-2 border-t pt-4">Editar Itens Selecionados em Massa</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border rounded-lg bg-slate-50">
-                            <div>
+                             <div>
                                 <label for="permuta-mass-estado" class="block text-sm font-medium mb-1">Novo Estado</label>
                                 <select id="permuta-mass-estado" class="w-full p-2 border rounded-lg bg-white">
                                     <option value="">(Manter original)</option>
@@ -426,10 +430,10 @@
                                 </select>
                             </div>
                              <div>
-                                <label for="permuta-mass-local" class="block text-sm font-medium mb-1">Nova Localização</label>
-                                <input type="text" id="permuta-mass-local" placeholder="(Manter original)" class="w-full p-2 border rounded-lg">
+                                <label for="permuta-mass-forn" class="block text-sm font-medium mb-1">Novo Fornecedor</label>
+                                <input type="text" id="permuta-mass-forn" placeholder="(Manter original)" class="w-full p-2 border rounded-lg">
                             </div>
-                            <div>
+                             <div>
                                 <label for="permuta-mass-obs" class="block text-sm font-medium mb-1">Adicionar Observação</label>
                                 <input type="text" id="permuta-mass-obs" placeholder="Texto a ser adicionado" class="w-full p-2 border rounded-lg">
                             </div>
@@ -586,7 +590,7 @@
         const overlayMessage = document.getElementById('overlay-message');
 
         // --- Funções Utilitárias ---
-        const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
+        const normalizeStr = (str) => (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         
@@ -740,6 +744,55 @@
             populatePermutaTab();
         }
 
+        function renderEditableTable() {
+             const tipo = editFilterTipo.value;
+            const unidade = editFilterUnidade.value;
+            const desc = editFilterDescricao.value.toLowerCase();
+            
+            const filtered = fullInventory.filter(item => 
+                (!tipo || item.Tipo === tipo) &&
+                (!unidade || item.Unidade === unidade) &&
+                (!desc || (item.Descrição || '').toLowerCase().includes(desc))
+            );
+
+            const filteredCount = filtered.length;
+            document.getElementById('unit-item-count').textContent = unidade ? `${filteredCount} iten(s)` : '';
+
+            const addItemBtn = document.getElementById('add-item-to-unit-btn');
+            addItemBtn.classList.toggle('hidden', !unidade);
+            
+            const itemsToRender = filtered.slice(0, 200);
+
+            const headers = ['Ações', 'Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+            const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
+            
+            editTableBody.innerHTML = itemsToRender.map(item => {
+                const itemData = dirtyItems.get(item.id) || item;
+                const isDirty = dirtyItems.has(item.id);
+                const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
+                
+                const cells = headers.map(h => {
+                    if (h === 'Ações') {
+                        return `<td class="p-2 border-b">
+                                    <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
+                                    </button>
+                                </td>`;
+                    }
+                    if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
+                    const value = escapeHtml(itemData[h]);
+                    const inputType = (h === 'Quantidade') ? 'number' : 'text';
+                    return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
+                }).join('');
+
+                return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${cells}</tr>`;
+            }).join('');
+
+            if(filtered.length > 200) {
+                 editTableBody.innerHTML += `<tr><td colspan="${headers.length}" class="text-center p-4 font-semibold text-orange-600">Apenas os primeiros 200 de ${filtered.length} resultados são exibidos. Refine sua busca.</td></tr>`;
+            }
+        }
+
         function populateEditableInventoryTab() {
             const updateUnidades = () => {
                 const selectedTipo = editFilterTipo.value;
@@ -747,64 +800,15 @@
                 editFilterUnidade.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
             };
             
-            const renderTable = () => {
-                const tipo = editFilterTipo.value;
-                const unidade = editFilterUnidade.value;
-                const desc = editFilterDescricao.value.toLowerCase();
-                
-                const filtered = fullInventory.filter(item => 
-                    (!tipo || item.Tipo === tipo) &&
-                    (!unidade || item.Unidade === unidade) &&
-                    (!desc || (item.Descrição || '').toLowerCase().includes(desc))
-                );
-
-                const filteredCount = filtered.length;
-                document.getElementById('unit-item-count').textContent = unidade ? `${filteredCount} iten(s)` : '';
-
-                const addItemBtn = document.getElementById('add-item-to-unit-btn');
-                addItemBtn.classList.toggle('hidden', !unidade);
-                
-                const itemsToRender = filtered.slice(0, 200);
-
-                const headers = ['Ações', 'Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
-                const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
-                
-                editTableBody.innerHTML = itemsToRender.map(item => {
-                    const itemData = dirtyItems.get(item.id) || item;
-                    const isDirty = dirtyItems.has(item.id);
-                    const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
-                    
-                    const cells = headers.map(h => {
-                        if (h === 'Ações') {
-                            return `<td class="p-2 border-b">
-                                        <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
-                                        </button>
-                                    </td>`;
-                        }
-                        if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
-                        const value = escapeHtml(itemData[h]);
-                        const inputType = (h === 'Quantidade') ? 'number' : 'text';
-                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
-                    }).join('');
-
-                    return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${cells}</tr>`;
-                }).join('');
-
-                if(filtered.length > 200) {
-                     editTableBody.innerHTML += `<tr><td colspan="${headers.length}" class="text-center p-4 font-semibold text-orange-600">Apenas os primeiros 200 de ${filtered.length} resultados são exibidos. Refine sua busca.</td></tr>`;
-                }
-            };
-            
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             editFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
             
-            const debouncedRenderTable = debounce(renderTable, 300);
-            editFilterTipo.onchange = () => { updateUnidades(); renderTable(); };
-            editFilterUnidade.onchange = renderTable;
+            const debouncedRenderTable = debounce(renderEditableTable, 300);
+            editFilterTipo.onchange = () => { updateUnidades(); renderEditableTable(); };
+            editFilterUnidade.onchange = renderEditableTable;
             editFilterDescricao.oninput = debouncedRenderTable;
             updateUnidades();
-            renderTable();
+            renderEditableTable();
         }
 
         function populateUnitMappingTab() {
@@ -1122,13 +1126,7 @@
             
             saveAllChangesBtn.addEventListener('click', async () => {
                 if (dirtyItems.size === 0) return;
-                const btnSpinner = document.getElementById('save-btn-spinner');
-                const btnText = document.getElementById('save-btn-text');
-                
-                saveAllChangesBtn.disabled = true;
-                btnSpinner.classList.remove('hidden');
-                btnText.textContent = `Salvando ${dirtyItems.size} itens...`;
-
+                showOverlay(`Salvando ${dirtyItems.size} alterações...`);
                 const batch = writeBatch(db);
                 dirtyItems.forEach((item, id) => {
                     const docRef = doc(db, 'patrimonio', id);
@@ -1137,17 +1135,27 @@
 
                 try {
                     await batch.commit();
-                    showNotification(`${dirtyItems.size} alterações salvas com sucesso!`, 'success');
+
+                    const itemsToCache = [];
+                    dirtyItems.forEach((updates, id) => {
+                        const index = fullInventory.findIndex(item => item.id === id);
+                        if (index !== -1) {
+                            fullInventory[index] = { ...fullInventory[index], ...updates };
+                            itemsToCache.push(fullInventory[index]);
+                        }
+                    });
+                    if (itemsToCache.length > 0) {
+                        await idb.patrimonio.bulkPut(itemsToCache);
+                    }
                     dirtyItems.clear();
+                    showNotification(`${itemsToCache.length} alterações salvas!`, 'success');
                     saveAllChangesBtn.disabled = true;
-                    document.querySelectorAll('.is-dirty').forEach(row => row.classList.remove('is-dirty'));
-                    await idb.metadata.clear();
+                    renderEditableTable();
                 } catch (error) {
                     console.error("Erro ao salvar alterações em lote:", error);
                     showNotification('Erro ao salvar alterações.', 'error');
                 } finally {
-                    btnSpinner.classList.add('hidden');
-                    btnText.textContent = 'Salvar Alterações';
+                    hideOverlay();
                 }
             });
             
@@ -1160,7 +1168,6 @@
                 const field = input.dataset.field;
                 const value = (input.type === 'number' ? Number(input.value) : input.value).trim();
                 
-                // Checagem de Tombamento duplicado
                 if (field === 'Tombamento' && value && !normalizeStr(value).includes('permuta') && value.toLowerCase() !== 's/t') {
                     const duplicate = fullInventory.find(item => item.id !== docId && item.Tombamento === value);
                     if (duplicate) {
@@ -1598,14 +1605,15 @@
             // --- LISTENERS PARA CAÇA PERMUTA ---
             function populatePermutaTab() {
                 const searchBtn = document.getElementById('permuta-search-btn');
-                const searchTermInput = document.getElementById('permuta-search-term');
                 const saveMassChangesBtn = document.getElementById('permuta-save-mass-changes');
                 const selectAllCheckbox = document.getElementById('permuta-select-all');
 
                 searchBtn.addEventListener('click', () => {
-                    const searchTerm = normalizeStr(searchTermInput.value);
-                    if (searchTerm.length < 3) {
-                        showNotification('Digite pelo menos 3 caracteres para buscar.', 'warning');
+                    const searchTerm = normalizeStr(document.getElementById('permuta-search-desc').value);
+                    const searchForn = normalizeStr(document.getElementById('permuta-search-forn').value);
+
+                    if (searchTerm.length < 3 && searchForn.length < 3) {
+                        showNotification('Digite pelo menos 3 caracteres na descrição ou fornecedor.', 'warning');
                         return;
                     }
                     
@@ -1613,8 +1621,12 @@
                     
                     const results = fullInventory.filter(item => {
                         const hasPermuta = normalizeStr(item.Tombamento).includes('permuta');
+                        if (!hasPermuta) return false;
+                        
                         const matchesKeywords = keywords.every(kw => normalizeStr(item.Descrição).includes(kw));
-                        return hasPermuta && matchesKeywords;
+                        const matchesForn = !searchForn || normalizeStr(item.Fornecedor).includes(searchForn);
+                        
+                        return matchesKeywords && matchesForn;
                     });
                     
                     const resultsArea = document.getElementById('permuta-results-area');
@@ -1625,8 +1637,8 @@
                         <div class="p-2 border-b flex items-center gap-3">
                             <input type="checkbox" class="permuta-item-checkbox h-4 w-4" data-doc-id="${item.id}">
                             <div>
-                                <strong class="text-sm">${escapeHtml(item.Descrição)}</strong>
-                                <p class="text-xs text-slate-500">Unidade: ${escapeHtml(item.Unidade)} | Local: ${escapeHtml(item.Localização)} | Estado: ${escapeHtml(item.Estado)}</p>
+                                <strong class="text-sm">${escapeHtml(item.Descrição)}</strong> (${escapeHtml(item.Tombamento)})
+                                <p class="text-xs text-slate-500">Unidade: ${escapeHtml(item.Unidade)} | Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado)}</p>
                             </div>
                         </div>
                     `).join('') : '<p class="p-4 text-center text-slate-500">Nenhum item de permuta encontrado.</p>';
@@ -1648,10 +1660,10 @@
                     }
 
                     const newEstado = document.getElementById('permuta-mass-estado').value;
-                    const newLocal = document.getElementById('permuta-mass-local').value;
+                    const newForn = document.getElementById('permuta-mass-forn').value;
                     const newObs = document.getElementById('permuta-mass-obs').value;
 
-                    if (!newEstado && !newLocal && !newObs) {
+                    if (!newEstado && !newForn && !newObs) {
                         return showNotification('Nenhum campo de edição em massa foi preenchido.', 'info');
                     }
 
@@ -1663,7 +1675,7 @@
                         if (item) {
                             const updates = { updatedAt: serverTimestamp() };
                             if (newEstado) updates.Estado = newEstado;
-                            if (newLocal) updates.Localização = newLocal;
+                            if (newForn) updates.Fornecedor = newForn;
                             if (newObs) {
                                 const oldObs = item.Observação || '';
                                 updates.Observação = oldObs ? `${oldObs}; ${newObs}` : newObs;
