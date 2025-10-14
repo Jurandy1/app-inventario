@@ -37,7 +37,6 @@
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .is-dirty { background-color: #fef9c3 !important; }
-        select[multiple] { height: 450px; }
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-container { transition: all 0.3s ease; max-height: 90vh; }
         
@@ -190,14 +189,16 @@
                             <label for="map-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo (Sistema)</label>
                             <select id="map-filter-tipo" class="w-full p-2 border rounded-lg bg-white mb-4"></select>
                             <label for="map-system-unit-select" class="block text-sm font-medium mb-1">Unidade(s) do Sistema</label>
-                            <div class="overflow-auto border rounded-lg bg-white">
-                                <select id="map-system-unit-select" multiple class="p-2 border-none" style="min-width: 500px; width: 100%;"></select>
+                            <div class="overflow-auto border rounded-lg bg-white h-[450px]">
+                                <select id="map-system-unit-select" multiple class="p-2 border-none w-full h-full" style="min-width: 500px;"></select>
                             </div>
                         </div>
                         <div>
                              <label for="map-giap-unit-multiselect" class="block text-sm font-medium mb-1">Unidade(s) da Planilha GIAP</label>
                              <input type="text" id="map-giap-filter" class="w-full p-2 border rounded-lg my-2" placeholder="Pesquisar unidade da planilha...">
-                            <select id="map-giap-unit-multiselect" multiple class="w-full p-2 border rounded-lg bg-white"></select>
+                            <div class="overflow-auto border rounded-lg bg-white h-[450px]">
+                                <select id="map-giap-unit-multiselect" multiple class="w-full p-2 border-none h-full" style="min-width: 500px;"></select>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-4">
@@ -1445,28 +1446,36 @@
             });
             
             document.getElementById('suggest-sobrando').addEventListener('click', () => {
-                 const kw = document.getElementById('leftover-keyword').value.toLowerCase();
-                 const tfilter = document.getElementById('leftover-tombo').value;
-                 const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
-                 const sob = giapInventory.filter(g =>
-                   !usedTombamentos.has(g.TOMBAMENTO?.trim()) &&
-                   (!tfilter || (g.TOMBAMENTO || '').includes(tfilter)) &&
-                   (!kw || (g.Descrição || '').toLowerCase().includes(kw) || (g.Espécie || '').toLowerCase().includes(kw))
-                 );
-                 document.getElementById('total-sobrando').textContent = sob.length;
-                 const list = document.getElementById('sobrando-list');
-                 list.innerHTML = '';
-                 if (sob.length > 0) {
-                     sob.forEach(g => {
-                         const d = document.createElement('div');
-                         d.className = 'card p-2 mb-1 text-sm';
-                         d.textContent = `Tombo: ${g.TOMBAMENTO} - ${g.Descrição || g.Espécie} (Unidade GIAP: ${g.Unidade})`;
-                         list.append(d);
-                     });
-                 } else {
-                    list.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado.</p>`;
-                 }
-                 showNotification(`${sob.length} tombos sobrando listados.`, 'success');
+                const kw = normalizeStr(document.getElementById('leftover-keyword').value);
+                const tfilter = document.getElementById('leftover-tombo').value.trim();
+                
+                const usedTombamentos = new Set(fullInventory.map(i => String(i.Tombamento || '').trim()).filter(Boolean));
+                
+                const sob = giapInventory.filter(g => {
+                    const tombo = String(g.TOMBAMENTO || '').trim();
+                    if (!tombo || normalizeStr(tombo).includes('permuta')) return false;
+
+                    const giapDesc = normalizeStr(g.Descrição || g.Espécie || '');
+                    
+                    return !usedTombamentos.has(tombo) &&
+                           (!tfilter || tombo.includes(tfilter)) &&
+                           (!kw || giapDesc.includes(kw));
+                });
+                
+                document.getElementById('total-sobrando').textContent = sob.length;
+                const list = document.getElementById('sobrando-list');
+                list.innerHTML = '';
+                if (sob.length > 0) {
+                    sob.forEach(g => {
+                        const d = document.createElement('div');
+                        d.className = 'card p-2 mb-1 text-sm';
+                        d.textContent = `Tombo: ${g.TOMBAMENTO} - ${g.Descrição || g.Espécie} (Unidade GIAP: ${g.Unidade})`;
+                        list.append(d);
+                    });
+                } else {
+                   list.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado com os filtros aplicados.</p>`;
+                }
+                showNotification(`${sob.length} tombos sobrando listados.`, 'success');
             });
             
             const subNavButtons = document.querySelectorAll('#content-importacao .sub-nav-btn');
