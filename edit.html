@@ -131,8 +131,8 @@
         <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
             <div class="container mx-auto px-4">
                 <div id="edit-nav" class="flex space-x-1 overflow-x-auto">
-                    <button class="nav-btn" data-tab="edicao">✏️ Inventário Editável</button>
-                    <button class="nav-btn active" data-tab="unidades">🔗 Ligar Unidades</button>
+                    <button class="nav-btn active" data-tab="edicao">✏️ Inventário Editável</button>
+                    <button class="nav-btn" data-tab="unidades">🔗 Ligar Unidades</button>
                     <button class="nav-btn" data-tab="conciliar">🤝 Conciliar Itens</button>
                     <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
                     <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
@@ -146,9 +146,9 @@
         <main class="container mx-auto p-4">
             
             <!-- ABA: Inventário Editável -->
-            <div id="content-edicao" class="hidden fade-in">
+            <div id="content-edicao" class="fade-in">
                  <div class="card">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                         <div>
                             <label for="edit-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
                             <select id="edit-filter-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
@@ -162,6 +162,10 @@
                                     + Adicionar Item
                                 </button>
                             </div>
+                        </div>
+                        <div>
+                            <label for="edit-filter-estado" class="block text-sm font-medium mb-1">Filtrar por Estado</label>
+                            <select id="edit-filter-estado" class="w-full p-2 border rounded-lg bg-white"></select>
                         </div>
                         <div>
                             <label for="edit-filter-descricao" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
@@ -199,7 +203,7 @@
             </div>
 
             <!-- ABA: Ligar Unidades -->
-            <div id="content-unidades" class="fade-in">
+            <div id="content-unidades" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">Mapeamento de Unidades</h2>
                     <p class="text-sm text-slate-600 mb-4">Ligue uma ou mais 'Unidades do Sistema' a uma ou mais 'Unidades da Planilha'. Use Ctrl/Shift+Click para múltiplas seleções.</p>
@@ -600,6 +604,7 @@
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
         const editFilterUnidade = document.getElementById('edit-filter-unidade');
+        const editFilterEstado = document.getElementById('edit-filter-estado');
         const editFilterDescricao = document.getElementById('edit-filter-descricao');
         const mapFilterTipo = document.getElementById('map-filter-tipo');
         const mapSystemUnitSelect = document.getElementById('map-system-unit-select');
@@ -717,7 +722,7 @@
                     return;
                 }
             }
-            giapMap = new Map(giapInventory.map(item => [item['TOMBAMENTO']?.trim(), item]));
+            giapMap = new Map(giapInventory.map(item => [String(item['TOMBAMENTO'] || '').trim(), item]));
             
             normalizedSystemUnits.clear();
             fullInventory.forEach(item => {
@@ -757,6 +762,102 @@
             });
         }
         
+        // --- LISTENERS PARA CAÇA PERMUTA ---
+        function populatePermutaTab() {
+            const searchBtn = document.getElementById('permuta-search-btn');
+            const saveMassChangesBtn = document.getElementById('permuta-save-mass-changes');
+            const selectAllCheckbox = document.getElementById('permuta-select-all');
+
+            searchBtn.addEventListener('click', () => {
+                const searchTerm = normalizeStr(document.getElementById('permuta-search-desc').value);
+                const searchForn = normalizeStr(document.getElementById('permuta-search-forn').value);
+
+                if (searchTerm.length < 3 && searchForn.length < 3) {
+                    showNotification('Digite pelo menos 3 caracteres na descrição ou fornecedor.', 'warning');
+                    return;
+                }
+                
+                const keywords = searchTerm.split(' ').filter(k => k);
+                
+                const results = fullInventory.filter(item => {
+                    const hasPermuta = normalizeStr(item.Tombamento).includes('permuta');
+                    if (!hasPermuta) return false;
+                    
+                    const matchesKeywords = keywords.every(kw => normalizeStr(item.Descrição).includes(kw));
+                    const matchesForn = !searchForn || normalizeStr(item.Fornecedor).includes(searchForn);
+                    
+                    return matchesKeywords && matchesForn;
+                });
+                
+                const resultsArea = document.getElementById('permuta-results-area');
+                const resultsList = document.getElementById('permuta-results-list');
+                document.getElementById('permuta-count').textContent = results.length;
+                
+                resultsList.innerHTML = results.length > 0 ? results.map(item => `
+                    <div class="p-2 border-b flex items-center gap-3">
+                        <input type="checkbox" class="permuta-item-checkbox h-4 w-4" data-doc-id="${item.id}">
+                        <div>
+                            <strong class="text-sm">${escapeHtml(item.Descrição)}</strong> (${escapeHtml(item.Tombamento)})
+                            <p class="text-xs text-slate-500">Unidade: ${escapeHtml(item.Unidade)} | Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado)}</p>
+                        </div>
+                    </div>
+                `).join('') : '<p class="p-4 text-center text-slate-500">Nenhum item de permuta encontrado.</p>';
+                
+                resultsArea.classList.remove('hidden');
+                selectAllCheckbox.checked = false;
+            });
+            
+            selectAllCheckbox.addEventListener('change', (e) => {
+                document.querySelectorAll('.permuta-item-checkbox').forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+            });
+
+            saveMassChangesBtn.addEventListener('click', async () => {
+                const selectedIds = Array.from(document.querySelectorAll('.permuta-item-checkbox:checked')).map(cb => cb.dataset.docId);
+                if (selectedIds.length === 0) {
+                    return showNotification('Nenhum item selecionado para editar.', 'warning');
+                }
+
+                const newEstado = document.getElementById('permuta-mass-estado').value;
+                const newForn = document.getElementById('permuta-mass-forn').value;
+                const newObs = document.getElementById('permuta-mass-obs').value;
+
+                if (!newEstado && !newForn && !newObs) {
+                    return showNotification('Nenhum campo de edição em massa foi preenchido.', 'info');
+                }
+
+                showOverlay(`Atualizando ${selectedIds.length} itens...`);
+                const batch = writeBatch(db);
+
+                selectedIds.forEach(id => {
+                    const item = fullInventory.find(i => i.id === id);
+                    if (item) {
+                        const updates = { updatedAt: serverTimestamp() };
+                        if (newEstado) updates.Estado = newEstado;
+                        if (newForn) updates.Fornecedor = newForn;
+                        if (newObs) {
+                            const oldObs = item.Observação || '';
+                            updates.Observação = oldObs ? `${oldObs}; ${newObs}` : newObs;
+                        }
+                        const docRef = doc(db, 'patrimonio', id);
+                        batch.update(docRef, updates);
+                    }
+                });
+
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear();
+                    showNotification(`${selectedIds.length} itens atualizados! A página será recarregada.`, 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch(e) {
+                    hideOverlay();
+                    showNotification('Erro ao salvar alterações em massa.', 'error');
+                    console.error(e);
+                }
+            });
+        }
+        
         function initializeUI() {
             populateEditableInventoryTab();
             populateUnitMappingTab();
@@ -770,12 +871,14 @@
         function renderEditableTable() {
              const tipo = editFilterTipo.value;
             const unidade = editFilterUnidade.value;
-            const desc = editFilterDescricao.value.toLowerCase();
+            const estado = editFilterEstado.value;
+            const desc = normalizeStr(editFilterDescricao.value);
             
             const filtered = fullInventory.filter(item => 
                 (!tipo || item.Tipo === tipo) &&
                 (!unidade || item.Unidade === unidade) &&
-                (!desc || (item.Descrição || '').toLowerCase().includes(desc))
+                (!estado || item.Estado === estado) &&
+                (!desc || normalizeStr(item.Descrição).includes(desc))
             );
 
             const filteredCount = filtered.length;
@@ -784,7 +887,8 @@
             const addItemBtn = document.getElementById('add-item-to-unit-btn');
             addItemBtn.classList.toggle('hidden', !unidade);
             
-            const itemsToRender = filtered.slice(0, 200);
+            const isSpecificFilterApplied = !!(unidade || desc || estado);
+            const itemsToRender = isSpecificFilterApplied ? filtered : filtered.slice(0, 200);
 
             const headers = ['Ações', 'Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
             const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
@@ -811,7 +915,7 @@
                 return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${cells}</tr>`;
             }).join('');
 
-            if(filtered.length > 200) {
+            if(!isSpecificFilterApplied && filtered.length > 200) {
                  editTableBody.innerHTML += `<tr><td colspan="${headers.length}" class="text-center p-4 font-semibold text-orange-600">Apenas os primeiros 200 de ${filtered.length} resultados são exibidos. Refine sua busca.</td></tr>`;
             }
         }
@@ -825,10 +929,14 @@
             
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             editFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+
+            const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
+            editFilterEstado.innerHTML = '<option value="">Todos os Estados</option>' + estadoOptions.map(e => `<option value="${e}">${e}</option>`).join('');
             
             const debouncedRenderTable = debounce(renderEditableTable, 300);
             editFilterTipo.onchange = () => { updateUnidades(); renderEditableTable(); };
             editFilterUnidade.onchange = renderEditableTable;
+            editFilterEstado.onchange = renderEditableTable;
             editFilterDescricao.oninput = debouncedRenderTable;
             updateUnidades();
             renderEditableTable();
