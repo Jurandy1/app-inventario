@@ -334,6 +334,7 @@
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         
+        const editTableBody = document.getElementById('edit-table-body');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
         const editFilterUnidade = document.getElementById('edit-filter-unidade');
@@ -462,8 +463,6 @@
         }
         
         function initializeUI() {
-            // virtualScroll = setupVirtualScroll('virtual-table-container', 'virtual-table-content', fullInventory, renderRow, 40);
-            
             populateEditableInventoryTab();
             populateUnitMappingTab();
             populateReconciliationTab();
