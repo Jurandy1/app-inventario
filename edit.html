@@ -137,7 +137,7 @@
                     <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
                     <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
                     <button class="nav-btn" data-tab="importacao">🔄 Importação e Substituição</button>
-                    <button class="nav-btn" data-tab="permuta">🔎 Caça Permuta</button>
+                    <button class="nav-btn" data-tab="notas_fiscais">📋 Notas Fiscais</button>
                     <button class="nav-btn" data-tab="giap">📋 Planilha GIAP</button>
                 </div>
             </div>
@@ -437,55 +437,15 @@
                 </div>
             </div>
 
-             <!-- ABA: Caça Permuta -->
-            <div id="content-permuta" class="hidden fade-in">
+            <!-- ABA: Notas Fiscais -->
+            <div id="content-notas_fiscais" class="hidden fade-in">
                 <div class="card">
-                    <h2 class="text-xl font-bold text-slate-800 mb-2">🔎 Caça Permuta</h2>
-                    <p class="text-sm text-slate-600 mb-4">Encontre itens marcados como "Permuta" e edite suas informações em massa.</p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4">
-                        <div>
-                            <label for="permuta-search-desc" class="text-sm font-medium">Buscar por nome do item</label>
-                            <input type="text" id="permuta-search-desc" class="w-full p-2 border rounded-lg mt-1" placeholder="Ex: Cadeira, longarina...">
-                        </div>
-                        <div>
-                            <label for="permuta-search-forn" class="text-sm font-medium">Buscar por fornecedor</label>
-                            <input type="text" id="permuta-search-forn" class="w-full p-2 border rounded-lg mt-1" placeholder="Ex: Marelli...">
-                        </div>
-                        <button id="permuta-search-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar</button>
-                    </div>
-            
-                    <div id="permuta-results-area" class="hidden mt-6">
-                        <div class="flex justify-between items-center mb-2">
-                             <h3 class="font-bold text-slate-700">Resultados da Busca (<span id="permuta-count">0</span>)</h3>
-                             <label class="flex items-center text-sm"><input type="checkbox" id="permuta-select-all" class="h-4 w-4 mr-2">Selecionar Todos</label>
-                        </div>
-                        <div id="permuta-results-list" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg mb-6"></div>
-                        
-                        <h3 class="font-bold text-slate-700 mb-2 border-t pt-4">Editar Itens Selecionados em Massa</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border rounded-lg bg-slate-50">
-                             <div>
-                                <label for="permuta-mass-estado" class="block text-sm font-medium mb-1">Novo Estado</label>
-                                <select id="permuta-mass-estado" class="w-full p-2 border rounded-lg bg-white">
-                                    <option value="">(Manter original)</option>
-                                    <option>Novo</option>
-                                    <option>Bom</option>
-                                    <option>Regular</option>
-                                    <option>Avariado</option>
-                                </select>
-                            </div>
-                             <div>
-                                <label for="permuta-mass-forn" class="block text-sm font-medium mb-1">Novo Fornecedor</label>
-                                <input type="text" id="permuta-mass-forn" placeholder="(Manter original)" class="w-full p-2 border rounded-lg">
-                            </div>
-                             <div>
-                                <label for="permuta-mass-obs" class="block text-sm font-medium mb-1">Adicionar Observação</label>
-                                <input type="text" id="permuta-mass-obs" placeholder="Texto a ser adicionado" class="w-full p-2 border rounded-lg">
-                            </div>
-                        </div>
-                        <button id="permuta-save-mass-changes" class="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Salvar Alterações em Massa</button>
-                    </div>
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
+                    <p class="text-sm text-slate-600 mb-4">Notas fiscais agrupadas por fornecedor, da mais recente para a mais antiga. Clique para expandir e ver os itens.</p>
+                    <div id="notas-fiscais-container" class="mt-4 space-y-2"></div>
                 </div>
             </div>
+
 
             <!-- ABA: Planilha GIAP -->
             <div id="content-giap" class="hidden fade-in">
@@ -821,102 +781,6 @@
             });
         }
         
-        // --- LISTENERS PARA CAÇA PERMUTA ---
-        function populatePermutaTab() {
-            const searchBtn = document.getElementById('permuta-search-btn');
-            const saveMassChangesBtn = document.getElementById('permuta-save-mass-changes');
-            const selectAllCheckbox = document.getElementById('permuta-select-all');
-
-            searchBtn.addEventListener('click', () => {
-                const searchTerm = normalizeStr(document.getElementById('permuta-search-desc').value);
-                const searchForn = normalizeStr(document.getElementById('permuta-search-forn').value);
-
-                if (searchTerm.length < 3 && searchForn.length < 3) {
-                    showNotification('Digite pelo menos 3 caracteres na descrição ou fornecedor.', 'warning');
-                    return;
-                }
-                
-                const keywords = searchTerm.split(' ').filter(k => k);
-                
-                const results = fullInventory.filter(item => {
-                    const hasPermuta = normalizeStr(item.Tombamento).includes('permuta');
-                    if (!hasPermuta) return false;
-                    
-                    const matchesKeywords = keywords.every(kw => normalizeStr(item.Descrição).includes(kw));
-                    const matchesForn = !searchForn || normalizeStr(item.Fornecedor).includes(searchForn);
-                    
-                    return matchesKeywords && matchesForn;
-                });
-                
-                const resultsArea = document.getElementById('permuta-results-area');
-                const resultsList = document.getElementById('permuta-results-list');
-                document.getElementById('permuta-count').textContent = results.length;
-                
-                resultsList.innerHTML = results.length > 0 ? results.map(item => `
-                    <div class="p-2 border-b flex items-center gap-3">
-                        <input type="checkbox" class="permuta-item-checkbox h-4 w-4" data-doc-id="${item.id}">
-                        <div>
-                            <strong class="text-sm">${escapeHtml(item.Descrição)}</strong> (${escapeHtml(item.Tombamento)})
-                            <p class="text-xs text-slate-500">Unidade: ${escapeHtml(item.Unidade)} | Fornecedor: ${escapeHtml(item.Fornecedor || 'N/D')} | Estado: ${escapeHtml(item.Estado)}</p>
-                        </div>
-                    </div>
-                `).join('') : '<p class="p-4 text-center text-slate-500">Nenhum item de permuta encontrado.</p>';
-                
-                resultsArea.classList.remove('hidden');
-                selectAllCheckbox.checked = false;
-            });
-            
-            selectAllCheckbox.addEventListener('change', (e) => {
-                document.querySelectorAll('.permuta-item-checkbox').forEach(cb => {
-                    cb.checked = e.target.checked;
-                });
-            });
-
-            saveMassChangesBtn.addEventListener('click', async () => {
-                const selectedIds = Array.from(document.querySelectorAll('.permuta-item-checkbox:checked')).map(cb => cb.dataset.docId);
-                if (selectedIds.length === 0) {
-                    return showNotification('Nenhum item selecionado para editar.', 'warning');
-                }
-
-                const newEstado = document.getElementById('permuta-mass-estado').value;
-                const newForn = document.getElementById('permuta-mass-forn').value;
-                const newObs = document.getElementById('permuta-mass-obs').value;
-
-                if (!newEstado && !newForn && !newObs) {
-                    return showNotification('Nenhum campo de edição em massa foi preenchido.', 'info');
-                }
-
-                showOverlay(`Atualizando ${selectedIds.length} itens...`);
-                const batch = writeBatch(db);
-
-                selectedIds.forEach(id => {
-                    const item = fullInventory.find(i => i.id === id);
-                    if (item) {
-                        const updates = { updatedAt: serverTimestamp() };
-                        if (newEstado) updates.Estado = newEstado;
-                        if (newForn) updates.Fornecedor = newForn;
-                        if (newObs) {
-                            const oldObs = item.Observação || '';
-                            updates.Observação = oldObs ? `${oldObs}; ${newObs}` : newObs;
-                        }
-                        const docRef = doc(db, 'patrimonio', id);
-                        batch.update(docRef, updates);
-                    }
-                });
-
-                try {
-                    await batch.commit();
-                    await idb.metadata.clear();
-                    showNotification(`${selectedIds.length} itens atualizados! A página será recarregada.`, 'success');
-                    setTimeout(() => window.location.reload(), 1500);
-                } catch(e) {
-                    hideOverlay();
-                    showNotification('Erro ao salvar alterações em massa.', 'error');
-                    console.error(e);
-                }
-            });
-        }
-        
         function initializeUI() {
             populateEditableInventoryTab();
             populateUnitMappingTab();
@@ -924,7 +788,6 @@
             populatePendingTransfersTab();
             populateImportAndReplaceTab();
             populateGiapTab();
-            populatePermutaTab();
         }
 
         function renderEditableTable() {
