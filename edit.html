@@ -806,7 +806,7 @@
                 const giapItem = giapMap.get(tombo);
                 if (!giapItem) return false;
 
-                const systemUnit = item.Unidade;
+                const systemUnit = (item.Unidade || '').trim();
                 const giapUnit = giapItem.Unidade;
 
                 if (!unitMapping[systemUnit] || unitMapping[systemUnit].length === 0) {
@@ -977,7 +977,7 @@
         }
         
         function renderConciliationLists() {
-            const unidade = document.getElementById('filter-unidade').value;
+            const unidade = document.getElementById('filter-unidade').value.trim();
             if (!unidade) {
                 document.getElementById('system-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Selecione uma unidade e clique em carregar.</p>`;
                 document.getElementById('giap-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Selecione uma unidade e clique em carregar.</p>`;
@@ -1193,7 +1193,7 @@
             mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
             mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
             saveMappingBtn.addEventListener('click', async () => {
-                const systemUnit = mapSystemUnitSelect.value;
+                const systemUnit = mapSystemUnitSelect.value.trim();
                 if (!systemUnit) return showNotification("Selecione uma Unidade do Sistema.", "warning");
                 const giapUnits = Array.from(mapGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
                 unitMapping[systemUnit] = giapUnits;
@@ -1209,7 +1209,7 @@
             savedMappingsContainer.addEventListener('click', async (e) => {
                 const deleteBtn = e.target.closest('.delete-mapping-btn');
                 if (deleteBtn) {
-                    const systemUnit = deleteBtn.dataset.systemUnit;
+                    const systemUnit = (deleteBtn.dataset.systemUnit || '').trim();
                     delete unitMapping[systemUnit];
                     try {
                         feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Removendo...`;
@@ -1231,11 +1231,11 @@
             });
 
             document.getElementById('load-conciliar').addEventListener('click', () => {
-                const unidade = document.getElementById('filter-unidade').value;
+                const unidade = document.getElementById('filter-unidade').value.trim();
                 if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
                 
                 const mappedGiapUnits = unitMapping[unidade] || [unidade];
-                if(mappedGiapUnits.length === 0) {
+                if(mappedGiapUnits.length === 1 && mappedGiapUnits[0] === unidade && !unitMapping[unidade]) {
                     showNotification('Esta unidade não está mapeada. Vá para a aba "Ligar Unidades".', 'warning');
                 }
 
@@ -1261,7 +1261,7 @@
             });
             
             document.getElementById('save-links').addEventListener('click', async () => {
-                const linkedItems = document.querySelectorAll('#created-links .link-success');
+                const linkedItems = document.querySelectorAll('#created-links > div');
                 if (linkedItems.length === 0) return showNotification('Nenhum novo link para salvar.', 'info');
 
                 showOverlay(`Salvando ${linkedItems.length} links...`);
@@ -1298,7 +1298,7 @@
                 if (giapItemsForImport.length === 0) return showNotification('Nenhum item GIAP selecionado para importar.', 'warning');
                 
                 const tipo = document.getElementById('filter-tipo').value;
-                const unidade = document.getElementById('filter-unidade').value;
+                const unidade = document.getElementById('filter-unidade').value.trim();
                 if (!unidade || !tipo) return showNotification('Selecione um Tipo e uma Unidade de destino nos filtros acima.', 'warning');
                 
                 const estado = document.getElementById('import-estado-select').value;
@@ -1474,7 +1474,7 @@
             
             document.getElementById('confirm-replace-btn').addEventListener('click', async () => {
                 const tipo = document.getElementById('replace-tipo').value;
-                const unidade = document.getElementById('replace-unit').value;
+                const unidade = document.getElementById('replace-unit').value.trim();
 
                 if (!unidade || itemsToReplace.length === 0) return showNotification('Dados inválidos ou unidade não selecionada.', 'error');
 
