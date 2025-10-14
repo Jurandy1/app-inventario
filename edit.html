@@ -424,6 +424,10 @@
                         <p class="text-sm text-slate-600 mb-4">Adicione aqui uma nova unidade que ainda não existe na planilha GIAP. Ela ficará disponível na aba "Ligar Unidades".</p>
                         <div class="space-y-4 max-w-md">
                             <div>
+                                <label for="add-giap-number" class="block text-sm font-medium mb-1">Número da Unidade (opcional)</label>
+                                <input type="text" id="add-giap-number" class="w-full p-2 border rounded-lg" placeholder="Ex: 140.3">
+                            </div>
+                            <div>
                                 <label for="add-giap-name" class="block text-sm font-medium mb-1">Nome da Nova Unidade</label>
                                 <input type="text" id="add-giap-name" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS VILA ESPERANÇA (NOVO)" required>
                             </div>
@@ -767,7 +771,7 @@
              try {
                 const docRef = doc(db, 'config', 'customGiapUnits');
                 const docSnap = await getDoc(docRef);
-                return docSnap.exists() ? docSnap.data().names || [] : [];
+                return docSnap.exists() ? docSnap.data().units || [] : [];
             } catch (error) { console.error("Error loading custom GIAP units:", error); return []; }
         }
 
@@ -988,7 +992,7 @@
         function updateGiapUnitOptions() {
             const filterText = normalizeStr(mapGiapFilter.value);
             let allGiapUnitsFromSheet = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))];
-            let allGiapUnits = [...new Set([...allGiapUnitsFromSheet, ...customGiapUnits])].sort();
+            let allGiapUnits = [...new Set([...allGiapUnitsFromSheet, ...customGiapUnits.map(u => u.name)])].sort();
 
             const selectedSystemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value);
             
@@ -1820,27 +1824,29 @@
 
             document.getElementById('save-giap-unit-btn').addEventListener('click', async () => {
                 const newUnitName = document.getElementById('add-giap-name').value.trim();
+                const newUnitNumber = document.getElementById('add-giap-number').value.trim();
                 if (!newUnitName) {
                     return showNotification('O nome da unidade não pode ser vazio.', 'warning');
                 }
                 
                 const normalizedNewName = normalizeStr(newUnitName);
                 const allGiapUnitNames = new Set(giapInventory.map(i => normalizeStr(i.Unidade)).filter(Boolean));
-                const allCustomUnitNames = new Set(customGiapUnits.map(u => normalizeStr(u)));
+                const allCustomUnitNames = new Set(customGiapUnits.map(u => normalizeStr(u.name)));
                 
                 if (allGiapUnitNames.has(normalizedNewName) || allCustomUnitNames.has(normalizedNewName)) {
                     return showNotification('Esta unidade já existe.', 'error');
                 }
 
                 showOverlay('Salvando nova unidade...');
-                const updatedCustomUnits = [...customGiapUnits, newUnitName];
+                const updatedCustomUnits = [...customGiapUnits, { name: newUnitName, number: newUnitNumber }];
 
                 try {
                     const docRef = doc(db, 'config', 'customGiapUnits');
-                    await setDoc(docRef, { names: updatedCustomUnits });
-                    customGiapUnits.push(newUnitName);
+                    await setDoc(docRef, { units: updatedCustomUnits });
+                    customGiapUnits.push({ name: newUnitName, number: newUnitNumber });
                     showNotification('Nova unidade salva com sucesso!', 'success');
                     document.getElementById('add-giap-name').value = '';
+                    document.getElementById('add-giap-number').value = '';
                     updateGiapUnitOptions(); // Refresh the list
                 } catch(e) {
                     showNotification('Erro ao salvar a nova unidade.', 'error');
