@@ -990,11 +990,12 @@
             const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
             const mappedGiapUnits = unitMapping[unidade] || [unidade];
 
-            const items = fullInventory.filter(i => 
-                i.Unidade === unidade && 
-                !i.Tombamento &&
-                normalizeStr(i.Descrição).includes(systemFilterText)
-            );
+            const items = fullInventory.filter(i => {
+                const tombo = (i.Tombamento || '').trim();
+                return i.Unidade === unidade && 
+                       (!tombo || tombo.toLowerCase() === 's/t') &&
+                       normalizeStr(i.Descrição).includes(systemFilterText);
+            });
 
             const tombos = giapInventory.filter(g => {
                 const tomboTrimmed = g.TOMBAMENTO?.trim();
@@ -1479,7 +1480,7 @@
                 if (!unidade || itemsToReplace.length === 0) return showNotification('Dados inválidos ou unidade não selecionada.', 'error');
 
                 showOverlay(`Substituindo inventário de ${unidade}...`);
-                const itemsToDelete = fullInventory.filter(item => item.Unidade === unidade);
+                const itemsToDelete = fullInventory.filter(item => item.Unidade.trim() === unidade);
                 
                 const batch = writeBatch(db);
 
