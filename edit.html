@@ -666,7 +666,7 @@
             sel.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
-        function renderList(containerId, arr, keyField, labelField) {
+        function renderList(containerId, arr, keyField, primaryLabelField) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
             if (!arr || arr.length === 0) {
@@ -677,8 +677,32 @@
                 const id = item[keyField];
                 const div = document.createElement('div');
                 div.className = 'reconciliation-list-item card p-2 text-sm';
-                div.textContent = item[labelField] || id;
                 div.dataset.id = id;
+
+                let detailsHtml = '';
+                if (containerId === 'system-list') {
+                    // Itens do Sistema com mais detalhes
+                    const fornecedor = escapeHtml(item.Fornecedor || 'N/D');
+                    const localizacao = escapeHtml(item.Localização || 'N/A');
+                    detailsHtml = `
+                        <strong>${escapeHtml(item[primaryLabelField])}</strong>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Fornecedor: ${fornecedor} | Local: ${localizacao}
+                        </p>
+                    `;
+                } else { // giap-list com mais detalhes
+                    const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
+                    const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
+                    const tombo = escapeHtml(item[keyField]);
+                    detailsHtml = `
+                        <strong>${tombo} - ${descricao}</strong>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Fornecedor GIAP: ${fornecedor}
+                        </p>
+                    `;
+                }
+                
+                div.innerHTML = detailsHtml;
                 div.onclick = (event) => handleSelect(containerId, id, item, event.currentTarget);
                 container.append(div);
             });
@@ -840,14 +864,22 @@
                 if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
                 
                 const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
+                const mappedGiapUnits = unitMapping[unidade] || []; // USA O MAPEAMENTO DE UNIDADES
+
+                if(mappedGiapUnits.length === 0) {
+                    showNotification('Esta unidade não está mapeada. Vá para a aba "Ligar Unidades".', 'warning');
+                }
 
                 const items = fullInventory.filter(i => i.Unidade === unidade && !i.Tombamento);
-                const tombos = giapInventory.filter(g =>
-                    !usedTombamentos.has(g.TOMBAMENTO?.trim()) && g.Unidade === unidade
-                );
+                const tombos = giapInventory.filter(g => {
+                    const tomboTrimmed = g.TOMBAMENTO?.trim();
+                    // Filtra tombos que não foram usados e que pertencem às unidades mapeadas
+                    return tomboTrimmed && !usedTombamentos.has(tomboTrimmed) && mappedGiapUnits.includes(g.Unidade);
+                });
                 
                 renderList('system-list', items, 'id', 'Descrição');
                 renderList('giap-list', tombos, 'TOMBAMENTO', 'Descrição');
+
                 document.getElementById('quick-actions').classList.remove('hidden');
                 document.getElementById('created-links').innerHTML = ''; // Limpa links anteriores
                 selSys = selGiap = null; // Reseta seleções
@@ -1004,3 +1036,4 @@
     </script>
 </body>
 </html>
+
