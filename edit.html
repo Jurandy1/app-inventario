@@ -8,18 +8,12 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <!-- Dexie.js for IndexedDB Cache -->
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
-    <!-- Fuse.js for fuzzy matching -->
-    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .table-container { 
-            max-height: calc(100vh - 420px); 
-            overflow-y: auto;
-            position: relative;
-        }
+        .table-container { max-height: calc(100vh - 420px); }
         .reconciliation-container { max-height: calc(100vh - 350px); }
         .status-feedback { color: #475569; }
         .nav-btn {
@@ -45,7 +39,6 @@
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .is-dirty { background-color: #fef9c3 !important; }
-        .is-divergent { background-color: #ffe4e6 !important; }
         select[multiple] { height: 150px; }
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-container { transition: all 0.3s ease; max-height: 90vh; }
@@ -84,10 +77,10 @@
         <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
             <div class="container mx-auto px-4">
                 <div id="edit-nav" class="flex space-x-1 overflow-x-auto">
-                    <button class="nav-btn" data-tab="edicao">✏️ Inventário</button>
+                    <button class="nav-btn" data-tab="edicao">✏️ Inventário Editável</button>
                     <button class="nav-btn" data-tab="unidades">🔗 Ligar Unidades</button>
-                    <button class="nav-btn active" data-tab="conciliar">🤝 Conciliar</button>
-                    <button class="nav-btn" data-tab="sobrando">⚠️ Sobrando</button>
+                    <button class="nav-btn active" data-tab="conciliar">🤝 Conciliar Itens</button>
+                    <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
                     <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
                     <button class="nav-btn" data-tab="transferencia-massa">✈️ Transf. em Massa</button>
                     <button class="nav-btn" data-tab="giap">📋 Planilha GIAP</button>
@@ -114,17 +107,28 @@
                             <input type="text" id="edit-filter-descricao" class="w-full p-2 border rounded-lg" placeholder="Digite para buscar...">
                         </div>
                     </div>
-                    <div class="flex items-center gap-4 flex-wrap">
-                        <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Salvar Alterações</button>
-                        <button id="check-divergences-btn" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">Verificar Divergências</button>
-                        <button id="sync-divergences-btn" class="hidden bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600">Sincronizar Divergências</button>
-                    </div>
+                    <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400" disabled>Salvar Alterações</button>
                 </div>
                 <div class="card mt-6 p-0 overflow-hidden">
-                    <div id="virtual-table-container" class="table-container">
-                         <div id="virtual-table-content" class="relative">
-                            <!-- Virtual rows will be injected here -->
-                         </div>
+                    <div class="table-container overflow-y-auto">
+                        <table class="w-full text-sm min-w-[1800px]">
+                            <thead class="bg-slate-100 sticky top-0">
+                                <tr>
+                                    <th class="p-3 text-left font-semibold">Tombamento</th>
+                                    <th class="p-3 text-left font-semibold">Descrição</th>
+                                    <th class="p-3 text-left font-semibold">Tipo</th>
+                                    <th class="p-3 text-left font-semibold">Unidade</th>
+                                    <th class="p-3 text-left font-semibold">Localização</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">NF</th>
+                                    <th class="p-3 text-left font-semibold">Origem da Doação</th>
+                                    <th class="p-3 text-left font-semibold">Estado</th>
+                                    <th class="p-3 text-left font-semibold">Quantidade</th>
+                                    <th class="p-3 text-left font-semibold">Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="edit-table-body"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -278,6 +282,7 @@
         <div class="modal-container bg-white w-full max-w-4xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"></div>
     </div>
     
+    <!-- Full Page Overlay for saving -->
     <div id="full-page-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
         <div class="text-center text-white">
             <div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-white mx-auto"></div>
@@ -320,6 +325,7 @@
         let normalizedSystemUnits = new Map();
         let virtualScroll;
         
+        // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
         const authGate = document.getElementById('auth-gate');
         const feedbackStatus = document.getElementById('feedback-status');
@@ -328,6 +334,7 @@
         const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
         const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
         
+        const editTableBody = document.getElementById('edit-table-body');
         const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
         const editFilterTipo = document.getElementById('edit-filter-tipo');
         const editFilterUnidade = document.getElementById('edit-filter-unidade');
@@ -338,7 +345,7 @@
         const mapGiapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
         const saveMappingBtn = document.getElementById('save-mapping-btn');
         const savedMappingsContainer = document.getElementById('saved-mappings-container');
-        
+
         const reconUnitSelect = document.getElementById('recon-unit-select');
         const linkSelectedBtn = document.getElementById('link-selected-btn');
         const reconciliationWorkspace = document.getElementById('reconciliation-workspace');
@@ -389,36 +396,30 @@
             document.getElementById('user-email-edit').textContent = user ? user.email : '';
             authGate.classList.toggle('hidden', !user);
             loadingScreen.classList.toggle('hidden', user);
-            if(user) document.addEventListener('DOMContentLoaded', () => loadData(false));
+            if(user) loadData(false);
             else loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2><p>Você precisa estar logado.</p></div>`;
         });
 
         async function loadData(forceRefresh) {
             loadingScreen.classList.remove('hidden');
-            try {
-                const metadata = await idb.metadata.get('lastFetch');
-                const isCacheStale = !metadata || (Date.now() - metadata.timestamp > CACHE_DURATION_MS);
-                if (!forceRefresh && !isCacheStale) {
-                    [fullInventory, giapInventory] = await Promise.all([idb.patrimonio.toArray(), idb.giap.toArray()]);
-                    unitMapping = await loadUnitMappingFromFirestore();
-                } else {
-                    throw new Error("Cache is stale or force refresh requested.");
-                }
-            } catch (error) {
-                 try {
+            const metadata = await idb.metadata.get('lastFetch');
+            const isCacheStale = !metadata || (Date.now() - metadata.timestamp > CACHE_DURATION_MS);
+            if (!forceRefresh && !isCacheStale) {
+                [fullInventory, giapInventory] = await Promise.all([idb.patrimonio.toArray(), idb.giap.toArray()]);
+                unitMapping = await loadUnitMappingFromFirestore();
+            } else {
+                try {
                     [fullInventory, giapInventory, unitMapping] = await Promise.all([loadFirebaseInventory(), loadGiapInventory(), loadUnitMappingFromFirestore()]);
                     await idb.transaction('rw', idb.patrimonio, idb.giap, idb.metadata, async () => {
                         await idb.patrimonio.clear(); await idb.patrimonio.bulkAdd(fullInventory);
                         await idb.giap.clear(); await idb.giap.bulkAdd(giapInventory);
                         await idb.metadata.put({ key: 'lastFetch', timestamp: Date.now() });
                     });
-                } catch (fetchError){
-                    console.error("Fetch error after cache miss:", fetchError);
-                    loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-xl font-bold text-red-600">Erro Crítico ao Carregar Dados</h2><p>Não foi possível buscar os dados do servidor nem do cache. Verifique sua conexão.</p></div>`;
+                } catch (error) {
+                    loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-xl font-bold text-red-600">Erro ao Carregar Dados</h2><p>${error.message}</p></div>`;
                     return;
                 }
             }
-
             giapMap = new Map(giapInventory.map(item => [item['TOMBAMENTO']?.trim(), item]));
             
             normalizedSystemUnits.clear();
@@ -450,24 +451,18 @@
 
         function loadGiapInventory() {
             return new Promise((resolve, reject) => {
-                 let timedOut = false;
-                const timer = setTimeout(() => { timedOut = true; reject(new Error('Timeout ao baixar a planilha GIAP. Verifique a rede.')); }, 30000);
                 Papa.parse(GIAP_SHEET_URL, { 
-                    download: true, header: true, skipEmptyLines: true, worker: true,
+                    download: true, 
+                    header: true, 
+                    skipEmptyLines: true, 
                     transformHeader: header => header.trim(),
-                    complete: r => { clearTimeout(timer); if(!timedOut) resolve(r.data); }, 
-                    error: e => { clearTimeout(timer); if(!timedOut) reject(e); }
+                    complete: r => resolve(r.data), 
+                    error: e => reject(e) 
                 });
             });
         }
         
         function initializeUI() {
-            if (!virtualScroll) {
-                virtualScroll = setupVirtualScroll('virtual-table-container', 'virtual-table-content', fullInventory, renderRow, 40);
-            } else {
-                virtualScroll.updateData(fullInventory);
-            }
-            
             populateEditableInventoryTab();
             populateUnitMappingTab();
             populateReconciliationTab();
@@ -475,69 +470,8 @@
             populatePendingTransfersTab();
             populateMassTransferTab();
             populateGiapTab();
-            initializeEventListeners();
         }
 
-        function setupVirtualScroll(containerId, contentId, data, renderRowFunc, rowHeight) {
-            const container = document.getElementById(containerId);
-            const content = document.getElementById(contentId);
-            let filteredData = data;
-
-            function render() {
-                if(!container) return;
-                const scrollTop = container.scrollTop;
-                const containerHeight = container.clientHeight;
-                const startIndex = Math.floor(scrollTop / rowHeight);
-                const endIndex = Math.min(startIndex + Math.ceil(containerHeight / rowHeight) + 2, filteredData.length);
-                
-                content.style.height = `${filteredData.length * rowHeight}px`;
-
-                let html = '';
-                for (let i = startIndex; i < endIndex; i++) {
-                    html += renderRowFunc(filteredData[i], i * rowHeight);
-                }
-                content.innerHTML = html;
-            }
-
-            container.addEventListener('scroll', render, { passive: true });
-
-            function updateData(newData) {
-                filteredData = newData;
-                if(container) container.scrollTop = 0;
-                render();
-            }
-            
-            render();
-
-            return { updateData, render };
-        }
-
-        function renderRow(item, top) {
-            const itemData = dirtyItems.get(item.id) || item;
-            const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
-            const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
-            
-            const createCell = (field, value, type = 'text', width = 'w-[150px]') => {
-                 return `<td class="p-2 border-b ${width}"><input type="${type}" data-field="${field}" class="w-full p-1 border rounded" value="${escapeHtml(value)}"></td>`;
-            };
-
-            return `<tr id="row-${item.id}" data-doc-id="${item.id}" 
-                        class="absolute ${dirtyItems.has(item.id) ? 'is-dirty' : ''} ${item.isDivergent ? 'is-divergent' : ''}" 
-                        style="top: ${top}px; height: 40px; width: 100%; display: flex;">
-                        ${createCell('Tombamento', itemData.Tombamento)}
-                        ${createCell('Descrição', itemData.Descrição, 'text', 'w-[300px]')}
-                        ${createCell('Tipo', itemData.Tipo)}
-                        ${createCell('Unidade', itemData.Unidade, 'text', 'w-[300px]')}
-                        ${createCell('Localização', itemData.Localização)}
-                        ${createCell('Fornecedor', itemData.Fornecedor, 'text', 'w-[200px]')}
-                        ${createCell('NF', itemData.NF)}
-                        ${createCell('Origem da Doação', itemData['Origem da Doação'])}
-                        <td class="p-2 border-b w-[150px]">${estadoSelect}</td>
-                        ${createCell('Quantidade', itemData.Quantidade, 'number')}
-                        ${createCell('Observação', itemData.Observação, 'text', 'w-[300px]')}
-                    </tr>`;
-        }
-        
         function populateEditableInventoryTab() {
             const updateUnidades = () => {
                 const selectedTipo = editFilterTipo.value;
@@ -545,7 +479,7 @@
                 editFilterUnidade.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
             };
             
-            const applyFiltersAndRender = () => {
+            const renderTable = () => {
                 const tipo = editFilterTipo.value;
                 const unidade = editFilterUnidade.value;
                 const desc = editFilterDescricao.value.toLowerCase();
@@ -554,18 +488,29 @@
                     (!unidade || item.Unidade === unidade) &&
                     (!desc || (item.Descrição || '').toLowerCase().includes(desc))
                 );
-                if (virtualScroll) virtualScroll.updateData(filtered);
+                const headers = ['Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
+                const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
+                editTableBody.innerHTML = filtered.map(item => {
+                    const itemData = dirtyItems.get(item.id) || item;
+                    const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
+                    return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${dirtyItems.has(item.id) ? 'is-dirty' : ''}">${headers.map(h => {
+                        if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
+                        const value = escapeHtml(itemData[h]);
+                        const inputType = (h === 'Quantidade') ? 'number' : 'text';
+                        return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
+                    }).join('')}</tr>`;
+                }).join('');
             };
             
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             editFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
             
-            const debouncedRender = debounce(applyFiltersAndRender, 300);
-            editFilterTipo.onchange = () => { updateUnidades(); applyFiltersAndRender(); };
-            editFilterUnidade.onchange = applyFiltersAndRender;
+            const debouncedRender = debounce(renderTable, 300);
+            editFilterTipo.onchange = () => { updateUnidades(); renderTable(); };
+            editFilterUnidade.onchange = renderTable;
             editFilterDescricao.oninput = debouncedRender;
             updateUnidades();
-            applyFiltersAndRender();
+            renderTable();
         }
         
         function populateUnitMappingTab() {
@@ -607,119 +552,141 @@
                     </button>
                 </div>`).join('') : `<p class="text-sm text-slate-500">Nenhuma ligação salva ainda.</p>`;
         }
-        
+
         function populateReconciliationTab() {
             const mappedSystemUnits = Object.keys(unitMapping).filter(key => unitMapping[key]?.length > 0).sort();
             reconUnitSelect.innerHTML = '<option value="">Selecione uma Unidade Mapeada</option>' + mappedSystemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
         }
         
-        function populateLeftoverTombosTab() { /* ... */ }
-        function populatePendingTransfersTab() { /* ... */ }
-        function populateGiapTab() { /* ... */ }
-        function populateMassTransferTab() { /* ... */ }
-        
-        function initializeEventListeners() {
-            forceRefreshBtn.addEventListener('click', () => { if (confirm("Forçar a atualização?")) loadData(true); });
-            logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
-            
-            navButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const tabName = e.currentTarget.dataset.tab;
-                    navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
-                    contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName)));
-                    if(tabName === 'edicao') {
-                        populateEditableInventoryTab();
-                    }
-                });
+        function populateLeftoverTombosTab() {
+            const descFilter = leftoverFilterDesc.value.toLowerCase();
+            const usedTombamentos = new Set(fullInventory.map(i => i.Tombamento?.trim()).filter(Boolean));
+            const leftoverItems = giapInventory.filter(item => {
+                const tombo = (item.TOMBAMENTO || '').trim();
+                const desc = (item.Descrição || item.Espécie || '').toLowerCase();
+                const isPermuta = tombo.toLowerCase().includes('permuta');
+                return tombo && !usedTombamentos.has(tombo) && !isPermuta && (!descFilter || desc.includes(descFilter));
             });
-            
-            saveAllChangesBtn.addEventListener('click', async () => { /* ... */ });
-            
-            document.getElementById('virtual-table-container').addEventListener('change', (e) => {
-                const input = e.target.closest('input, select');
-                if (input) {
-                    const row = input.closest('tr');
-                    const docId = row.dataset.docId;
-                    const field = input.dataset.field;
-                    const value = input.type === 'number' ? Number(input.value) : input.value;
-                    const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
-                    const updatedItem = { ...currentItem, [field]: value };
-                    
-                    if (field === 'Tombamento' && value.trim()) {
-                        const giapItem = giapMap.get(value.trim());
-                        if (giapItem) {
-                            const descriptionToShow = giapItem.Descrição || giapItem.Espécie || 'N/A';
-                            if (confirm(`Item encontrado:\n\n${descriptionToShow}\n\nDeseja preencher Descrição, Fornecedor e NF?`)) {
-                                updatedItem.Descrição = descriptionToShow;
-                                updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
-                                updatedItem.NF = giapItem.NF || '';
-                                row.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
-                                row.querySelector('[data-field="Fornecedor"]').value = updatedItem.Fornecedor;
-                                row.querySelector('[data-field="NF"]').value = updatedItem.NF;
-                            }
-                        }
-                    }
-                    
-                    dirtyItems.set(docId, updatedItem);
-                    row.classList.add('is-dirty');
-                    saveAllChangesBtn.disabled = false;
-                }
-            });
-
-            mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
-            mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
-            saveMappingBtn.addEventListener('click', async () => {
-                const systemUnit = mapSystemUnitSelect.value;
-                if (!systemUnit) return alert("Selecione uma Unidade do Sistema.");
-                const giapUnits = Array.from(mapGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
-                unitMapping[systemUnit] = giapUnits;
-                try {
-                    feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Salvando...`;
-                    await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
-                    feedbackStatus.textContent = `Mapeamento salvo!`;
-                    populateUnitMappingTab();
-                    populateReconciliationTab();
-                } catch (error) { feedbackStatus.textContent = `Erro ao salvar.`; console.error(error); }
-            });
-            savedMappingsContainer.addEventListener('click', async (e) => {
-                const deleteBtn = e.target.closest('.delete-mapping-btn');
-                if (deleteBtn) {
-                    const systemUnit = deleteBtn.dataset.systemUnit;
-                    if (confirm(`Remover a ligação para "${systemUnit}"?`)) {
-                        delete unitMapping[systemUnit];
-                        try {
-                            feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Removendo...`;
-                            await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
-                            feedbackStatus.textContent = `Ligação removida.`;
-                            populateUnitMappingTab();
-                            populateReconciliationTab();
-                        } catch (error) { feedbackStatus.textContent = `Erro ao remover.`; console.error(error); }
-                    }
-                }
-            });
-            
-            reconUnitSelect.addEventListener('change', renderReconciliationWorkspace);
-            reconSystemFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
-            reconGiapFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
-            
-            reconSystemItemsList.addEventListener('click', handleReconSelection);
-            reconGiapItemsList.addEventListener('click', handleReconSelection);
-            linkSelectedBtn.addEventListener('click', async () => { /* ... */ });
-            
-            leftoverFilterDesc.addEventListener('input', populateLeftoverTombosTab);
-            massTransferSearchBtn.addEventListener('click', () => { /* ... */ });
-            massTransferSetAllStatus.addEventListener('change', (e) => { /* ... */ });
-            massTransferConfirmBtn.addEventListener('click', async () => { /* ... */ });
-
-            document.addEventListener('click', (e) => {
-                if (e.target.matches('.js-close-modal') || e.target.matches('.modal-overlay')) {
-                    closeModal(e.target.closest('.modal'));
-                }
-            });
+            leftoverTombosContainer.innerHTML = leftoverItems.length > 0 ? leftoverItems.map(item => `
+                <div class="p-3 border rounded-md bg-white flex justify-between items-center gap-4">
+                    <div>
+                        <strong class="font-mono">${escapeHtml(item.TOMBAMENTO)}</strong>
+                        <p class="text-sm text-slate-600">${escapeHtml(item.Descrição || item.Espécie)}</p>
+                        <p class="text-xs text-slate-400">Unidade GIAP: ${escapeHtml(item.Unidade)} | Valor: ${escapeHtml(item['Valor NF'])} | Cadastro: ${escapeHtml(item.Cadastro)}</p>
+                    </div>
+                    <button class="suggest-match-btn text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-tombo="${escapeHtml(item.TOMBAMENTO)}" data-desc="${escapeHtml(item.Descrição || item.Espécie)}">Sugerir Vínculo</button>
+                </div>`).join('') : `<p class="text-slate-500 text-center p-4">Nenhum tombamento sobrando com o filtro atual.</p>`;
         }
         
+        function populatePendingTransfersTab() {
+            const pendingTransfers = fullInventory.filter(item => {
+                const tombo = item.Tombamento?.trim();
+                const giapItem = giapMap.get(tombo);
+                return giapItem && normalizeStr(item.Unidade) !== normalizeStr(giapItem.Unidade);
+            });
+            pendingTransfersContainer.innerHTML = pendingTransfers.length > 0 ? pendingTransfers.map(item => `
+                <div class="p-3 border rounded-md bg-red-50 text-red-800">
+                    <strong>${escapeHtml(item.Descrição)}</strong> (T: ${escapeHtml(item.Tombamento)})
+                    <p class="text-sm">Está em <strong>${escapeHtml(item.Unidade)}</strong> mas na planilha consta em <strong>${escapeHtml(giapMap.get(item.Tombamento.trim()).Unidade)}</strong>.</p>
+                </div>`).join('') : `<p class="text-slate-500 text-center p-4">Nenhuma transferência pendente identificada.</p>`;
+        }
+
+        function populateGiapTab() {
+            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            giapTableBody.innerHTML = giapInventory.map(item => `<tr class="border-b">${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}</tr>`).join('');
+        }
+        
+        function populateMassTransferTab() {
+            const systemUnits = [...normalizedSystemUnits.values()].sort();
+            massTransferUnit.innerHTML = systemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+        }
+        
+        forceRefreshBtn.addEventListener('click', () => { if (confirm("Forçar a atualização?")) loadData(true); });
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
+        
+        navButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const tabName = e.currentTarget.dataset.tab;
+                navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+                contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName)));
+                if(tabName === 'edicao') {
+                    populateEditableInventoryTab();
+                }
+            });
+        });
+        
+        saveAllChangesBtn.addEventListener('click', async () => { /* ... */ });
+        
+        document.getElementById('edit-table-body').addEventListener('change', (e) => {
+            const input = e.target.closest('input, select');
+            if (input) {
+                const row = input.closest('tr');
+                const docId = row.dataset.docId;
+                const field = input.dataset.field;
+                const value = input.type === 'number' ? Number(input.value) : input.value;
+                const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
+                const updatedItem = { ...currentItem, [field]: value };
+                
+                if (field === 'Tombamento' && value.trim()) {
+                    const giapItem = giapMap.get(value.trim());
+                    if (giapItem) {
+                        const descriptionToShow = giapItem.Descrição || giapItem.Espécie || 'N/A';
+                        if (confirm(`Item encontrado na Planilha GIAP:\n\nDescrição: ${descriptionToShow}\n\nDeseja preencher os campos Descrição, Fornecedor e NF?`)) {
+                            updatedItem.Descrição = descriptionToShow;
+                            updatedItem.Fornecedor = giapItem['Nome Fornecedor'] || '';
+                            updatedItem.NF = giapItem.NF || '';
+                            
+                            row.querySelector('[data-field="Descrição"]').value = updatedItem.Descrição;
+                            row.querySelector('[data-field="Fornecedor"]').value = updatedItem.Fornecedor;
+                            row.querySelector('[data-field="NF"]').value = updatedItem.NF;
+                        }
+                    }
+                }
+                
+                dirtyItems.set(docId, updatedItem);
+                row.classList.add('is-dirty');
+                saveAllChangesBtn.disabled = false;
+            }
+        });
+
+        mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
+        mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
+        saveMappingBtn.addEventListener('click', async () => {
+            const systemUnit = mapSystemUnitSelect.value;
+            if (!systemUnit) return alert("Selecione uma Unidade do Sistema.");
+            const giapUnits = Array.from(mapGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
+            unitMapping[systemUnit] = giapUnits;
+            try {
+                feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Salvando...`;
+                await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
+                feedbackStatus.textContent = `Mapeamento salvo!`;
+                populateUnitMappingTab();
+                populateReconciliationTab();
+            } catch (error) { feedbackStatus.textContent = `Erro ao salvar.`; console.error(error); }
+        });
+        savedMappingsContainer.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.delete-mapping-btn');
+            if (deleteBtn) {
+                const systemUnit = deleteBtn.dataset.systemUnit;
+                if (confirm(`Remover a ligação para "${systemUnit}"?`)) {
+                    delete unitMapping[systemUnit];
+                    try {
+                        feedbackStatus.innerHTML = `<div class="saving-spinner"></div> Removendo...`;
+                        await setDoc(doc(db, 'config', 'unitMapping'), { mappings: unitMapping });
+                        feedbackStatus.textContent = `Ligação removida.`;
+                        populateUnitMappingTab();
+                        populateReconciliationTab();
+                    } catch (error) { feedbackStatus.textContent = `Erro ao remover.`; console.error(error); }
+                }
+            }
+        });
+        
+        reconUnitSelect.addEventListener('change', renderReconciliationWorkspace);
+        reconSystemFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
+        reconGiapFilter.addEventListener('input', debounce(renderReconciliationWorkspace, 300));
+
         function renderReconciliationWorkspace() {
-             const systemUnit = reconUnitSelect.value;
+            const systemUnit = reconUnitSelect.value;
             if (!systemUnit) { reconciliationWorkspace.classList.add('hidden'); return; }
             
             const mappedGiapUnits = unitMapping[systemUnit] || [];
@@ -752,7 +719,137 @@
             reconciliationWorkspace.classList.remove('hidden');
         }
 
-        function handleReconSelection(e) { /* ... */ }
+        function handleReconSelection(e) {
+            const itemEl = e.target.closest('.reconciliation-list-item');
+            if (!itemEl) return;
+            itemEl.classList.toggle('selected');
+            const systemSelected = document.querySelectorAll('#recon-system-items-list .selected').length;
+            const giapSelected = document.querySelectorAll('#recon-giap-items-list .selected').length;
+            reconSystemCount.textContent = systemSelected;
+            reconGiapCount.textContent = giapSelected;
+            linkSelectedBtn.disabled = !(systemSelected > 0 && systemSelected === giapSelected);
+        }
+
+        reconSystemItemsList.addEventListener('click', handleReconSelection);
+        reconGiapItemsList.addEventListener('click', handleReconSelection);
+        
+        linkSelectedBtn.addEventListener('click', async () => {
+            const selectedSystemNodes = document.querySelectorAll('#recon-system-items-list .selected');
+            const selectedGiapNodes = document.querySelectorAll('#recon-giap-items-list .selected');
+            if (selectedSystemNodes.length === 0) return;
+
+            showOverlay(`Ligando e salvando ${selectedSystemNodes.length} item(s)...`);
+            const batch = writeBatch(db);
+
+            selectedSystemNodes.forEach((systemNode, index) => {
+                const giapNode = selectedGiapNodes[index];
+                const systemId = systemNode.dataset.id;
+                const giapTombo = giapNode.dataset.id;
+                const systemItem = fullInventory.find(i => i.id === systemId);
+                const giapItem = giapMap.get(giapTombo);
+                
+                if(systemItem && giapItem) {
+                    const docRef = doc(db, 'patrimonio', systemId);
+                    const updatedData = {
+                        Tombamento: giapItem.TOMBAMENTO,
+                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                        Fornecedor: giapItem['Nome Fornecedor'] || '',
+                        NF: giapItem.NF || '',
+                        Tipo: giapItem.Tipo || systemItem.Tipo,
+                        Estado: systemItem.Estado || 'Bom',
+                        updatedAt: serverTimestamp()
+                    };
+                    batch.update(docRef, updatedData);
+                }
+            });
+
+            try {
+                await batch.commit();
+                await idb.patrimonio.clear(); await idb.metadata.clear();
+                setTimeout(() => window.location.reload(), 500);
+            } catch (error) {
+                fullPageOverlay.classList.add('hidden');
+                feedbackStatus.textContent = 'Erro ao salvar vínculos.';
+                console.error(error);
+            }
+        });
+        
+        leftoverFilterDesc.addEventListener('input', populateLeftoverTombosTab);
+        
+        massTransferSearchBtn.addEventListener('click', () => {
+            const tombosInput = massTransferTombos.value;
+            const tombos = tombosInput.split(',').map(t => t.trim()).filter(Boolean);
+            const existingTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()));
+            const foundItems = [];
+            const notFound = [];
+
+            tombos.forEach(tombo => {
+                const giapItem = giapMap.get(tombo);
+                if (giapItem && !existingTombos.has(tombo)) {
+                    foundItems.push(giapItem);
+                } else {
+                    notFound.push(tombo);
+                }
+            });
+
+            if (notFound.length > 0) alert(`Não encontrados ou já existem: ${notFound.join(', ')}`);
+
+            if (foundItems.length > 0) {
+                const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
+                massTransferList.innerHTML = foundItems.map(item => `
+                    <div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center">
+                        <div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição || item.Espécie)}</div>
+                        <div><select data-tombo="${escapeHtml(item.TOMBAMENTO)}" class="mass-transfer-status w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option>${opt}</option>`).join('')}</select></div>
+                    </div>`).join('');
+                massTransferResults.classList.remove('hidden');
+            } else {
+                massTransferResults.classList.add('hidden');
+            }
+        });
+
+        massTransferSetAllStatus.addEventListener('change', (e) => {
+            document.querySelectorAll('.mass-transfer-status').forEach(select => select.value = e.target.value);
+        });
+        
+        massTransferConfirmBtn.addEventListener('click', async () => {
+            const destinationUnit = massTransferUnit.value;
+            if (!destinationUnit) return alert('Selecione uma unidade de destino.');
+            
+            const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status'));
+            if (itemsToCreate.length === 0) return;
+
+            showOverlay(`Criando ${itemsToCreate.length} itens...`);
+            const batch = writeBatch(db);
+            itemsToCreate.forEach(select => {
+                const tombo = select.dataset.tombo;
+                const giapItem = giapMap.get(tombo);
+                if (giapItem) {
+                    const newItemRef = doc(collection(db, 'patrimonio'));
+                    const newItem = {
+                        Tombamento: tombo,
+                        Descrição: giapItem.Descrição || giapItem.Espécie || '',
+                        Tipo: giapItem.Tipo || '',
+                        Unidade: destinationUnit,
+                        Localização: '',
+                        Fornecedor: giapItem['Nome Fornecedor'] || '',
+                        NF: giapItem.NF || '',
+                        'Origem da Doação': '',
+                        Estado: select.value,
+                        Quantidade: 1,
+                        Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`
+                    };
+                    batch.set(newItemRef, newItem);
+                }
+            });
+            try {
+                await batch.commit();
+                await idb.patrimonio.clear(); await idb.metadata.clear();
+                setTimeout(() => window.location.reload(), 500);
+            } catch (e) {
+                fullPageOverlay.classList.add('hidden');
+                feedbackStatus.textContent = 'Erro ao criar itens.'; console.error(e);
+            }
+        });
 
         function escapeHtml(unsafe) {
             if (unsafe === undefined || unsafe === null) return '';
@@ -773,6 +870,11 @@
             setTimeout(() => { modalEl.classList.add('hidden'); }, 300);
         };
         
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.js-close-modal') || e.target.matches('.modal-overlay')) {
+                closeModal(e.target.closest('.modal'));
+            }
+        });
     </script>
 </body>
 </html>
