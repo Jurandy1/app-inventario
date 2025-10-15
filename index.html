@@ -85,15 +85,23 @@
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .loading-spinner {
-            border: 5px solid #e5e7eb;
-            border-top: 5px solid var(--secondary-blue);
+        .loading-spinner, .btn-spinner {
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid var(--secondary-blue);
             border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-spinner {
             width: 50px;
             height: 50px;
-            animation: spin 1s linear infinite;
             margin: auto;
         }
+        .btn-spinner {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+        }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* --- Sistema de Notificação (Toast/Snackbar) --- */
@@ -114,28 +122,6 @@
         .notification-toast.success { background-color: #10b981; }
         .notification-toast.error { background-color: #ef4444; }
         .notification-toast.info { background-color: #3b82f6; }
-
-        /* Ajustes para modal login responsivo */
-        #login-modal .modal-container {
-          max-width: 400px;
-          width: 90%;
-          padding: 1rem;
-          margin: auto;
-          box-sizing: border-box;
-        }
-        #login-modal input, #login-modal button {
-          width: 100%;
-          margin-bottom: 1rem;
-          font-size: 1.1rem;
-        }
-        @media (max-width: 480px) {
-          #login-modal .modal-container {
-            padding: 0.5rem;
-          }
-          #login-modal input, #login-modal button {
-            font-size: 1rem;
-          }
-        }
 
     </style>
 </head>
@@ -165,7 +151,7 @@
     <!-- Sub-Header de Status -->
     <div class="bg-white shadow-sm border-b border-slate-200">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.12 </span></h2>
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.12.1 </span></h2>
             <div class="flex items-center gap-2">
                 <div id="status-feedback" class="font-semibold text-sm text-slate-600">Carregando...</div>
                 <button id="force-refresh-btn-index" title="Forçar Atualização dos Dados" class="p-2 rounded-md hover:bg-slate-100 text-slate-500">
@@ -293,7 +279,40 @@
     </main>
 
     <!-- MODAIS -->
-    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-sm rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="login-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Acesso Restrito</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 space-y-4"> <div id="login-error" class="hidden p-3 text-sm text-red-700 bg-red-100 rounded-lg"></div><div><label for="login-email" class="block text-sm font-medium mb-1">Email</label><input type="email" id="login-email" class="w-full p-2 border rounded-lg" required autofocus></div><div><label for="login-password" class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-password" class="w-full p-2 border rounded-lg" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg"> <button type="submit" id="btn-login" class="btn btn-primary w-full">Entrar</button> </div></form> </div></div>
+    <!-- MODAL DE LOGIN (CORRIGIDO E RESPONSIVO) -->
+    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div>
+        <div class="modal-container bg-white w-full max-w-md mx-auto rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <form id="login-form">
+                <div class="flex items-center justify-between p-5 border-b">
+                    <h3 class="text-xl font-semibold text-slate-800">Acesso Restrito</h3>
+                    <button type="button" class="p-2 rounded-full text-slate-500 hover:bg-slate-200 js-close-modal" aria-label="Fechar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div id="login-error" class="hidden p-3 text-sm font-medium text-red-700 bg-red-100 rounded-lg"></div>
+                    <div>
+                        <label for="login-email" class="block text-sm font-medium mb-1 text-slate-700">Email</label>
+                        <input type="email" id="login-email" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required autofocus>
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-sm font-medium mb-1 text-slate-700">Senha</label>
+                        <input type="password" id="login-password" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                </div>
+                <div class="flex justify-end p-5 border-t bg-slate-50 rounded-b-lg">
+                    <button type="submit" id="btn-login" class="btn btn-primary w-full py-3 text-base flex items-center justify-center disabled:bg-slate-400">
+                        <span id="login-btn-text">Entrar</span>
+                        <span id="login-btn-spinner" class="hidden btn-spinner"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</label><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-origem-da-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-origem-da-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
     <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
     <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> </div></div></div>
@@ -849,22 +868,45 @@
                 showNotification('Preencha e-mail e senha.', 'error');
                 return;
             }
+            
+            // --- MELHORIA: Feedback visual no botão de login ---
+            const loginBtn = document.getElementById('btn-login');
+            const btnText = document.getElementById('login-btn-text');
+            const btnSpinner = document.getElementById('login-btn-spinner');
+            
+            loginBtn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
 
             const loginErrorEl = loginForm.querySelector('#login-error');
             loginErrorEl.classList.add('hidden');
+            
             try {
                 await signInWithEmailAndPassword(auth, email, password);
                 closeModal(loginModal);
             } catch (error) {
                 let errorMessage = "Ocorreu um erro desconhecido. Tente novamente.";
+                // --- MELHORIA: Mensagens de erro mais específicas ---
                 switch (error.code) {
-                    case 'auth/user-not-found': errorMessage = "Nenhum usuário encontrado com este e-mail."; break;
-                    case 'auth/wrong-password': errorMessage = "Senha incorreta. Por favor, tente novamente."; break;
-                    case 'auth/invalid-email': errorMessage = "O formato do e-mail é inválido."; break;
-                    case 'auth/invalid-credential': errorMessage = "As credenciais fornecidas são inválidas."; break;
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                    case 'auth/invalid-credential':
+                        errorMessage = "E-mail ou senha incorretos. Por favor, verifique e tente novamente.";
+                        break;
+                    case 'auth/invalid-email':
+                        errorMessage = "O formato do e-mail é inválido.";
+                        break;
+                    case 'auth/too-many-requests':
+                         errorMessage = "Acesso bloqueado temporariamente devido a muitas tentativas. Tente novamente mais tarde.";
+                         break;
                 }
                 loginErrorEl.textContent = errorMessage;
                 loginErrorEl.classList.remove('hidden');
+            } finally {
+                // --- MELHORIA: Restaurar o estado do botão ---
+                loginBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
             }
         }
         
@@ -929,4 +971,3 @@
     </script>
 </body>
 </html>
-
