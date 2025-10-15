@@ -862,8 +862,9 @@
 
         async function handleLogin(e) {
             e.preventDefault();
-            const email = loginForm.email.value;
-            const password = loginForm.password.value;
+            // CORREÇÃO: Acessando os campos diretamente pelo ID, em vez de pelo formulário.
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
             if (!email || !password) {
                 showNotification('Preencha e-mail e senha.', 'error');
                 return;
@@ -971,4 +972,5 @@
     </script>
 </body>
 </html>
+
 
