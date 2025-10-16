@@ -385,7 +385,7 @@
                     <div id="subtab-content-edit-by-desc" class="hidden">
                         <h2 class="text-xl font-bold text-slate-800 mb-2">Editar Tombamentos por Descrição</h2>
                         <p class="text-sm text-slate-600 mb-4">
-                            Esta ferramenta atualiza itens existentes em uma unidade. Ela localiza os itens pela <strong class="text-blue-600">Descrição</strong> (que deve ser idêntica) e atualiza os campos de Tombamento, Localização e Estado.
+                            Esta ferramenta atualiza itens existentes em uma unidade. Ela localiza os itens por <strong class="text-blue-600">Descrição similar</strong> e atualiza os campos de Tombamento, Localização e Estado.
                         </p>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -410,7 +410,7 @@
 
                         <div id="edit-by-desc-results" class="hidden mt-6 border-t pt-4">
                              <h3 class="font-bold text-slate-700 mb-2">Pré-visualização das Atualizações (<span id="edit-by-desc-preview-count">0</span> itens)</h3>
-                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados no inventário. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso por outro item.</p>
+                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados ou tiveram múltiplas correspondências. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso.</p>
                             <div id="edit-by-desc-preview-table-container" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg">
                                 <!-- A tabela de pré-visualização será inserida aqui -->
                             </div>
@@ -706,6 +706,24 @@
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         
+        function calculateSimilarity(str1, str2) {
+            const s1 = normalizeStr(str1);
+            const s2 = normalizeStr(str2);
+            
+            if (s1 === s2) return 1.0;
+            if (s1.includes(s2) || s2.includes(s1)) return 0.9; // Prioriza substrings com pontuação alta
+
+            const words1 = new Set(s1.split(/\s+/));
+            const words2 = new Set(s2.split(/\s+/));
+
+            if (words1.size === 0 || words2.size === 0) return 0;
+            
+            const intersection = new Set([...words1].filter(word => words2.has(word)));
+            
+            const score = (2 * intersection.size) / (words1.size + words2.size); // Coeficiente de Sørensen–Dice
+            return score;
+        }
+
         function parseEstadoEOrigem(texto) {
             const textoCru = (texto || '').trim();
             if (!textoCru) return { estado: 'Regular', origem: '' };
@@ -2121,13 +2139,59 @@
                         updatesToProcess = pastedData.map((row, index) => {
                             const pastedDesc = (row.descricao || '').trim();
                             const pastedTombo = (row.tombamento || 'S/T').trim();
+                            const pastedLocal = (row.localizacao || '').trim();
+                            const pastedEstado = parseEstadoEOrigem((row.estado || '').trim()).estado;
+
+                            // Lógica de correspondência aprimorada
+                            let systemItem = inventoryInUnit.find(i => (i.Descrição || '').trim() === pastedDesc);
+                            let matchType = 'exact';
+
+                            if (!systemItem) {
+                                const SIMILARITY_THRESHOLD = 0.7; 
+
+                                const potentialMatches = inventoryInUnit
+                                    .map(item => ({
+                                        item: item,
+                                        score: calculateSimilarity(item.Descrição || '', pastedDesc)
+                                    }))
+                                    .filter(match => match.score >= SIMILARITY_THRESHOLD)
+                                    .sort((a, b) => b.score - a.score); 
+
+                                if (potentialMatches.length === 1) {
+                                    systemItem = potentialMatches[0].item;
+                                    matchType = 'possible';
+                                } else if (potentialMatches.length > 1) {
+                                    const bestScore = potentialMatches[0].score;
+                                    const topMatches = potentialMatches.filter(m => m.score >= bestScore * 0.95);
+
+                                    if (topMatches.length === 1) {
+                                            systemItem = topMatches[0].item;
+                                            matchType = 'possible';
+                                    } else {
+                                        const refinedMatches = topMatches.filter(({item}) => 
+                                            (item.Localização || '').trim() === pastedLocal &&
+                                            (item.Estado || '').trim() === pastedEstado
+                                        );
+                                        if (refinedMatches.length === 1) {
+                                            systemItem = refinedMatches[0].item;
+                                            matchType = 'possible_refined';
+                                        } else {
+                                            matchType = 'multiple';
+                                            systemItem = null;
+                                        }
+                                    }
+                                } else {
+                                    matchType = 'not_found';
+                                    systemItem = null;
+                                }
+                            }
                             
-                            const systemItem = inventoryInUnit.find(i => (i.Descrição || '').trim() === pastedDesc);
                             const giapItem = pastedTombo ? giapMap.get(pastedTombo) : null;
                             const tomboInUse = pastedTombo && existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
-
+                            
                             let status = 'ok';
-                            if (!systemItem) status = 'not_found';
+                            if (matchType === 'not_found') status = 'not_found';
+                            else if (matchType === 'multiple') status = 'multiple_found';
                             else if (tomboInUse) status = 'tombo_in_use';
 
                             return {
@@ -2135,13 +2199,13 @@
                                 pastedData: {
                                     descricao: pastedDesc,
                                     tombamento: pastedTombo,
-                                    localizacao: (row.localizacao || '').trim(),
-                                    estado: (row.estado || '').trim()
+                                    localizacao: pastedLocal,
+                                    estado: pastedEstado
                                 },
                                 systemItem: systemItem,
                                 giapItem: giapItem,
                                 status: status,
-                                giapFound: !!giapItem,
+                                matchType: matchType,
                                 useGiapDesc: false,
                             };
                         });
@@ -2169,23 +2233,36 @@
                 updates.forEach(upd => {
                     let rowClass = '';
                     let statusHtml = '';
-                    if (upd.status === 'not_found') {
-                        rowClass = 'bg-yellow-100';
-                        statusHtml = '<span class="font-bold text-yellow-700">Item não encontrado</span>';
-                    } else if (upd.status === 'tombo_in_use') {
-                        rowClass = 'bg-red-100';
-                        statusHtml = `<span class="font-bold text-red-700">Tombo já existe em: ${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`;
-                    } else {
-                        statusHtml = '<span class="font-bold text-green-700">Pronto para atualizar</span>';
-                        if(!upd.giapFound && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
-                            statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>';
-                        }
+
+                    switch(upd.status) {
+                        case 'not_found':
+                            rowClass = 'bg-yellow-100';
+                            statusHtml = '<span class="font-bold text-yellow-700">Item não encontrado</span>';
+                            break;
+                        case 'multiple_found':
+                             rowClass = 'bg-yellow-100';
+                            statusHtml = '<span class="font-bold text-yellow-700">Múltiplas correspondências.</span>';
+                            break;
+                        case 'tombo_in_use':
+                            rowClass = 'bg-red-100';
+                            statusHtml = `<span class="font-bold text-red-700">Tombo já existe em:<br>${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`;
+                            break;
+                        case 'ok':
+                            statusHtml = upd.matchType.startsWith('possible')
+                                ? '<span class="font-bold text-blue-700">Possível correspondência</span>'
+                                : '<span class="font-bold text-green-700">Pronto para atualizar</span>';
+                            
+                            if(!upd.giapFound && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
+                                statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>';
+                            }
+                            break;
                     }
                     
-                    let descHtml = `<strong>Atual:</strong> ${escapeHtml(upd.pastedData.descricao)}`;
+                    let descHtml = upd.systemItem ? `<strong>Atual:</strong> ${escapeHtml(upd.systemItem.Descrição)}` : `<strong>Planilha:</strong> ${escapeHtml(upd.pastedData.descricao)}`;
+                    
                     if (upd.giapItem && upd.systemItem) {
                         const giapDesc = upd.giapItem.Descrição || upd.giapItem.Espécie;
-                        if (giapDesc && (upd.systemItem.Descrição || '').trim() !== giapDesc.trim()) {
+                        if (giapDesc && upd.systemItem.Descrição.trim() !== giapDesc.trim()) {
                             descHtml += `<br><strong>GIAP:</strong> <span class="text-blue-600">${escapeHtml(giapDesc)}</span>
                                         <div class="mt-1">
                                             <label class="inline-flex items-center">
@@ -2194,8 +2271,6 @@
                                             </label>
                                         </div>`;
                         }
-                    } else if (upd.systemItem) {
-                         descHtml = `<strong>Atual:</strong> ${escapeHtml(upd.systemItem.Descrição)}`;
                     }
 
                     const originalData = upd.systemItem ? `T: ${upd.systemItem.Tombamento}<br>L: ${upd.systemItem.Localização}<br>E: ${upd.systemItem.Estado}` : 'N/A';
@@ -2283,4 +2358,5 @@
     </script>
 </body>
 </html>
+
 
