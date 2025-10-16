@@ -2143,8 +2143,11 @@
                     complete: (results) => {
                         const pastedData = results.data;
                         const inventoryInUnit = fullInventory.filter(i => i.Unidade === unidade);
-                        const existingTombos = new Map(fullInventory.map(i => [i.Tombamento, i]));
+                        const existingTombos = new Map(fullInventory.map(i => [normalizeTombo(i.Tombamento), i]));
 
+                        // Create a pool of available items to match against
+                        const availableItems = inventoryInUnit.map(item => ({ item, isMatched: false }));
+                        
                         updatesToProcess = pastedData.map((row, index) => {
                             const pastedDesc = (row.descricao || '').trim();
                             const pastedTomboRaw = (row.tombamento || 'S/T').trim();
@@ -2152,56 +2155,66 @@
                             const pastedLocal = (row.localizacao || '').trim();
                             const pastedEstado = parseEstadoEOrigem((row.estado || '').trim()).estado;
 
-                            // Lógica de correspondência aprimorada
-                            let systemItem = inventoryInUnit.find(i => (i.Descrição || '').trim() === pastedDesc);
-                            let matchType = 'exact';
-
-                            if (!systemItem) {
-                                const SIMILARITY_THRESHOLD = 0.7; 
-
-                                const potentialMatches = inventoryInUnit
-                                    .map(item => ({
-                                        item: item,
-                                        score: calculateSimilarity(item.Descrição || '', pastedDesc)
+                            let foundItemWrapper = null;
+                            let matchType = 'not_found';
+                            
+                            // 1. Exact match pass
+                            const exactMatch = availableItems.find(wrapper => !wrapper.isMatched && (wrapper.item.Descrição || '').trim() === pastedDesc);
+                            if (exactMatch) {
+                                foundItemWrapper = exactMatch;
+                                matchType = 'exact';
+                            } else {
+                                // 2. Similarity match pass
+                                const SIMILARITY_THRESHOLD = 0.7;
+                                const potentialMatches = availableItems
+                                    .filter(wrapper => !wrapper.isMatched)
+                                    .map(wrapper => ({
+                                        wrapper: wrapper,
+                                        score: calculateSimilarity(wrapper.item.Descrição || '', pastedDesc)
                                     }))
                                     .filter(match => match.score >= SIMILARITY_THRESHOLD)
-                                    .sort((a, b) => b.score - a.score); 
+                                    .sort((a, b) => b.score - a.score);
 
-                                if (potentialMatches.length === 1) {
-                                    systemItem = potentialMatches[0].item;
-                                    matchType = 'possible';
-                                } else if (potentialMatches.length > 1) {
+                                if (potentialMatches.length > 0) {
                                     const bestScore = potentialMatches[0].score;
                                     const topMatches = potentialMatches.filter(m => m.score >= bestScore * 0.95);
 
+                                    let bestMatch = null;
+
                                     if (topMatches.length === 1) {
-                                            systemItem = topMatches[0].item;
-                                            matchType = 'possible';
+                                        bestMatch = topMatches[0];
+                                        matchType = 'possible';
                                     } else {
-                                        const refinedMatches = topMatches.filter(({item}) => 
-                                            (item.Localização || '').trim() === pastedLocal &&
-                                            (item.Estado || '').trim() === pastedEstado
+                                        // Tie-breaking logic
+                                        const refinedMatches = topMatches.filter(({wrapper}) => 
+                                            (wrapper.item.Localização || '').trim() === pastedLocal &&
+                                            (wrapper.item.Estado || '').trim() === pastedEstado
                                         );
-                                        if (refinedMatches.length === 1) {
-                                            systemItem = refinedMatches[0].item;
+                                        if (refinedMatches.length > 0) {
+                                            bestMatch = refinedMatches[0]; // Pick the first one
                                             matchType = 'possible_refined';
-                                        } else {
-                                            matchType = 'multiple';
-                                            systemItem = null;
                                         }
                                     }
-                                } else {
-                                    matchType = 'not_found';
-                                    systemItem = null;
+                                    
+                                    if(bestMatch){
+                                        foundItemWrapper = bestMatch.wrapper;
+                                        matchType = matchType === 'possible_refined' ? 'possible_refined' : 'possible';
+                                    } else {
+                                         matchType = 'multiple'; // Could not break the tie
+                                    }
                                 }
                             }
-                            
+
+                            if (foundItemWrapper) {
+                                foundItemWrapper.isMatched = true; // Mark as used for next iterations
+                            }
+
+                            const systemItem = foundItemWrapper ? foundItemWrapper.item : null;
                             const giapItem = pastedTombo ? giapMap.get(pastedTombo) : null;
-                            const tomboInUse = pastedTombo && existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
+                            const tomboInUse = pastedTombo && pastedTombo !== 'S/T' && existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
                             
                             let status = 'ok';
-                            if (matchType === 'not_found') status = 'not_found';
-                            else if (matchType === 'multiple') status = 'multiple_found';
+                            if (!systemItem) status = matchType === 'multiple' ? 'multiple_found' : 'not_found';
                             else if (tomboInUse) status = 'tombo_in_use';
 
                             return {
@@ -2368,6 +2381,7 @@
     </script>
 </body>
 </html>
+
 
 
 
