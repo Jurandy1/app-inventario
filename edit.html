@@ -2118,19 +2118,20 @@
                         const inventoryInUnit = fullInventory.filter(i => i.Unidade === unidade);
                         const existingTombos = new Map(fullInventory.map(i => [i.Tombamento, i]));
 
-                        updatesToProcess = pastedData.map(row => {
+                        updatesToProcess = pastedData.map((row, index) => {
                             const pastedDesc = (row.descricao || '').trim();
                             const pastedTombo = (row.tombamento || 'S/T').trim();
                             
                             const systemItem = inventoryInUnit.find(i => (i.Descrição || '').trim() === pastedDesc);
-                            const giapFound = giapMap.has(pastedTombo);
-                            const tomboInUse = existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
+                            const giapItem = pastedTombo ? giapMap.get(pastedTombo) : null;
+                            const tomboInUse = pastedTombo && existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
 
                             let status = 'ok';
                             if (!systemItem) status = 'not_found';
                             else if (tomboInUse) status = 'tombo_in_use';
 
                             return {
+                                id: index,
                                 pastedData: {
                                     descricao: pastedDesc,
                                     tombamento: pastedTombo,
@@ -2138,8 +2139,10 @@
                                     estado: (row.estado || '').trim()
                                 },
                                 systemItem: systemItem,
+                                giapItem: giapItem,
                                 status: status,
-                                giapFound: giapFound
+                                giapFound: !!giapItem,
+                                useGiapDesc: false,
                             };
                         });
 
@@ -2152,11 +2155,12 @@
 
             function renderEditByDescPreview(updates) {
                 const container = document.getElementById('edit-by-desc-preview-table-container');
+                const existingTombos = new Map(fullInventory.map(i => [i.Tombamento, i]));
                 document.getElementById('edit-by-desc-preview-count').textContent = updates.length;
                 let tableHtml = `<table class="w-full text-xs text-left">
                                     <thead class="bg-slate-200">
                                         <tr>
-                                            <th class="p-2">Descrição do Item</th>
+                                            <th class="p-2 w-1/3">Descrição (Sistema vs. GIAP)</th>
                                             <th class="p-2">Dados Atuais no Sistema</th>
                                             <th class="p-2">Novos Dados da Planilha</th>
                                             <th class="p-2">Status</th>
@@ -2173,14 +2177,32 @@
                         statusHtml = `<span class="font-bold text-red-700">Tombo já existe em: ${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`;
                     } else {
                         statusHtml = '<span class="font-bold text-green-700">Pronto para atualizar</span>';
-                        if(!upd.giapFound) statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>'
+                        if(!upd.giapFound && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
+                            statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>';
+                        }
+                    }
+                    
+                    let descHtml = `<strong>Atual:</strong> ${escapeHtml(upd.pastedData.descricao)}`;
+                    if (upd.giapItem && upd.systemItem) {
+                        const giapDesc = upd.giapItem.Descrição || upd.giapItem.Espécie;
+                        if (giapDesc && (upd.systemItem.Descrição || '').trim() !== giapDesc.trim()) {
+                            descHtml += `<br><strong>GIAP:</strong> <span class="text-blue-600">${escapeHtml(giapDesc)}</span>
+                                        <div class="mt-1">
+                                            <label class="inline-flex items-center">
+                                                <input type="checkbox" class="h-4 w-4 rounded border-gray-300 use-giap-desc-cb" data-update-id="${upd.id}">
+                                                <span class="ml-2 text-slate-700">Usar descrição do GIAP</span>
+                                            </label>
+                                        </div>`;
+                        }
+                    } else if (upd.systemItem) {
+                         descHtml = `<strong>Atual:</strong> ${escapeHtml(upd.systemItem.Descrição)}`;
                     }
 
                     const originalData = upd.systemItem ? `T: ${upd.systemItem.Tombamento}<br>L: ${upd.systemItem.Localização}<br>E: ${upd.systemItem.Estado}` : 'N/A';
                     const newData = `T: ${upd.pastedData.tombamento}<br>L: ${upd.pastedData.localizacao}<br>E: ${upd.pastedData.estado}`;
 
                     tableHtml += `<tr class="${rowClass} border-b">
-                                    <td class="p-2 font-semibold">${escapeHtml(upd.pastedData.descricao)}</td>
+                                    <td class="p-2">${descHtml}</td>
                                     <td class="p-2">${originalData}</td>
                                     <td class="p-2">${newData}</td>
                                     <td class="p-2">${statusHtml}</td>
@@ -2190,6 +2212,17 @@
                 container.innerHTML = tableHtml + '</tbody></table>';
             }
             
+            document.getElementById('edit-by-desc-preview-table-container').addEventListener('change', (e) => {
+                const checkbox = e.target;
+                if (checkbox.classList.contains('use-giap-desc-cb')) {
+                    const updateId = parseInt(checkbox.dataset.updateId, 10);
+                    const update = updatesToProcess.find(u => u.id === updateId);
+                    if (update) {
+                        update.useGiapDesc = checkbox.checked;
+                    }
+                }
+            });
+
             document.getElementById('confirm-edit-by-desc-btn').addEventListener('click', async () => {
                 const validUpdates = updatesToProcess.filter(u => u.status === 'ok');
                 if(validUpdates.length === 0) return showNotification('Nenhum item válido para atualizar.', 'error');
@@ -2199,12 +2232,21 @@
 
                 validUpdates.forEach(upd => {
                     const docRef = doc(db, 'patrimonio', upd.systemItem.id);
-                    batch.update(docRef, {
+                    const updatePayload = {
                         Tombamento: upd.pastedData.tombamento,
                         Localização: upd.pastedData.localizacao,
                         Estado: upd.pastedData.estado,
                         updatedAt: serverTimestamp()
-                    });
+                    };
+                    
+                    if (upd.useGiapDesc && upd.giapItem) {
+                        const giapDesc = upd.giapItem.Descrição || upd.giapItem.Espécie;
+                        if(giapDesc) {
+                           updatePayload.Descrição = giapDesc;
+                        }
+                    }
+
+                    batch.update(docRef, updatePayload);
                 });
 
                 try {
@@ -2241,3 +2283,4 @@
     </script>
 </body>
 </html>
+
