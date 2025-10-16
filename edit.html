@@ -655,7 +655,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -681,11 +681,12 @@
         });
         const CACHE_DURATION_MS = 2 * 60 * 60 * 1000;
 
-        let fullInventory = [], giapInventory = [], customGiapUnits = [], itensATombarList = [];
+        let fullInventory = [], giapInventory = [], customGiapUnits = [];
         let giapMap = new Map();
         let unitMapping = {};
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
+        let padroesConciliacao = []; // IA LEARNING
         
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
@@ -730,32 +731,143 @@
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         
+        // --- NOVAS FUNÇÕES DE SIMILARIDADE E IA ---
+        function levenshteinDistance(s1, s2) {
+            const len1 = s1.length;
+            const len2 = s2.length;
+            if (Math.abs(len1 - len2) > 20) return Math.max(len1, len2);
+            const matrix = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(0));
+            for (let i = 0; i <= len1; i++) matrix[0][i] = i;
+            for (let j = 0; j <= len2; j++) matrix[j][0] = j;
+            for (let j = 1; j <= len2; j++) {
+                for (let i = 1; i <= len1; i++) {
+                    const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+                    matrix[j][i] = Math.min(
+                        matrix[j][i - 1] + 1,      // inserção
+                        matrix[j - 1][i] + 1,      // deleção
+                        matrix[j - 1][i - 1] + cost // substituição
+                    );
+                }
+            }
+            return matrix[len2][len1];
+        }
+
         function calculateSimilarity(str1, str2) {
             const s1 = normalizeStr(str1);
             const s2 = normalizeStr(str2);
-            
             if (s1 === s2) return 1.0;
-            if (s1.includes(s2) || s2.includes(s1)) return 0.9; // Prioriza substrings com pontuação alta
-
-            const words1 = new Set(s1.split(/\s+/));
-            const words2 = new Set(s2.split(/\s+/));
-
-            if (words1.size === 0 || words2.size === 0) return 0;
-            
-            const intersection = new Set([...words1].filter(word => words2.has(word)));
-            
-            const score = (2 * intersection.size) / (words1.size + words2.size); // Coeficiente de Sørensen–Dice
-            return score;
+            if (s1.includes(s2) || s2.includes(s1)) return 0.92;
+            const words1 = new Set(s1.split(/\s+/).filter(w => w.length > 2));
+            const words2 = new Set(s2.split(/\s+/).filter(w => w.length > 2));
+            if (words1.size === 0 && words2.size === 0) return 0;
+            const intersection = new Set([...words1].filter(w => words2.has(w)));
+            const union = new Set([...words1, ...words2]);
+            const jaccardScore = union.size > 0 ? intersection.size / union.size : 0;
+            let substringBonus = 0;
+            const minLen = Math.min(s1.length, s2.length);
+            for (let size = Math.min(8, minLen); size >= 4; size--) {
+                let found = false;
+                for (let i = 0; i <= s1.length - size; i++) {
+                    const substr = s1.substring(i, i + size);
+                    if (s2.includes(substr)) {
+                        substringBonus = Math.max(substringBonus, (size / Math.max(s1.length, s2.length)) * 0.3);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+            let levBonus = 0;
+            if (s1.length < 50 && s2.length < 50) {
+                const distance = levenshteinDistance(s1, s2);
+                const maxLen = Math.max(s1.length, s2.length);
+                levBonus = maxLen > 0 ? (1 - distance / maxLen) * 0.2 : 0;
+            }
+            return Math.min(jaccardScore * 0.6 + substringBonus + levBonus, 1.0);
         }
 
-        const normalizeTombo = (tombo) => {
-            if (!tombo) return '';
-            let str = String(tombo).trim();
-            if (str.endsWith('.0')) {
-                str = str.slice(0, -2);
+        async function carregarPadroesConciliacao() {
+            try {
+                const q = query(
+                    collection(db, 'padroesConciliacao'),
+                    orderBy('timestamp', 'desc'),
+                    limit(300)
+                );
+                const snapshot = await getDocs(q);
+                padroesConciliacao = snapshot.docs.map(doc => doc.data());
+                console.log(`✅ ${padroesConciliacao.length} padrões de conciliação carregados`);
+            } catch (error) {
+                console.warn('Padrões de conciliação ainda não existem. Será criada ao salvar o primeiro vínculo.');
+                padroesConciliacao = [];
             }
-            return str;
-        };
+        }
+
+        async function salvarPadraoConciliacao(systemItem, giapItem, score) {
+            const padrao = {
+                descricaoSistema: systemItem.Descrição || '',
+                fornecedorSistema: systemItem.Fornecedor || '',
+                descricaoGIAP: `${giapItem.Descrição || ''} ${giapItem.Espécie || ''}`.trim(),
+                fornecedorGIAP: giapItem['Nome Fornecedor'] || '',
+                tombamento: giapItem.TOMBAMENTO,
+                unidade: systemItem.Unidade || '',
+                tipo: systemItem.Tipo || '',
+                scoreOriginal: score,
+                timestamp: serverTimestamp(),
+                usuario: auth.currentUser?.email || 'unknown'
+            };
+            try {
+                await addDoc(collection(db, 'padroesConciliacao'), padrao);
+                padroesConciliacao.unshift({ ...padrao, timestamp: new Date() });
+                if (padroesConciliacao.length > 300) {
+                    padroesConciliacao = padroesConciliacao.slice(0, 300);
+                }
+                console.log('✅ Padrão de conciliação salvo');
+            } catch (error) {
+                console.error('Erro ao salvar padrão:', error);
+            }
+        }
+
+        function suggestGiapMatchesComAprendizado(systemItem) {
+            let { giapItems } = getConciliationData();
+            if (!giapItems || giapItems.length === 0) {
+                renderList('giap-list', [], 'TOMBAMENTO', 'Descrição');
+                return;
+            }
+            const systemDesc = `${systemItem.Descrição || ''} ${systemItem.Fornecedor || ''}`.trim();
+            const scoredItems = giapItems.map(giapItem => {
+                const giapDesc = `${giapItem.Descrição || ''} ${giapItem.Espécie || ''} ${giapItem['Nome Fornecedor'] || ''}`.trim();
+                let baseScore = calculateSimilarity(systemDesc, giapDesc);
+                if (systemItem.Fornecedor && systemItem.Fornecedor !== '-' && giapItem['Nome Fornecedor'] && giapItem['Nome Fornecedor'] !== '-') {
+                    const fornecedorMatch = calculateSimilarity(systemItem.Fornecedor, giapItem['Nome Fornecedor']);
+                    if (fornecedorMatch > 0.7) { baseScore += 0.15; }
+                }
+                return { item: giapItem, baseScore: Math.min(baseScore, 1.0), bonusScore: 0 };
+            });
+
+            if (padroesConciliacao.length > 0) {
+                padroesConciliacao.forEach(padrao => {
+                    const similaridadeComPadrao = calculateSimilarity(systemDesc, `${padrao.descricaoSistema} ${padrao.fornecedorSistema}`);
+                    if (similaridadeComPadrao > 0.7) {
+                        scoredItems.forEach(scored => {
+                            const giapDescCompleta = `${scored.item.Descrição || ''} ${scored.item.Espécie || ''} ${scored.item['Nome Fornecedor'] || ''}`;
+                            const similaridadeComPadraoGiap = calculateSimilarity(giapDescCompleta, `${padrao.descricaoGIAP} ${padrao.fornecedorGIAP}`);
+                            if (similaridadeComPadraoGiap > 0.6) {
+                                const boost = similaridadeComPadrao * similaridadeComPadraoGiap * 0.2;
+                                scored.bonusScore += boost;
+                            }
+                        });
+                    }
+                });
+            }
+
+            scoredItems.forEach(scored => { scored.finalScore = Math.min(scored.baseScore + scored.bonusScore, 1.0); });
+            scoredItems.sort((a, b) => b.finalScore - a.finalScore);
+            const topScore = scoredItems.length > 0 ? scoredItems[0].finalScore : 0;
+            const suggestionMap = new Map(scoredItems.map(si => [si.item.TOMBAMENTO, si.finalScore]));
+            renderList('giap-list', scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore: topScore });
+        }
+        
+        // FIM DAS FUNÇÕES DE IA
 
         function parseEstadoEOrigem(texto) {
             const textoCru = (texto || '').trim();
@@ -831,23 +943,21 @@
 
             if (!forceRefresh && !isCacheStale) {
                 feedbackStatus.textContent = 'Carregando dados do cache local...';
-                [fullInventory, giapInventory, unitMapping, customGiapUnits, itensATombarList] = await Promise.all([
+                [fullInventory, giapInventory, unitMapping, customGiapUnits] = await Promise.all([
                     idb.patrimonio.toArray(), 
                     idb.giap.toArray(), 
                     loadUnitMappingFromFirestore(),
-                    loadCustomGiapUnits(),
-                    loadItensATombar()
+                    loadCustomGiapUnits()
                 ]);
                 showNotification('Dados carregados do cache.', 'info');
             } else {
                 feedbackStatus.textContent = 'Buscando dados atualizados do servidor...';
                 try {
-                    [fullInventory, giapInventory, unitMapping, customGiapUnits, itensATombarList] = await Promise.all([
+                    [fullInventory, giapInventory, unitMapping, customGiapUnits] = await Promise.all([
                         loadFirebaseInventory(), 
                         loadGiapInventory(), 
                         loadUnitMappingFromFirestore(),
-                        loadCustomGiapUnits(),
-                        loadItensATombar()
+                        loadCustomGiapUnits()
                     ]);
                     await idb.transaction('rw', idb.patrimonio, idb.giap, idb.metadata, async () => {
                         await idb.patrimonio.clear(); await idb.patrimonio.bulkAdd(fullInventory);
@@ -873,6 +983,8 @@
                 }
             });
 
+            await carregarPadroesConciliacao();
+
             feedbackStatus.textContent = `Pronto. ${fullInventory.length} itens carregados.`;
             initializeUI();
             loadingScreen.classList.add('hidden');
@@ -897,16 +1009,6 @@
         async function loadFirebaseInventory() {
             const querySnapshot = await getDocs(query(collection(db, 'patrimonio')));
             return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        }
-
-        async function loadItensATombar() {
-            try {
-                const querySnapshot = await getDocs(query(collection(db, 'itens_a_tombar')));
-                return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            } catch (error) {
-                console.error("Erro ao carregar itens a tombar:", error);
-                return [];
-            }
         }
 
         function loadGiapInventory() {
@@ -1368,10 +1470,6 @@
             const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
             const sel = document.getElementById('filter-tipo');
             sel.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-
-            // NEW: Populate filters for "Itens a Tombar" sub-tab
-            const tombarFilterTipo = document.getElementById('tombar-filter-tipo');
-            tombarFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
         function renderList(containerId, arr, keyField, primaryLabelField, suggestionInfo = null) {
@@ -1451,10 +1549,10 @@
             const mappedGiapUnits = unitMapping[unidade] || [unidade];
 
             const systemItems = fullInventory.filter(i => {
-                const tombo = (i.Tombamento || '').trim().toLowerCase();
+                const tombo = (i.Tombamento || '').trim();
                 return i.Unidade === unidade && 
-                       (!tombo || tombo === 's/t') &&
-                       !tombo.includes('permuta') &&
+                       (!tombo || tombo.toLowerCase() === 's/t') &&
+                       !tombo.toLowerCase().includes('permuta') &&
                        normalizeStr(i.Descrição).includes(systemFilterText);
             });
 
@@ -1470,25 +1568,6 @@
             return { systemItems, giapItems };
         }
 
-        function suggestGiapMatches(systemItem) {
-            let { giapItems } = getConciliationData();
-            if (giapItems.length === 0) return;
-
-            const scoredItems = giapItems.map(giapItem => {
-                const systemDesc = systemItem.Descrição || '';
-                const giapDesc = giapItem.Descrição || giapItem.Espécie || '';
-                const score = calculateSimilarity(systemDesc, giapDesc);
-                return { item: giapItem, score };
-            }).sort((a, b) => b.score - a.score);
-
-            const topScore = scoredItems.length > 0 ? scoredItems[0].score : 0;
-            const suggestionMap = new Map(scoredItems.map(si => [si.item.TOMBAMENTO, si.score]));
-
-            // Chama renderList com os itens ordenados e informações de sugestão
-            renderList('giap-list', scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore });
-        }
-
-
         function handleSelect(containerId, id, obj, element) {
             if (element.classList.contains('linked')) return;
 
@@ -1498,8 +1577,8 @@
                 document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
                 
-                // Dispara a lógica de sugestão
-                suggestGiapMatches(obj); 
+                // Dispara a lógica de sugestão com IA
+                suggestGiapMatchesComAprendizado(obj); 
 
                 if (selGiap) createLink();
 
@@ -1563,68 +1642,6 @@
             renderList('system-list', systemItems, 'id', 'Descrição');
             renderList('giap-list', giapItems, 'TOMBAMENTO', 'Descrição');
         }
-
-        function renderItensATombar() {
-            const container = document.getElementById('itens-a-tombar-container');
-            const tipoFiltro = document.getElementById('tombar-filter-tipo').value;
-            const unidadeFiltro = document.getElementById('tombar-filter-unidade').value;
-
-            const filteredItems = itensATombarList.filter(item => {
-                return (!tipoFiltro || item.tipo === tipoFiltro) &&
-                       (!unidadeFiltro || item.unidade === unidadeFiltro);
-            });
-
-            if (filteredItems.length === 0) {
-                container.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item S/T aguardando tombamento com os filtros selecionados.</p>';
-                return;
-            }
-
-            const groupedByTipo = filteredItems.reduce((acc, item) => {
-                const tipo = item.tipo || 'Sem Tipo';
-                if (!acc[tipo]) acc[tipo] = [];
-                acc[tipo].push(item);
-                return acc;
-            }, {});
-
-            let html = '';
-            for (const tipo in groupedByTipo) {
-                html += `<h3 class="text-lg font-bold text-slate-700 p-2 bg-slate-100 rounded-t-lg mt-4 first:mt-0">${escapeHtml(tipo)}</h3>`;
-                
-                const groupedByUnidade = groupedByTipo[tipo].reduce((acc, item) => {
-                    const unidade = item.unidade || 'Sem Unidade';
-                    if (!acc[unidade]) acc[unidade] = [];
-                    acc[unidade].push(item);
-                    return acc;
-                }, {});
-
-                for(const unidade in groupedByUnidade) {
-                    html += `<details class="bg-white rounded-lg shadow-sm border mb-2 border-t-0 rounded-t-none" open>
-                                <summary class="p-3 font-semibold cursor-pointer hover:bg-slate-50">${escapeHtml(unidade)} (${groupedByUnidade[unidade].length})</summary>
-                                <div class="p-2 border-t">
-                                    <table class="w-full text-sm">
-                                        <thead>
-                                            <tr class="border-b bg-slate-50">
-                                                <th class="p-2 text-left">Descrição do Item</th>
-                                                <th class="p-2 text-left">Novo Tombamento</th>
-                                                <th class="p-2 text-left">Ação</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>`;
-                    groupedByUnidade[unidade].forEach(item => {
-                        html += `<tr class="border-b">
-                                    <td class="p-2">${escapeHtml(item.descricao)}</td>
-                                    <td class="p-2 font-mono">${escapeHtml(item.novoTombamento)}</td>
-                                    <td class="p-2">
-                                        <button data-id="${item.id}" class="confirm-tombo-btn bg-green-100 text-green-700 px-3 py-1 text-xs rounded-md hover:bg-green-200">Confirmar Tombamento</button>
-                                    </td>
-                                 </tr>`;
-                    });
-                    html += `</tbody></table></div></details>`;
-                }
-            }
-            container.innerHTML = html;
-        }
-
 
         function openAddItemModal(defaults = {}) {
             const modal = document.getElementById('add-item-modal');
@@ -2000,18 +2017,11 @@
                             Observação: wasST ? 'Item era S/T. Conciliado.' : oldObs,
                             updatedAt: serverTimestamp()
                         });
-                        
-                        if (wasST) {
-                            const itemParaTombarRef = doc(collection(db, 'itens_a_tombar'));
-                            batch.set(itemParaTombarRef, {
-                                patrimonioId: systemId,
-                                novoTombamento: tombamento,
-                                descricao: giapItem.Descrição || giapItem.Espécie,
-                                unidade: systemItem.Unidade,
-                                tipo: systemItem.Tipo,
-                                conciliadoEm: serverTimestamp()
-                            });
-                        }
+
+                        const giapDesc = `${giapItem.Descrição || ''} ${giapItem.Espécie || ''}`;
+                        const systemDesc = systemItem.Descrição || '';
+                        const score = calculateSimilarity(systemDesc, giapDesc);
+                        salvarPadraoConciliacao(systemItem, giapItem, score);
                     }
                 });
 
@@ -2106,19 +2116,6 @@
                     document.getElementById('subtab-content-edit-by-desc').classList.toggle('hidden', subTab !== 'edit-by-desc'); // Novo
                     document.getElementById('subtab-content-massa').classList.toggle('hidden', subTab !== 'massa');
                     document.getElementById('subtab-content-add_giap').classList.toggle('hidden', subTab !== 'add_giap');
-                });
-            });
-
-            const conciliarSubNavs = document.querySelectorAll('#content-conciliar .sub-nav-btn');
-            conciliarSubNavs.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const subTab = e.currentTarget.dataset.subtabConciliar;
-                    conciliarSubNavs.forEach(btn => btn.classList.toggle('active', btn.dataset.subtabConciliar === subTab));
-                    document.getElementById('subtab-conciliar-conciliacao_main').classList.toggle('hidden', subTab !== 'conciliacao_main');
-                    document.getElementById('subtab-conciliar-itens_a_tombar').classList.toggle('hidden', subTab !== 'itens_a_tombar');
-                    if (subTab === 'itens_a_tombar') {
-                        renderItensATombar();
-                    }
                 });
             });
             
@@ -2515,39 +2512,6 @@
             });
             // --- FIM: Listeners da Nova Ferramenta ---
 
-            document.getElementById('tombar-filter-tipo').addEventListener('change', () => {
-                const tipo = document.getElementById('tombar-filter-tipo').value;
-                const unidades = [...new Set(itensATombarList.filter(i => !tipo || i.tipo === tipo).map(i => i.unidade).filter(Boolean))].sort();
-                const selU = document.getElementById('tombar-filter-unidade');
-                selU.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option>${u}</option>`).join('');
-                selU.disabled = false;
-                renderItensATombar();
-            });
-            document.getElementById('tombar-filter-unidade').addEventListener('change', renderItensATombar);
-
-            document.getElementById('itens-a-tombar-container').addEventListener('click', async (e) => {
-                const btn = e.target.closest('.confirm-tombo-btn');
-                if (!btn) return;
-                
-                const docId = btn.dataset.id;
-                if (!docId) return;
-
-                btn.disabled = true;
-                btn.innerHTML = `<span class="saving-spinner"></span>`;
-
-                try {
-                    await deleteDoc(doc(db, "itens_a_tombar", docId));
-                    itensATombarList = itensATombarList.filter(item => item.id !== docId);
-                    renderItensATombar();
-                    showNotification('Tombamento confirmado e removido da lista!', 'success');
-                } catch (error) {
-                    console.error("Erro ao confirmar tombamento:", error);
-                    showNotification('Erro ao confirmar tombamento.', 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Confirmar Tombamento';
-                }
-            });
-
 
             // --- NOVO: Event Listeners para a Aba de Notas Fiscais ---
             const debouncedRenderNf = debounce(renderNfList, 300);
@@ -2569,3 +2533,4 @@
     </script>
 </body>
 </html>
+
