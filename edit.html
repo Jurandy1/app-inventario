@@ -336,6 +336,7 @@
                 <div class="card">
                     <div class="flex border-b mb-6">
                         <button class="sub-nav-btn active" data-subtab="substituir">Substituir Inventário</button>
+                        <button class="sub-nav-btn" data-subtab="edit-by-desc">Editar por Descrição</button> <!-- NOVA FERRAMENTA -->
                         <button class="sub-nav-btn" data-subtab="massa">Importar por Tombamento</button>
                         <button class="sub-nav-btn" data-subtab="add_giap">Adicionar Unidade GIAP</button>
                     </div>
@@ -379,6 +380,46 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- INÍCIO: Nova Sub-Aba: Editar por Descrição -->
+                    <div id="subtab-content-edit-by-desc" class="hidden">
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">Editar Tombamentos por Descrição</h2>
+                        <p class="text-sm text-slate-600 mb-4">
+                            Esta ferramenta atualiza itens existentes em uma unidade. Ela localiza os itens pela <strong class="text-blue-600">Descrição</strong> (que deve ser idêntica) e atualiza os campos de Tombamento, Localização e Estado.
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="edit-by-desc-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
+                                <select id="edit-by-desc-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
+                            </div>
+                            <div>
+                                <label for="edit-by-desc-unit" class="block text-sm font-medium mb-1">Unidade de Destino (a ser atualizada)</label>
+                                <select id="edit-by-desc-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="edit-by-desc-data" class="block text-sm font-medium mb-1">Cole os dados do Excel aqui (com cabeçalho)</label>
+                            <p class="text-xs text-slate-500 mb-2">
+                                O sistema identificará as colunas pelos cabeçalhos: <strong>ITEM (Descrição)</strong>, <strong>TOMBO (Tombamento)</strong>, <strong>LOCAL (Localização)</strong>, <strong>ESTADO DE CONSERVAÇÃO (Estado)</strong>.
+                            </p>
+                            <textarea id="edit-by-desc-data" rows="8" class="w-full p-2 border rounded-lg font-mono text-xs" placeholder="Copie as colunas do Excel, incluindo o cabeçalho, e cole aqui..."></textarea>
+                        </div>
+                        <button id="preview-edit-by-desc-btn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Visualizar Dados para Atualização</button>
+
+                        <div id="edit-by-desc-results" class="hidden mt-6 border-t pt-4">
+                             <h3 class="font-bold text-slate-700 mb-2">Pré-visualização das Atualizações (<span id="edit-by-desc-preview-count">0</span> itens)</h3>
+                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados no inventário. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso por outro item.</p>
+                            <div id="edit-by-desc-preview-table-container" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg">
+                                <!-- A tabela de pré-visualização será inserida aqui -->
+                            </div>
+                             <div class="mt-4">
+                                <button id="confirm-edit-by-desc-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-slate-400">Confirmar e Atualizar Itens</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- FIM: Nova Sub-Aba -->
 
                     <!-- Sub-Aba: Importar em Massa (funcionalidade antiga) -->
                     <div id="subtab-content-massa" class="hidden">
@@ -626,6 +667,7 @@
         let giapItemsForImport = [];
         let itemsToReplace = [];
         let processedNfData = {}; // To store processed NF data
+        let updatesToProcess = []; // For the new "Edit by Desc" tool
 
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
@@ -1229,37 +1271,34 @@
         function populateImportAndReplaceTab() {
             const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
             
-            const massTransferTipo = document.getElementById('mass-transfer-tipo');
-            massTransferTipo.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            const selects = [
+                document.getElementById('mass-transfer-tipo'),
+                document.getElementById('replace-tipo'),
+                document.getElementById('edit-by-desc-tipo') // Novo select
+            ];
+
+            selects.forEach(select => {
+                if(select) select.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            });
             
-            massTransferTipo.addEventListener('change', () => {
-                const selectedTipo = massTransferTipo.value;
-                const massTransferUnit = document.getElementById('mass-transfer-unit');
-                if (!selectedTipo) {
-                    massTransferUnit.innerHTML = '';
-                    massTransferUnit.disabled = true;
-                    return;
-                }
-                const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
-                massTransferUnit.innerHTML = unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-                massTransferUnit.disabled = false;
-            });
+            const setupUnitSelect = (tipoSelectId, unitSelectId) => {
+                 document.getElementById(tipoSelectId).addEventListener('change', () => {
+                    const selectedTipo = document.getElementById(tipoSelectId).value;
+                    const unitSelect = document.getElementById(unitSelectId);
+                    if (!selectedTipo) {
+                        unitSelect.innerHTML = '';
+                        unitSelect.disabled = true;
+                        return;
+                    }
+                    const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
+                    unitSelect.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                    unitSelect.disabled = false;
+                });
+            };
 
-            const replaceTipo = document.getElementById('replace-tipo');
-            replaceTipo.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-
-            replaceTipo.addEventListener('change', () => {
-                const selectedTipo = replaceTipo.value;
-                const replaceUnit = document.getElementById('replace-unit');
-                if (!selectedTipo) {
-                    replaceUnit.innerHTML = '';
-                    replaceUnit.disabled = true;
-                    return;
-                }
-                const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
-                replaceUnit.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-                replaceUnit.disabled = false;
-            });
+            setupUnitSelect('mass-transfer-tipo', 'mass-transfer-unit');
+            setupUnitSelect('replace-tipo', 'replace-unit');
+            setupUnitSelect('edit-by-desc-tipo', 'edit-by-desc-unit'); // Nova configuração
         }
        
         function populateReconciliationTab_Optimized() {
@@ -1866,6 +1905,7 @@
                     const subTab = e.currentTarget.dataset.subtab;
                     subNavButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.subtab === subTab));
                     document.getElementById('subtab-content-substituir').classList.toggle('hidden', subTab !== 'substituir');
+                    document.getElementById('subtab-content-edit-by-desc').classList.toggle('hidden', subTab !== 'edit-by-desc'); // Novo
                     document.getElementById('subtab-content-massa').classList.toggle('hidden', subTab !== 'massa');
                     document.getElementById('subtab-content-add_giap').classList.toggle('hidden', subTab !== 'add_giap');
                 });
@@ -2054,6 +2094,132 @@
                     hideOverlay();
                 }
             });
+
+            // --- INÍCIO: Listeners para a Nova Ferramenta "Editar por Descrição" ---
+            document.getElementById('preview-edit-by-desc-btn').addEventListener('click', () => {
+                const unidade = document.getElementById('edit-by-desc-unit').value;
+                const data = document.getElementById('edit-by-desc-data').value;
+                if (!unidade) return showNotification('Selecione uma unidade de destino.', 'warning');
+                if (!data) return showNotification('Cole os dados da planilha.', 'warning');
+
+                Papa.parse(data, {
+                    header: true,
+                    skipEmptyLines: true,
+                    transformHeader: (h) => {
+                        const normH = normalizeStr(h);
+                        if (normH.includes('item') || normH.includes('descri')) return 'descricao';
+                        if (normH.includes('tombo')) return 'tombamento';
+                        if (normH.includes('local')) return 'localizacao';
+                        if (normH.includes('estado')) return 'estado';
+                        return h;
+                    },
+                    complete: (results) => {
+                        const pastedData = results.data;
+                        const inventoryInUnit = fullInventory.filter(i => i.Unidade === unidade);
+                        const existingTombos = new Map(fullInventory.map(i => [i.Tombamento, i]));
+
+                        updatesToProcess = pastedData.map(row => {
+                            const pastedDesc = (row.descricao || '').trim();
+                            const pastedTombo = (row.tombamento || 'S/T').trim();
+                            
+                            const systemItem = inventoryInUnit.find(i => (i.Descrição || '').trim() === pastedDesc);
+                            const giapFound = giapMap.has(pastedTombo);
+                            const tomboInUse = existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
+
+                            let status = 'ok';
+                            if (!systemItem) status = 'not_found';
+                            else if (tomboInUse) status = 'tombo_in_use';
+
+                            return {
+                                pastedData: {
+                                    descricao: pastedDesc,
+                                    tombamento: pastedTombo,
+                                    localizacao: (row.localizacao || '').trim(),
+                                    estado: (row.estado || '').trim()
+                                },
+                                systemItem: systemItem,
+                                status: status,
+                                giapFound: giapFound
+                            };
+                        });
+
+                        renderEditByDescPreview(updatesToProcess);
+                        document.getElementById('edit-by-desc-results').classList.remove('hidden');
+                        document.getElementById('confirm-edit-by-desc-btn').disabled = updatesToProcess.filter(u => u.status === 'ok').length === 0;
+                    }
+                });
+            });
+
+            function renderEditByDescPreview(updates) {
+                const container = document.getElementById('edit-by-desc-preview-table-container');
+                document.getElementById('edit-by-desc-preview-count').textContent = updates.length;
+                let tableHtml = `<table class="w-full text-xs text-left">
+                                    <thead class="bg-slate-200">
+                                        <tr>
+                                            <th class="p-2">Descrição do Item</th>
+                                            <th class="p-2">Dados Atuais no Sistema</th>
+                                            <th class="p-2">Novos Dados da Planilha</th>
+                                            <th class="p-2">Status</th>
+                                        </tr>
+                                    </thead><tbody>`;
+                updates.forEach(upd => {
+                    let rowClass = '';
+                    let statusHtml = '';
+                    if (upd.status === 'not_found') {
+                        rowClass = 'bg-yellow-100';
+                        statusHtml = '<span class="font-bold text-yellow-700">Item não encontrado</span>';
+                    } else if (upd.status === 'tombo_in_use') {
+                        rowClass = 'bg-red-100';
+                        statusHtml = `<span class="font-bold text-red-700">Tombo já existe em: ${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`;
+                    } else {
+                        statusHtml = '<span class="font-bold text-green-700">Pronto para atualizar</span>';
+                        if(!upd.giapFound) statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>'
+                    }
+
+                    const originalData = upd.systemItem ? `T: ${upd.systemItem.Tombamento}<br>L: ${upd.systemItem.Localização}<br>E: ${upd.systemItem.Estado}` : 'N/A';
+                    const newData = `T: ${upd.pastedData.tombamento}<br>L: ${upd.pastedData.localizacao}<br>E: ${upd.pastedData.estado}`;
+
+                    tableHtml += `<tr class="${rowClass} border-b">
+                                    <td class="p-2 font-semibold">${escapeHtml(upd.pastedData.descricao)}</td>
+                                    <td class="p-2">${originalData}</td>
+                                    <td class="p-2">${newData}</td>
+                                    <td class="p-2">${statusHtml}</td>
+                                  </tr>`;
+                });
+
+                container.innerHTML = tableHtml + '</tbody></table>';
+            }
+            
+            document.getElementById('confirm-edit-by-desc-btn').addEventListener('click', async () => {
+                const validUpdates = updatesToProcess.filter(u => u.status === 'ok');
+                if(validUpdates.length === 0) return showNotification('Nenhum item válido para atualizar.', 'error');
+                
+                showOverlay(`Atualizando ${validUpdates.length} itens...`);
+                const batch = writeBatch(db);
+
+                validUpdates.forEach(upd => {
+                    const docRef = doc(db, 'patrimonio', upd.systemItem.id);
+                    batch.update(docRef, {
+                        Tombamento: upd.pastedData.tombamento,
+                        Localização: upd.pastedData.localizacao,
+                        Estado: upd.pastedData.estado,
+                        updatedAt: serverTimestamp()
+                    });
+                });
+
+                try {
+                    await batch.commit();
+                    await idb.metadata.clear();
+                    showNotification(`${validUpdates.length} itens atualizados com sucesso! Recarregando...`, 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } catch(e) {
+                    hideOverlay();
+                    showNotification('Erro ao atualizar os itens.', 'error');
+                    console.error(e);
+                }
+            });
+            // --- FIM: Listeners da Nova Ferramenta ---
+
 
             // --- NOVO: Event Listeners para a Aba de Notas Fiscais ---
             const debouncedRenderNf = debounce(renderNfList, 300);
