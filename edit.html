@@ -869,6 +869,15 @@
         
         // FIM DAS FUNÇÕES DE IA
 
+        const normalizeTombo = (tombo) => {
+            if (!tombo) return '';
+            let str = String(tombo).trim();
+            if (str.endsWith('.0')) {
+                str = str.slice(0, -2);
+            }
+            return str;
+        };
+
         function parseEstadoEOrigem(texto) {
             const textoCru = (texto || '').trim();
             if (!textoCru) return { estado: 'Regular', origem: '' };
@@ -2533,4 +2542,5 @@
     </script>
 </body>
 </html>
+
 
