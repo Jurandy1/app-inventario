@@ -239,7 +239,7 @@
             <div id="content-conciliar" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
-                    <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo. Salve os vínculos no final.</p>
+                    <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo. O sistema irá sugerir os melhores tombos para o item selecionado.</p>
                     <div class="flex flex-wrap items-end gap-2 mb-4">
                         <div class="flex-grow">
                             <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
@@ -383,9 +383,9 @@
                     
                     <!-- INÍCIO: Nova Sub-Aba: Editar por Descrição -->
                     <div id="subtab-content-edit-by-desc" class="hidden">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">Editar Tombamentos por Descrição</h2>
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">Editar Tombamentos por Descrição (com Lógica Aprimorada)</h2>
                         <p class="text-sm text-slate-600 mb-4">
-                            Esta ferramenta atualiza itens existentes em uma unidade. Ela localiza os itens por <strong class="text-blue-600">Descrição similar</strong> e atualiza os campos de Tombamento, Localização e Estado.
+                            Esta ferramenta inteligente atualiza itens existentes em uma unidade. Ela localiza os itens por <strong class="text-blue-600">Descrição similar</strong> e outros campos, depois atualiza Tombamento, Localização e Estado.
                         </p>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -402,7 +402,7 @@
                         <div>
                             <label for="edit-by-desc-data" class="block text-sm font-medium mb-1">Cole os dados do Excel aqui (com cabeçalho)</label>
                             <p class="text-xs text-slate-500 mb-2">
-                                O sistema identificará as colunas pelos cabeçalhos: <strong>ITEM (Descrição)</strong>, <strong>TOMBO (Tombamento)</strong>, <strong>LOCAL (Localização)</strong>, <strong>ESTADO DE CONSERVAÇÃO (Estado)</strong>.
+                                O sistema identificará as colunas pelos cabeçalhos: <strong>ITEM (ou Descrição)</strong>, <strong>TOMBO (ou Tombamento)</strong>, <strong>LOCAL (ou Localização)</strong>, <strong>ESTADO DE CONSERVAÇÃO (ou Estado)</strong>.
                             </p>
                             <textarea id="edit-by-desc-data" rows="8" class="w-full p-2 border rounded-lg font-mono text-xs" placeholder="Copie as colunas do Excel, incluindo o cabeçalho, e cole aqui..."></textarea>
                         </div>
@@ -410,7 +410,7 @@
 
                         <div id="edit-by-desc-results" class="hidden mt-6 border-t pt-4">
                              <h3 class="font-bold text-slate-700 mb-2">Pré-visualização das Atualizações (<span id="edit-by-desc-preview-count">0</span> itens)</h3>
-                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados ou tiveram múltiplas correspondências. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso.</p>
+                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados ou a correspondência é ambígua. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso por outro item.</p>
                             <div id="edit-by-desc-preview-table-container" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg">
                                 <!-- A tabela de pré-visualização será inserida aqui -->
                             </div>
@@ -1334,7 +1334,7 @@
             sel.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
-        function renderList(containerId, arr, keyField, primaryLabelField) {
+        function renderList(containerId, arr, keyField, primaryLabelField, suggestionInfo = null) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
             if (!arr || arr.length === 0) {
@@ -1364,19 +1364,90 @@
                     const dataCadastro = escapeHtml(item.Cadastro || 'N/D');
                     const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
                     const tombo = escapeHtml(item[keyField]);
+                    const valorNf = escapeHtml(item['Valor NF'] || 'N/A');
                     detailsHtml = `
-                        <strong>${tombo} - ${descricao}</strong>
-                        <p class="text-xs text-slate-500 mt-1">
-                            Cadastro: <strong>${dataCadastro}</strong> | Fornecedor: <strong>${fornecedor}</strong>
-                        </p>
-                    `;
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <strong>${tombo} - ${descricao}</strong>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    Cadastro: <strong>${dataCadastro}</strong> | Fornecedor: <strong>${fornecedor}</strong>
+                                </p>
+                            </div>
+                            <div class="text-right ml-2">
+                                <p class="text-xs text-slate-500">Valor NF</p>
+                                <strong class="text-sm text-green-700">${valorNf}</strong>
+                            </div>
+                        </div>`;
                 }
                 
                 div.innerHTML = detailsHtml;
+
+                // Lógica de destaque da sugestão
+                if (suggestionInfo && suggestionInfo.suggestions.has(id)) {
+                    const score = suggestionInfo.suggestions.get(id);
+                    // Destaque mais forte para as melhores sugestões
+                    if (score > 0.7 && score >= suggestionInfo.topScore * 0.9) {
+                        div.style.backgroundColor = '#dbeafe'; 
+                        div.style.borderLeft = '4px solid #3b82f6';
+                    } else if (score > 0.5) {
+                        div.style.backgroundColor = '#e0f2fe';
+                        div.style.borderLeft = '4px solid #0ea5e9';
+                    }
+                }
+                
                 div.onclick = (event) => handleSelect(containerId, id, item, event.currentTarget);
                 container.append(div);
             });
         }
+        
+        function getConciliationData() {
+            const unidade = document.getElementById('filter-unidade').value.trim();
+            if (!unidade) return { systemItems: [], giapItems: [] };
+            
+            const systemFilterText = normalizeStr(document.getElementById('system-list-filter').value);
+            const giapFilterText = normalizeStr(document.getElementById('giap-list-filter').value);
+
+            const usedTombamentos = new Set(fullInventory.map(i => normalizeStr(i.Tombamento)).filter(Boolean));
+            const mappedGiapUnits = unitMapping[unidade] || [unidade];
+
+            const systemItems = fullInventory.filter(i => {
+                const tombo = (i.Tombamento || '').trim();
+                return i.Unidade === unidade && 
+                       (!tombo || tombo.toLowerCase() === 's/t') &&
+                       !tombo.toLowerCase().includes('permuta') &&
+                       normalizeStr(i.Descrição).includes(systemFilterText);
+            });
+
+            const giapItems = giapInventory.filter(g => {
+                const tomboTrimmed = normalizeStr(g.TOMBAMENTO);
+                const giapDesc = normalizeStr(g.Descrição || g.Espécie);
+                return tomboTrimmed && 
+                       !usedTombamentos.has(tomboTrimmed) && 
+                       mappedGiapUnits.includes(g.Unidade) &&
+                       giapDesc.includes(giapFilterText);
+            });
+
+            return { systemItems, giapItems };
+        }
+
+        function suggestGiapMatches(systemItem) {
+            let { giapItems } = getConciliationData();
+            if (giapItems.length === 0) return;
+
+            const scoredItems = giapItems.map(giapItem => {
+                const systemDesc = systemItem.Descrição || '';
+                const giapDesc = giapItem.Descrição || giapItem.Espécie || '';
+                const score = calculateSimilarity(systemDesc, giapDesc);
+                return { item: giapItem, score };
+            }).sort((a, b) => b.score - a.score);
+
+            const topScore = scoredItems.length > 0 ? scoredItems[0].score : 0;
+            const suggestionMap = new Map(scoredItems.map(si => [si.item.TOMBAMENTO, si.score]));
+
+            // Chama renderList com os itens ordenados e informações de sugestão
+            renderList('giap-list', scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore });
+        }
+
 
         function handleSelect(containerId, id, obj, element) {
             if (element.classList.contains('linked')) return;
@@ -1386,6 +1457,10 @@
                 selSys = { id, obj };
                 document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
+                
+                // Dispara a lógica de sugestão
+                suggestGiapMatches(obj); 
+
                 if (selGiap) createLink();
 
             } else if (containerId === 'giap-list' && selSys) {
@@ -1443,31 +1518,10 @@
                 return;
             }
             
-            const systemFilterText = normalizeStr(document.getElementById('system-list-filter').value);
-            const giapFilterText = normalizeStr(document.getElementById('giap-list-filter').value);
-
-            const usedTombamentos = new Set(fullInventory.map(i => normalizeStr(i.Tombamento)).filter(Boolean));
-            const mappedGiapUnits = unitMapping[unidade] || [unidade];
-
-            const items = fullInventory.filter(i => {
-                const tombo = (i.Tombamento || '').trim();
-                return i.Unidade === unidade && 
-                       (!tombo || tombo.toLowerCase() === 's/t') &&
-                       !tombo.toLowerCase().includes('permuta') &&
-                       normalizeStr(i.Descrição).includes(systemFilterText);
-            });
-
-            const tombos = giapInventory.filter(g => {
-                const tomboTrimmed = normalizeStr(g.TOMBAMENTO);
-                const giapDesc = normalizeStr(g.Descrição || g.Espécie);
-                return tomboTrimmed && 
-                       !usedTombamentos.has(tomboTrimmed) && 
-                       mappedGiapUnits.includes(g.Unidade) &&
-                       giapDesc.includes(giapFilterText);
-            });
+            const { systemItems, giapItems } = getConciliationData();
             
-            renderList('system-list', items, 'id', 'Descrição');
-            renderList('giap-list', tombos, 'TOMBAMENTO', 'Descrição');
+            renderList('system-list', systemItems, 'id', 'Descrição');
+            renderList('giap-list', giapItems, 'TOMBAMENTO', 'Descrição');
         }
 
         function openAddItemModal(defaults = {}) {
@@ -2135,7 +2189,7 @@
                     transformHeader: (h) => {
                         const normH = normalizeStr(h);
                         if (normH.includes('item') || normH.includes('descri')) return 'descricao';
-                        if (normH.includes('tombo')) return 'tombamento';
+                        if (normH.includes('tombo') || normH.includes('tombamento')) return 'tombamento';
                         if (normH.includes('local')) return 'localizacao';
                         if (normH.includes('estado')) return 'estado';
                         return h;
@@ -2145,93 +2199,72 @@
                         const inventoryInUnit = fullInventory.filter(i => i.Unidade === unidade);
                         const existingTombos = new Map(fullInventory.map(i => [normalizeTombo(i.Tombamento), i]));
 
-                        // Create a pool of available items to match against
+                        // Cria um "pool" de itens disponíveis para evitar múltiplas correspondências para o mesmo item
                         const availableItems = inventoryInUnit.map(item => ({ item, isMatched: false }));
                         
-                        updatesToProcess = pastedData.map((row, index) => {
+                        updatesToProcess = pastedData.map((row, rowIndex) => {
                             const pastedDesc = (row.descricao || '').trim();
                             const pastedTomboRaw = (row.tombamento || 'S/T').trim();
                             const pastedTombo = normalizeTombo(pastedTomboRaw);
                             const pastedLocal = (row.localizacao || '').trim();
                             const pastedEstado = parseEstadoEOrigem((row.estado || '').trim()).estado;
 
-                            let foundItemWrapper = null;
+                            if (!pastedDesc) {
+                                return { 
+                                    id: rowIndex, pastedData: {}, systemItem: null, 
+                                    status: 'empty_row', matchType: 'n/a' 
+                                };
+                            }
+                            
+                            // Calcula um score de correspondência para todos os itens disponíveis
+                            const potentialMatches = availableItems
+                                .filter(wrapper => !wrapper.isMatched)
+                                .map(wrapper => {
+                                    const systemDesc = (wrapper.item.Descrição || '').trim();
+                                    const systemLocal = (wrapper.item.Localização || '').trim();
+                                    const systemEstado = (wrapper.item.Estado || '').trim();
+
+                                    let score = calculateSimilarity(systemDesc, pastedDesc) * 100;
+                                    if (systemDesc === pastedDesc) score += 50; 
+                                    if (systemLocal === pastedLocal && pastedLocal) score += 15;
+                                    if (systemEstado === pastedEstado) score += 10;
+                                    
+                                    return { wrapper, score };
+                                })
+                                .filter(match => match.score > 60) // Limiar mínimo de score
+                                .sort((a, b) => b.score - a.score);
+
+                            let bestMatchWrapper = null;
                             let matchType = 'not_found';
                             
-                            // 1. Exact match pass
-                            const exactMatch = availableItems.find(wrapper => !wrapper.isMatched && (wrapper.item.Descrição || '').trim() === pastedDesc);
-                            if (exactMatch) {
-                                foundItemWrapper = exactMatch;
-                                matchType = 'exact';
-                            } else {
-                                // 2. Similarity match pass
-                                const SIMILARITY_THRESHOLD = 0.7;
-                                const potentialMatches = availableItems
-                                    .filter(wrapper => !wrapper.isMatched)
-                                    .map(wrapper => ({
-                                        wrapper: wrapper,
-                                        score: calculateSimilarity(wrapper.item.Descrição || '', pastedDesc)
-                                    }))
-                                    .filter(match => match.score >= SIMILARITY_THRESHOLD)
-                                    .sort((a, b) => b.score - a.score);
-
-                                if (potentialMatches.length > 0) {
-                                    const bestScore = potentialMatches[0].score;
-                                    const topMatches = potentialMatches.filter(m => m.score >= bestScore * 0.95);
-
-                                    let bestMatch = null;
-
-                                    if (topMatches.length === 1) {
-                                        bestMatch = topMatches[0];
-                                        matchType = 'possible';
-                                    } else {
-                                        // Tie-breaking logic
-                                        const refinedMatches = topMatches.filter(({wrapper}) => 
-                                            (wrapper.item.Localização || '').trim() === pastedLocal &&
-                                            (wrapper.item.Estado || '').trim() === pastedEstado
-                                        );
-                                        if (refinedMatches.length > 0) {
-                                            bestMatch = refinedMatches[0]; // Pick the first one
-                                            matchType = 'possible_refined';
-                                        }
-                                    }
-                                    
-                                    if(bestMatch){
-                                        foundItemWrapper = bestMatch.wrapper;
-                                        matchType = matchType === 'possible_refined' ? 'possible_refined' : 'possible';
-                                    } else {
-                                         matchType = 'multiple'; // Could not break the tie
-                                    }
+                            if (potentialMatches.length > 0) {
+                                bestMatchWrapper = potentialMatches[0].wrapper;
+                                bestMatchWrapper.isMatched = true; // Reserva o item
+                                
+                                if (potentialMatches[0].score > 140) {
+                                    matchType = 'exact';
+                                } else if (potentialMatches.length > 1 && potentialMatches[0].score - potentialMatches[1].score < 10) {
+                                    matchType = 'ambiguous';
+                                } else {
+                                    matchType = 'possible';
                                 }
                             }
-
-                            if (foundItemWrapper) {
-                                foundItemWrapper.isMatched = true; // Mark as used for next iterations
-                            }
-
-                            const systemItem = foundItemWrapper ? foundItemWrapper.item : null;
+                            
+                            const systemItem = bestMatchWrapper ? bestMatchWrapper.item : null;
                             const giapItem = pastedTombo ? giapMap.get(pastedTombo) : null;
                             const tomboInUse = pastedTombo && pastedTombo !== 'S/T' && existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
                             
                             let status = 'ok';
-                            if (!systemItem) status = matchType === 'multiple' ? 'multiple_found' : 'not_found';
+                            if (!systemItem) status = 'not_found';
+                            else if (matchType === 'ambiguous') status = 'multiple_found';
                             else if (tomboInUse) status = 'tombo_in_use';
 
                             return {
-                                id: index,
-                                pastedData: {
-                                    descricao: pastedDesc,
-                                    tombamento: pastedTombo,
-                                    localizacao: pastedLocal,
-                                    estado: pastedEstado
-                                },
-                                systemItem: systemItem,
-                                giapItem: giapItem,
-                                status: status,
-                                matchType: matchType,
-                                useGiapDesc: false,
+                                id: rowIndex,
+                                pastedData: { descricao: pastedDesc, tombamento: pastedTombo, localizacao: pastedLocal, estado: pastedEstado },
+                                systemItem, giapItem, status, matchType, useGiapDesc: false,
                             };
-                        });
+                        }).filter(u => u.status !== 'empty_row');
 
                         renderEditByDescPreview(updatesToProcess);
                         document.getElementById('edit-by-desc-results').classList.remove('hidden');
@@ -2242,15 +2275,15 @@
 
             function renderEditByDescPreview(updates) {
                 const container = document.getElementById('edit-by-desc-preview-table-container');
-                const existingTombos = new Map(fullInventory.map(i => [i.Tombamento, i]));
+                const existingTombos = new Map(fullInventory.map(i => [normalizeTombo(i.Tombamento), i]));
                 document.getElementById('edit-by-desc-preview-count').textContent = updates.length;
                 let tableHtml = `<table class="w-full text-xs text-left">
                                     <thead class="bg-slate-200">
                                         <tr>
-                                            <th class="p-2 w-1/3">Descrição (Sistema vs. GIAP)</th>
+                                            <th class="p-2 w-1/3">Descrição (Sistema vs. Planilha)</th>
                                             <th class="p-2">Dados Atuais no Sistema</th>
                                             <th class="p-2">Novos Dados da Planilha</th>
-                                            <th class="p-2">Status</th>
+                                            <th class="p-2">Status da Correspondência</th>
                                         </tr>
                                     </thead><tbody>`;
                 updates.forEach(upd => {
@@ -2258,22 +2291,12 @@
                     let statusHtml = '';
 
                     switch(upd.status) {
-                        case 'not_found':
-                            rowClass = 'bg-yellow-100';
-                            statusHtml = '<span class="font-bold text-yellow-700">Item não encontrado</span>';
-                            break;
-                        case 'multiple_found':
-                             rowClass = 'bg-yellow-100';
-                            statusHtml = '<span class="font-bold text-yellow-700">Múltiplas correspondências.</span>';
-                            break;
-                        case 'tombo_in_use':
-                            rowClass = 'bg-red-100';
-                            statusHtml = `<span class="font-bold text-red-700">Tombo já existe em:<br>${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`;
-                            break;
+                        case 'not_found': rowClass = 'bg-yellow-100'; statusHtml = '<span class="font-bold text-yellow-700">Item não encontrado</span>'; break;
+                        case 'multiple_found': rowClass = 'bg-yellow-100'; statusHtml = '<span class="font-bold text-yellow-700">Correspondência ambígua</span>'; break;
+                        case 'tombo_in_use': rowClass = 'bg-red-100'; statusHtml = `<span class="font-bold text-red-700">Tombo já existe em:<br>${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`; break;
                         case 'ok':
-                            statusHtml = upd.matchType.startsWith('possible')
-                                ? '<span class="font-bold text-blue-700">Possível correspondência</span>'
-                                : '<span class="font-bold text-green-700">Pronto para atualizar</span>';
+                            if (upd.matchType === 'exact') statusHtml = '<span class="font-bold text-green-700">Correspondência Exata</span>';
+                            else statusHtml = '<span class="font-bold text-blue-700">Melhor Correspondência</span>';
                             
                             if(!upd.giapItem && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
                                 statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>';
@@ -2281,23 +2304,25 @@
                             break;
                     }
                     
-                    let descHtml = upd.systemItem ? `<strong>Atual:</strong> ${escapeHtml(upd.systemItem.Descrição)}` : `<strong>Planilha:</strong> ${escapeHtml(upd.pastedData.descricao)}`;
+                    let descHtml = upd.systemItem ? `<strong>Sistema:</strong> ${escapeHtml(upd.systemItem.Descrição)}` : `<strong>Planilha:</strong> ${escapeHtml(upd.pastedData.descricao)}`;
+                     if (upd.systemItem && upd.systemItem.Descrição !== upd.pastedData.descricao) {
+                        descHtml += `<br><strong>Planilha:</strong> <span class="text-blue-600">${escapeHtml(upd.pastedData.descricao)}</span>`
+                    }
                     
                     if (upd.giapItem && upd.systemItem) {
                         const giapDesc = upd.giapItem.Descrição || upd.giapItem.Espécie;
                         if (giapDesc && upd.systemItem.Descrição.trim() !== giapDesc.trim()) {
-                            descHtml += `<br><strong>GIAP:</strong> <span class="text-blue-600">${escapeHtml(giapDesc)}</span>
-                                        <div class="mt-1">
+                            descHtml += `<div class="mt-1 p-1 bg-blue-50 rounded">
                                             <label class="inline-flex items-center">
                                                 <input type="checkbox" class="h-4 w-4 rounded border-gray-300 use-giap-desc-cb" data-update-id="${upd.id}">
-                                                <span class="ml-2 text-slate-700">Usar descrição do GIAP</span>
+                                                <span class="ml-2 text-blue-800 text-xs">Usar descrição do GIAP: ${escapeHtml(giapDesc)}</span>
                                             </label>
                                         </div>`;
                         }
                     }
 
-                    const originalData = upd.systemItem ? `T: ${upd.systemItem.Tombamento}<br>L: ${upd.systemItem.Localização}<br>E: ${upd.systemItem.Estado}` : 'N/A';
-                    const newData = `T: ${upd.pastedData.tombamento}<br>L: ${upd.pastedData.localizacao}<br>E: ${upd.pastedData.estado}`;
+                    const originalData = upd.systemItem ? `T: ${upd.systemItem.Tombamento || 'S/T'}<br>L: ${upd.systemItem.Localização}<br>E: ${upd.systemItem.Estado}` : 'N/A';
+                    const newData = `<strong>T: ${upd.pastedData.tombamento}</strong><br>L: ${upd.pastedData.localizacao}<br>E: ${upd.pastedData.estado}`;
 
                     tableHtml += `<tr class="${rowClass} border-b">
                                     <td class="p-2">${descHtml}</td>
@@ -2381,7 +2406,3 @@
     </script>
 </body>
 </html>
-
-
-
-
