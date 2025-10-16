@@ -442,35 +442,39 @@
             <div id="content-notas_fiscais" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
-                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, agrupadas por categoria. Verifique quais itens já foram alocados no inventário.</p>
+                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, agrupadas por categoria do item. Verifique quais itens já foram alocados no inventário.</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b">
+                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b">
                         <div>
                             <label for="nf-search" class="block text-sm font-medium mb-1">Pesquisar por Nº da NF</label>
                             <input type="text" id="nf-search" placeholder="Digite o número..." class="w-full p-2 border rounded-lg">
                         </div>
                         <div>
                             <label for="nf-item-search" class="block text-sm font-medium mb-1">Pesquisar por Item</label>
-                            <input type="text" id="nf-item-search" placeholder="Digite o nome do item..." class="w-full p-2 border rounded-lg">
+                            <input type="text" id="nf-item-search" placeholder="Nome, espécie..." class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label for="nf-category" class="block text-sm font-medium mb-1">Categoria do Item</label>
+                            <select id="nf-category" class="w-full p-2 border rounded-lg bg-white">
+                                <option value="">Todas as Categorias</option>
+                            </select>
                         </div>
                         <div>
                             <label for="nf-tipo-entrada" class="block text-sm font-medium mb-1">Tipo de Entrada</label>
                             <select id="nf-tipo-entrada" class="w-full p-2 border rounded-lg bg-white">
-                                <option value="">Todas</option>
-                                <option value="Compra">Compra</option>
-                                <option value="Doação">Doação</option>
+                                <option value="">Todos os Tipos</option>
                             </select>
                         </div>
-                        <div class="self-end">
-                            <button id="clear-nf-filters-btn" class="w-full bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300">Limpar Filtros</button>
-                        </div>
                         <div>
-                            <label for="nf-date-start" class="block text-sm font-medium mb-1">Data de Início (Cadastro)</label>
+                            <label for="nf-date-start" class="block text-sm font-medium mb-1">Data de Início</label>
                             <input type="date" id="nf-date-start" class="w-full p-2 border rounded-lg">
                         </div>
                         <div>
-                            <label for="nf-date-end" class="block text-sm font-medium mb-1">Data de Fim (Cadastro)</label>
+                            <label for="nf-date-end" class="block text-sm font-medium mb-1">Data de Fim</label>
                             <input type="date" id="nf-date-end" class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div class="col-span-1 md:col-span-2 flex items-end">
+                            <button id="clear-nf-filters-btn" class="w-full bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300">Limpar Filtros</button>
                         </div>
                     </div>
 
@@ -625,7 +629,7 @@
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
         let itemsToReplace = [];
-        let processedNfData = {}; // To store processed NF data
+        let processedNfData = {};
 
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
@@ -1073,12 +1077,32 @@
             return new Date(0);
         }
 
+        // --- Início: Funções da Aba Notas Fiscais (MELHORADO) ---
+        const itemCategories = {
+            'Informática': ['computador', 'notebook', 'impressora', 'monitor', 'teclado', 'mouse', 'cpu', 'estabilizador', 'nobreak', 'roteador', 'webcam', 'gabinete'],
+            'Mobiliário': ['mesa', 'cadeira', 'armário', 'estante', 'sofá', 'poltrona', 'gaveteiro', 'balcão', 'prateleira', 'longarina', 'cama'],
+            'Eletrodomésticos': ['geladeira', 'frigobar', 'freezer', 'fogão', 'microondas', 'ar condicionado', 'split', 'ventilador', 'bebedouro', 'purificador', 'tv', 'televisor', 'liquidificador', 'sanduicheira'],
+            'Equipamentos Diversos': ['extintor', 'lixeira', 'escada', 'botijão'],
+        };
+
+        function categorizeItem(item) {
+            const description = normalizeStr(item.Descrição || '') + ' ' + normalizeStr(item.Espécie || '');
+            for (const category in itemCategories) {
+                if (itemCategories[category].some(keyword => description.includes(keyword))) {
+                    return category;
+                }
+            }
+            return 'Outros';
+        }
+
         function populateNfTab() {
             if (giapInventory.length === 0) return;
             
             const giapWithNf = giapInventory
-                .filter(item => item.NF && item.NF.trim() !== '')
-                .sort((a, b) => parsePtBrDate(b.Cadastro) - parsePtBrDate(a.Cadastro));
+                .filter(item => item.NF && item.NF.trim() !== '');
+
+            const allCategories = new Set();
+            const allTiposEntrada = new Set();
 
             processedNfData = giapWithNf.reduce((acc, item) => {
                 const nf = item.NF.trim();
@@ -1090,9 +1114,21 @@
                         dataCadastro: item.Cadastro
                     };
                 }
+                const category = categorizeItem(item);
+                allCategories.add(category);
+                if(acc[nf].tipoEntrada && acc[nf].tipoEntrada !== 'N/A') {
+                   allTiposEntrada.add(acc[nf].tipoEntrada);
+                }
+                
                 acc[nf].items.push(item);
                 return acc;
             }, {});
+
+            const categorySelect = document.getElementById('nf-category');
+            categorySelect.innerHTML = '<option value="">Todas as Categorias</option>' + [...allCategories].sort().map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const tipoEntradaSelect = document.getElementById('nf-tipo-entrada');
+            tipoEntradaSelect.innerHTML = '<option value="">Todos os Tipos</option>' + [...allTiposEntrada].sort().map(t => `<option value="${t}">${t}</option>`).join('');
 
             renderNfList(); 
         }
@@ -1104,6 +1140,7 @@
             
             const nfSearchTerm = document.getElementById('nf-search').value.toLowerCase();
             const nfItemSearchTerm = document.getElementById('nf-item-search').value.toLowerCase();
+            const nfCategory = document.getElementById('nf-category').value;
             const nfTipoEntrada = document.getElementById('nf-tipo-entrada').value;
             const startDateStr = document.getElementById('nf-date-start').value;
             const endDateStr = document.getElementById('nf-date-end').value;
@@ -1113,93 +1150,88 @@
             if (endDate) { endDate.setHours(23, 59, 59, 999); }
             if (startDate) { startDate.setHours(0, 0, 0, 0); }
 
-            const filteredNfs = Object.keys(processedNfData).filter(nf => {
-                const nfGroup = processedNfData[nf];
-                
-                if (nfSearchTerm && !nf.toLowerCase().includes(nfSearchTerm)) return false;
-                
-                if (nfItemSearchTerm) {
-                    const itemMatch = nfGroup.items.some(item => 
-                        (item.Descrição || '').toLowerCase().includes(nfItemSearchTerm) || 
-                        (item.Espécie || '').toLowerCase().includes(nfItemSearchTerm)
-                    );
-                    if (!itemMatch) return false;
-                }
+            const nfsByCategory = {};
 
-                if (nfTipoEntrada && nfGroup.tipoEntrada !== nfTipoEntrada) return false;
+            Object.keys(processedNfData).forEach(nf => {
+                const nfGroup = processedNfData[nf];
+
+                if (nfSearchTerm && !nf.toLowerCase().includes(nfSearchTerm)) return;
+                if (nfTipoEntrada && nfGroup.tipoEntrada !== nfTipoEntrada) return;
                 
                 const nfDate = parsePtBrDate(nfGroup.dataCadastro);
-                if (startDate && nfDate < startDate) return false;
-                if (endDate && nfDate > endDate) return false;
-                
-                return true;
+                if (startDate && nfDate < startDate) return;
+                if (endDate && nfDate > endDate) return;
+
+                const matchingItems = nfGroup.items.filter(item => {
+                    const description = normalizeStr(item.Descrição || '') + ' ' + normalizeStr(item.Espécie || '');
+                    if (nfItemSearchTerm && !description.includes(nfItemSearchTerm)) return false;
+                    if (nfCategory && categorizeItem(item) !== nfCategory) return false;
+                    return true;
+                });
+
+                if (matchingItems.length > 0) {
+                    matchingItems.forEach(item => {
+                        const category = nfCategory || categorizeItem(item); // Group by selected category or auto-detected one
+                        if (!nfsByCategory[category]) nfsByCategory[category] = {};
+                        if (!nfsByCategory[category][nf]) {
+                            nfsByCategory[category][nf] = { ...nfGroup, items: [] };
+                        }
+                        nfsByCategory[category][nf].items.push(item);
+                    });
+                }
             });
 
-            if (filteredNfs.length === 0) {
+            const categories = Object.keys(nfsByCategory).sort();
+            if (categories.length === 0) {
                 container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhuma nota fiscal encontrada com os filtros aplicados.</p>`;
                 return;
             }
 
-            const categorizedNfs = filteredNfs.reduce((acc, nfKey) => {
-                const nfGroup = processedNfData[nfKey];
-                const category = nfGroup.tipoEntrada || 'Outros';
-                if (!acc[category]) {
-                    acc[category] = [];
-                }
-                acc[category].push(nfKey);
-                return acc;
-            }, {});
-
-            const categories = Object.keys(categorizedNfs).sort();
             categories.forEach(category => {
                 const categoryHeader = document.createElement('h3');
                 categoryHeader.className = 'text-lg font-bold text-slate-700 p-2 bg-slate-100 rounded-t-lg mt-6 first:mt-0';
                 categoryHeader.textContent = category;
                 container.appendChild(categoryHeader);
 
-                const nfsInCategory = categorizedNfs[category];
-                nfsInCategory.forEach(nf => {
-                    const nfGroup = processedNfData[nf];
+                const nfsInThisCategory = Object.keys(nfsByCategory[category]).sort((a,b) => parsePtBrDate(nfsByCategory[category][b].dataCadastro) - parsePtBrDate(nfsByCategory[category][a].dataCadastro));
+                
+                nfsInThisCategory.forEach(nf => {
+                    const nfGroup = nfsByCategory[category][nf];
                     const nfDetails = document.createElement('details');
-                    nfDetails.className = 'bg-white rounded-lg shadow-sm border mb-3 border-t-0 rounded-t-none';
+                    nfDetails.className = 'bg-white rounded-b-lg shadow-sm border border-t-0 mb-3';
                     nfDetails.open = false;
 
-                    const itemSummaryText = nfGroup.items.slice(0, 2).map(i => escapeHtml(i.Descrição || i.Espécie)).join(', ') + (nfGroup.items.length > 2 ? '...' : '');
-                    
-                    const nfSummary = document.createElement('summary');
-                    nfSummary.className = 'p-4 font-semibold cursor-pointer grid grid-cols-1 md:grid-cols-3 gap-4 items-center hover:bg-slate-50';
-                    nfSummary.innerHTML = `
+                    const tipoEntradaClass = normalizeStr(nfGroup.tipoEntrada).includes('doacao') ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
+                    const summary = document.createElement('summary');
+                    summary.className = 'p-4 font-semibold cursor-pointer grid grid-cols-1 md:grid-cols-4 gap-4 items-center hover:bg-slate-50';
+                    summary.innerHTML = `
                         <div class="md:col-span-2">
-                            <p class="text-xs text-slate-500">NF: <strong class="text-blue-700 text-sm">${escapeHtml(nf)}</strong> | Fornecedor: <strong>${escapeHtml(nfGroup.fornecedor)}</strong></p>
-                            <p class="text-xs text-slate-500 mt-1 truncate">Itens: ${itemSummaryText}</p>
+                            <p class="text-xs text-slate-500">NF: <strong class="text-blue-700 text-sm">${escapeHtml(nf)}</strong></p>
+                            <p class="text-xs text-slate-500 mt-1">Fornecedor: <strong>${escapeHtml(nfGroup.fornecedor)}</strong></p>
                         </div>
                         <div>
                             <p class="text-xs text-slate-500">Data Cadastro</p>
                             <strong>${escapeHtml(nfGroup.dataCadastro)}</strong>
                         </div>
-                    `;
-                    nfDetails.appendChild(nfSummary);
+                        <div class="text-right">
+                             <span class="px-2 py-1 text-xs font-bold ${tipoEntradaClass} rounded-full">${escapeHtml(nfGroup.tipoEntrada)}</span>
+                        </div>`;
+                    nfDetails.appendChild(summary);
 
                     const itemsListContainer = document.createElement('div');
                     itemsListContainer.className = 'p-4 border-t border-slate-200 space-y-2';
-
                     nfGroup.items.forEach(item => {
                         const tombo = item.TOMBAMENTO?.trim();
-                        const allocatedItem = tombo ? giapMap.get(tombo) : undefined;
+                        const systemItem = tombo ? fullInventory.find(i => i.Tombamento?.trim() === tombo) : null;
                         
                         let allocationHtml = `<span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Não Alocado</span>`;
-                        if (allocatedItem) {
-                            const systemItem = fullInventory.find(i => i.Tombamento?.trim() === tombo);
-                             if (systemItem) {
-                                allocationHtml = `
-                                    <div>
-                                        <span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado</span>
-                                        <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(systemItem.Unidade)}</strong> (${escapeHtml(systemItem.Tipo)})</p>
-                                    </div>
-                                `;
-                             }
+                        if (systemItem) {
+                            allocationHtml = `
+                                <div>
+                                    <span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado</span>
+                                    <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(systemItem.Unidade)}</strong></p>
+                                </div>`;
                         }
-
                         const itemDiv = document.createElement('div');
                         itemDiv.className = 'p-3 border rounded-md flex justify-between items-center bg-slate-50/50';
                         itemDiv.innerHTML = `
@@ -1207,18 +1239,15 @@
                                 <p class="font-bold text-slate-800">${escapeHtml(item.Descrição || item.Espécie)}</p>
                                 <p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p>
                             </div>
-                            <div class="text-right ml-4">
-                                ${allocationHtml}
-                            </div>
-                        `;
+                            <div class="text-right ml-4">${allocationHtml}</div>`;
                         itemsListContainer.appendChild(itemDiv);
                     });
-
                     nfDetails.appendChild(itemsListContainer);
                     container.appendChild(nfDetails);
                 });
             });
         }
+        // --- Fim: Funções da Aba Notas Fiscais ---
 
 
         function populateGiapTab() {
@@ -2046,7 +2075,7 @@
                     showNotification('Nova unidade salva com sucesso!', 'success');
                     document.getElementById('add-giap-name').value = '';
                     document.getElementById('add-giap-number').value = '';
-                    updateGiapUnitOptions(); // Refresh the list
+                    updateGiapUnitOptions();
                 } catch(e) {
                     showNotification('Erro ao salvar a nova unidade.', 'error');
                     console.error(e);
@@ -2055,10 +2084,10 @@
                 }
             });
 
-            // --- NOVO: Event Listeners para a Aba de Notas Fiscais ---
             const debouncedRenderNf = debounce(renderNfList, 300);
             document.getElementById('nf-search').addEventListener('input', debouncedRenderNf);
             document.getElementById('nf-item-search').addEventListener('input', debouncedRenderNf);
+            document.getElementById('nf-category').addEventListener('change', renderNfList);
             document.getElementById('nf-tipo-entrada').addEventListener('change', renderNfList);
             document.getElementById('nf-date-start').addEventListener('change', renderNfList);
             document.getElementById('nf-date-end').addEventListener('change', renderNfList);
@@ -2066,6 +2095,7 @@
             document.getElementById('clear-nf-filters-btn').addEventListener('click', () => {
                 document.getElementById('nf-search').value = '';
                 document.getElementById('nf-item-search').value = '';
+                document.getElementById('nf-category').value = '';
                 document.getElementById('nf-tipo-entrada').value = '';
                 document.getElementById('nf-date-start').value = '';
                 document.getElementById('nf-date-end').value = '';
