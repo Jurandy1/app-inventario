@@ -724,6 +724,15 @@
             return score;
         }
 
+        const normalizeTombo = (tombo) => {
+            if (!tombo) return '';
+            let str = String(tombo).trim();
+            if (str.endsWith('.0')) {
+                str = str.slice(0, -2);
+            }
+            return str;
+        };
+
         function parseEstadoEOrigem(texto) {
             const textoCru = (texto || '').trim();
             if (!textoCru) return { estado: 'Regular', origem: '' };
@@ -826,7 +835,7 @@
                     return;
                 }
             }
-            giapMap = new Map(giapInventory.map(item => [String(item['TOMBAMENTO'] || '').trim(), item]));
+            giapMap = new Map(giapInventory.map(item => [normalizeTombo(item['TOMBAMENTO']), item]));
             
             normalizedSystemUnits.clear();
             fullInventory.forEach(item => {
@@ -2138,7 +2147,8 @@
 
                         updatesToProcess = pastedData.map((row, index) => {
                             const pastedDesc = (row.descricao || '').trim();
-                            const pastedTombo = (row.tombamento || 'S/T').trim();
+                            const pastedTomboRaw = (row.tombamento || 'S/T').trim();
+                            const pastedTombo = normalizeTombo(pastedTomboRaw);
                             const pastedLocal = (row.localizacao || '').trim();
                             const pastedEstado = parseEstadoEOrigem((row.estado || '').trim()).estado;
 
@@ -2252,7 +2262,7 @@
                                 ? '<span class="font-bold text-blue-700">Possível correspondência</span>'
                                 : '<span class="font-bold text-green-700">Pronto para atualizar</span>';
                             
-                            if(!upd.giapFound && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
+                            if(!upd.giapItem && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
                                 statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>';
                             }
                             break;
@@ -2358,5 +2368,6 @@
     </script>
 </body>
 </html>
+
 
 
