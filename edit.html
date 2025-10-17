@@ -10,8 +10,8 @@
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family/Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 420px); }
         .reconciliation-container { max-height: calc(100vh - 550px); }
@@ -1538,7 +1538,7 @@
                 container.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado.</p>`;
                 return;
             }
-            arr.forEach(item => {
+            arr.forEach((item, index) => {
                 const id = item[keyField];
                 const div = document.createElement('div');
                 div.className = 'reconciliation-list-item card p-2 text-sm';
@@ -1582,11 +1582,11 @@
                 // Lógica de destaque da sugestão
                 if (suggestionInfo && suggestionInfo.suggestions.has(id)) {
                     const score = suggestionInfo.suggestions.get(id);
-                    // Destaque mais forte para as melhores sugestões
-                    if (score > 0.7 && score >= suggestionInfo.topScore * 0.9) {
+                     // Destaque mais forte APENAS para a melhor sugestão (o primeiro da lista)
+                    if (index === 0 && score > 0.7) { 
                         div.style.backgroundColor = '#dbeafe'; 
                         div.style.borderLeft = '4px solid #3b82f6';
-                    } else if (score > 0.5) {
+                    } else if (score > 0.5) { // Lighter highlight for other good matches
                         div.style.backgroundColor = '#e0f2fe';
                         div.style.borderLeft = '4px solid #0ea5e9';
                     }
@@ -1638,15 +1638,16 @@
             if (containerId === 'system-list') {
                 clearGiapImportSelection();
                 selSys = { id, obj };
+                selGiap = null; // Limpa seleção anterior do GIAP
+
+                // Limpa visualmente a seleção na lista GIAP
+                document.querySelectorAll('#giap-list .selected').forEach(el => el.classList.remove('selected'));
+                
                 document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
                 
                 // Dispara a lógica de sugestão com IA
                 suggestGiapMatchesComAprendizado(obj); 
-
-                if (selGiap) {
-                    openDescriptionChoiceModal();
-                }
 
             } else if (containerId === 'giap-list' && selSys) {
                 selGiap = { tomb: id, obj };
