@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family/Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         .table-container { max-height: calc(100vh - 420px); }
@@ -101,6 +101,22 @@
         .notification-toast.error { background-color: #ef4444; }
         .notification-toast.info { background-color: #3b82f6; }
         .notification-toast.warning { background-color: #f59e0b; }
+        .created-link-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .delete-link-btn {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+        }
+        .delete-link-btn:hover {
+            background-color: #fee2e2;
+        }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -640,6 +656,32 @@
             </form>
         </div>
     </div>
+
+    <!-- MODAL DE ESCOLHA DE DESCRIÇÃO - NOVO -->
+    <div id="desc-choice-modal" class="modal fixed inset-0 z-[70] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
+        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
+             <div class="p-4 border-b">
+                <h3 class="text-xl font-semibold">Escolha a Descrição do Item</h3>
+             </div>
+             <div class="p-6 space-y-4">
+                <p>Qual descrição você prefere para o item <strong id="desc-choice-tombo" class="font-mono"></strong>?</p>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Descrição Atual no Sistema:</p>
+                    <p id="desc-choice-current" class="p-2 bg-gray-100 rounded-md text-sm"></p>
+                </div>
+                 <div>
+                    <p class="text-sm font-medium text-blue-700">Nova Descrição da Planilha GIAP:</p>
+                    <p id="desc-choice-new" class="p-2 bg-blue-50 rounded-md text-sm font-semibold"></p>
+                </div>
+             </div>
+             <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
+                <button type="button" id="desc-choice-cancel-btn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancelar</button>
+                <button type="button" id="desc-choice-keep-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Manter Descrição Atual</button>
+                <button type="button" id="desc-choice-update-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Usar Descrição da Planilha</button>
+             </div>
+        </div>
+    </div>
     
     <!-- Full Page Overlay for saving -->
     <div id="full-page-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
@@ -655,7 +697,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -687,6 +729,7 @@
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
         let padroesConciliacao = []; // IA LEARNING
+        let linksToCreate = []; // Armazena vínculos pendentes
         
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
@@ -724,6 +767,9 @@
         const syncUpdateAllBtn = document.getElementById('sync-update-all-btn');
         const syncKeepDescBtn = document.getElementById('sync-keep-desc-btn');
         const syncCancelBtn = document.getElementById('sync-cancel-btn');
+
+        // Modal de escolha de descrição
+        const descChoiceModal = document.getElementById('desc-choice-modal');
 
 
         // --- Funções Utilitárias ---
@@ -1033,7 +1079,7 @@
         function initializeUI() {
             populateEditableInventoryTab();
             populateUnitMappingTab();
-            populateReconciliationTab_Optimized();
+            populateReconciliationTab();
             populatePendingTransfersTab();
             populateImportAndReplaceTab();
             populateGiapTab();
@@ -1475,10 +1521,14 @@
             setupUnitSelect('edit-by-desc-tipo', 'edit-by-desc-unit'); // Nova configuração
         }
        
-        function populateReconciliationTab_Optimized() {
-            const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
+        function populateReconciliationTab() {
+            const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
             const sel = document.getElementById('filter-tipo');
             sel.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            
+            // Preenche filtros da aba "Itens a Tombar"
+            const tombarFilterTipo = document.getElementById('tombar-filter-tipo');
+            tombarFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
         function renderList(containerId, arr, keyField, primaryLabelField, suggestionInfo = null) {
@@ -1555,22 +1605,27 @@
             const giapFilterText = normalizeStr(document.getElementById('giap-list-filter').value);
 
             const usedTombamentos = new Set(fullInventory.map(i => normalizeStr(i.Tombamento)).filter(Boolean));
+            // Adiciona tombos pendentes de vínculo para não serem mostrados como disponíveis
+            linksToCreate.forEach(link => usedTombamentos.add(normalizeTombo(link.giapItem.TOMBAMENTO)));
+
             const mappedGiapUnits = unitMapping[unidade] || [unidade];
 
             const systemItems = fullInventory.filter(i => {
                 const tombo = (i.Tombamento || '').trim();
-                return i.Unidade === unidade && 
+                const isPending = linksToCreate.some(l => l.systemItem.id === i.id);
+                return !isPending &&
+                       i.Unidade === unidade && 
                        (!tombo || tombo.toLowerCase() === 's/t') &&
-                       !tombo.toLowerCase().includes('permuta') &&
+                       !normalizeStr(tombo).includes('permuta') &&
                        normalizeStr(i.Descrição).includes(systemFilterText);
             });
 
             const giapItems = giapInventory.filter(g => {
-                const tomboTrimmed = normalizeStr(g.TOMBAMENTO);
+                const tomboTrimmed = normalizeTombo(g.TOMBAMENTO);
                 const giapDesc = normalizeStr(g.Descrição || g.Espécie);
                 return tomboTrimmed && 
                        !usedTombamentos.has(tomboTrimmed) && 
-                       mappedGiapUnits.includes(g.Unidade) &&
+                       mappedGiapUnits.map(normalizeStr).includes(normalizeStr(g.Unidade)) &&
                        giapDesc.includes(giapFilterText);
             });
 
@@ -1589,13 +1644,15 @@
                 // Dispara a lógica de sugestão com IA
                 suggestGiapMatchesComAprendizado(obj); 
 
-                if (selGiap) createLink();
+                if (selGiap) {
+                    openDescriptionChoiceModal();
+                }
 
             } else if (containerId === 'giap-list' && selSys) {
                 selGiap = { tomb: id, obj };
                 document.querySelectorAll('#giap-list .selected, #giap-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
-                createLink();
+                openDescriptionChoiceModal();
 
             } else if (containerId === 'giap-list' && !selSys) {
                 element.classList.toggle('selected-for-import');
@@ -1622,20 +1679,43 @@
             updateImportButton();
         }
         
-        function createLink() {
-            const div = document.createElement('div');
-            div.className = 'card link-success p-2 text-sm bg-green-50 border-l-4 border-green-500';
-            div.textContent = `VINCULADO: ${selSys.obj.Descrição} ↔ ${selGiap.tomb}`;
-            div.dataset.systemId = selSys.id;
-            div.dataset.tombamento = selGiap.tomb;
+        function addLinkToCreate(useGiapDescription) {
+            const link = {
+                systemItem: selSys.obj,
+                giapItem: selGiap.obj,
+                useGiapDescription
+            };
+            linksToCreate.push(link);
+            renderCreatedLinks();
 
-            document.getElementById('created-links').append(div);
-            
             document.querySelector(`#system-list div[data-id='${selSys.id}']`).classList.add('linked');
             document.querySelector(`#giap-list div[data-id='${selGiap.tomb}']`).classList.add('linked');
 
             selSys = selGiap = null;
             document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
+        }
+
+        function renderCreatedLinks() {
+            const container = document.getElementById('created-links');
+            container.innerHTML = linksToCreate.map((link, index) => {
+                const systemDesc = link.systemItem.Descrição;
+                const giapDesc = link.giapItem.Descrição || link.giapItem.Espécie;
+                const finalDesc = link.useGiapDescription ? giapDesc : systemDesc;
+
+                return `<div class="created-link-item card link-success p-2 text-sm bg-green-50 border-l-4 border-green-500">
+                            <span>
+                                <strong>S/T:</strong> ${escapeHtml(systemDesc)} ↔ 
+                                <strong>Tombo:</strong> ${escapeHtml(link.giapItem.TOMBAMENTO)}<br>
+                                <span class="text-xs text-blue-700">Descrição a ser salva: "${escapeHtml(finalDesc)}"</span>
+                            </span>
+                            <button class="delete-link-btn" data-index="${index}" title="Remover Vínculo">
+                                <svg class="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/>
+                                </svg>
+                            </button>
+                        </div>`;
+            }).join('');
         }
         
         function renderConciliationLists() {
@@ -1673,6 +1753,79 @@
             modal.querySelector('.modal-container')?.classList.add('opacity-0', 'scale-95');
             setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
+
+        function openDescriptionChoiceModal() {
+            if (!selSys || !selGiap) return;
+
+            document.getElementById('desc-choice-tombo').textContent = selGiap.tomb;
+            document.getElementById('desc-choice-current').textContent = selSys.obj.Descrição;
+            document.getElementById('desc-choice-new').textContent = selGiap.obj.Descrição || selGiap.obj.Espécie;
+            
+            descChoiceModal.classList.remove('hidden');
+        }
+
+        function closeDescriptionChoiceModal() {
+            descChoiceModal.classList.add('hidden');
+        }
+
+        // --- ABA "ITENS A TOMBAR" ---
+        function renderItensATombar() {
+            const container = document.getElementById('itens-a-tombar-container');
+            const tipo = document.getElementById('tombar-filter-tipo').value;
+            const unidade = document.getElementById('tombar-filter-unidade').value;
+
+            const itemsPendentes = fullInventory.filter(item => 
+                item.etiquetaPendente === true &&
+                (!tipo || item.Tipo === tipo) &&
+                (!unidade || item.Unidade === unidade)
+            );
+
+            if (itemsPendentes.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item pendente de tombamento com os filtros selecionados.</p>';
+                return;
+            }
+
+            const groupedByTipo = itemsPendentes.reduce((acc, item) => {
+                const tipoKey = item.Tipo || 'Sem Tipo';
+                if (!acc[tipoKey]) acc[tipoKey] = [];
+                acc[tipoKey].push(item);
+                return acc;
+            }, {});
+
+            let html = '';
+            for (const tipo of Object.keys(groupedByTipo).sort()) {
+                html += `<h3 class="text-lg font-bold text-slate-700 p-2 bg-slate-100 rounded-t-lg mt-4">${tipo}</h3>`;
+                
+                const groupedByUnidade = groupedByTipo[tipo].reduce((acc, item) => {
+                    const unidadeKey = item.Unidade || 'Sem Unidade';
+                    if (!acc[unidadeKey]) acc[unidadeKey] = [];
+                    acc[unidadeKey].push(item);
+                    return acc;
+                }, {});
+
+                for (const unidade of Object.keys(groupedByUnidade).sort()) {
+                    html += `<details class="bg-white rounded-lg shadow-sm border mb-2" open><summary class="p-4 font-semibold cursor-pointer hover:bg-slate-50">${unidade}</summary>
+                                <div class="p-2 border-t">
+                                    <table class="w-full text-sm">
+                                        <thead><tr class="border-b"><th class="p-2 text-left">Descrição</th><th class="p-2 text-left">Novo Tombo</th><th class="p-2 text-left">Ação</th></tr></thead>
+                                        <tbody>`;
+                    
+                    groupedByUnidade[unidade].forEach(item => {
+                        html += `<tr class="border-b hover:bg-green-50">
+                                    <td class="p-2">${escapeHtml(item.Descrição)}</td>
+                                    <td class="p-2 font-mono">${escapeHtml(item.Tombamento)}</td>
+                                    <td class="p-2">
+                                        <button data-id="${item.id}" class="confirmar-tombamento-btn text-xs bg-green-100 text-green-700 px-3 py-1 rounded-md hover:bg-green-200">Confirmar Tombamento</button>
+                                    </td>
+                                </tr>`;
+                    });
+                    
+                    html += `</tbody></table></div></details>`;
+                }
+            }
+            container.innerHTML = html;
+        }
+
 
         // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -1981,12 +2134,13 @@
 
                 document.getElementById('system-list-filter').value = '';
                 document.getElementById('giap-list-filter').value = '';
-
+                linksToCreate = [];
+                renderCreatedLinks();
                 renderConciliationLists();
                 clearGiapImportSelection();
 
                 document.getElementById('quick-actions').classList.remove('hidden');
-                document.getElementById('created-links').innerHTML = '';
+                
                 selSys = selGiap = null;
             });
 
@@ -2001,43 +2155,36 @@
             });
             
             document.getElementById('save-links').addEventListener('click', async () => {
-                const linkedItems = document.querySelectorAll('#created-links > div');
-                if (linkedItems.length === 0) return showNotification('Nenhum novo link para salvar.', 'info');
+                if (linksToCreate.length === 0) return showNotification('Nenhum novo link para salvar.', 'info');
 
-                showOverlay(`Salvando ${linkedItems.length} links...`);
+                showOverlay(`Salvando ${linksToCreate.length} links...`);
                 const batch = writeBatch(db);
 
-                linkedItems.forEach(div => {
-                    const systemId = div.dataset.systemId;
-                    const systemItem = fullInventory.find(i => i.id === systemId);
-                    const tombamento = div.dataset.tombamento;
-                    const giapItem = giapMap.get(tombamento);
+                linksToCreate.forEach(link => {
+                    const { systemItem, giapItem, useGiapDescription } = link;
+                    const docRef = doc(db, 'patrimonio', systemItem.id);
+                    
+                    const newDesc = useGiapDescription ? (giapItem.Descrição || giapItem.Espécie) : systemItem.Descrição;
 
-                    if (systemItem && giapItem) {
-                        const oldObs = systemItem.Observação || '';
-                        const docRef = doc(db, 'patrimonio', systemId);
-                        
-                        const originalTombo = (systemItem.Tombamento || '').trim().toLowerCase();
-                        const wasST = !originalTombo || originalTombo === 's/t';
+                    // Ação: Apenas atualiza o item existente, não cria um novo, evitando duplicatas.
+                    batch.update(docRef, {
+                        Tombamento: giapItem.TOMBAMENTO,
+                        Descrição: newDesc,
+                        Fornecedor: giapItem['Nome Fornecedor'],
+                        NF: giapItem['NF'],
+                        etiquetaPendente: true, // Flag para a aba "Itens a Tombar"
+                        updatedAt: serverTimestamp()
+                    });
 
-                        batch.update(docRef, {
-                            Tombamento: tombamento, Descrição: giapItem.Descrição || giapItem.Espécie,
-                            Fornecedor: giapItem['Nome Fornecedor'], NF: giapItem['NF'],
-                            Observação: wasST ? 'Item era S/T. Conciliado.' : oldObs,
-                            updatedAt: serverTimestamp()
-                        });
-
-                        const giapDesc = `${giapItem.Descrição || ''} ${giapItem.Espécie || ''}`;
-                        const systemDesc = systemItem.Descrição || '';
-                        const score = calculateSimilarity(systemDesc, giapDesc);
-                        salvarPadraoConciliacao(systemItem, giapItem, score);
-                    }
+                    // Salva o padrão de conciliação para a IA
+                    const score = calculateSimilarity(systemItem.Descrição, (giapItem.Descrição || giapItem.Espécie));
+                    salvarPadraoConciliacao(systemItem, giapItem, score);
                 });
 
                 try {
                     await batch.commit();
                     await idb.metadata.clear();
-                    showNotification(`${linkedItems.length} links salvos! A página será recarregada.`, 'success');
+                    showNotification(`${linksToCreate.length} links salvos! A página será recarregada.`, 'success');
                     setTimeout(() => window.location.reload(), 2000);
                 } catch (error) {
                     hideOverlay();
@@ -2045,6 +2192,26 @@
                     console.error("Erro ao salvar links:", error);
                 }
             });
+
+            // Listener para deletar um vínculo pendente
+            document.getElementById('created-links').addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-link-btn');
+                if (!deleteBtn) return;
+                
+                const index = parseInt(deleteBtn.dataset.index, 10);
+                const removedLink = linksToCreate.splice(index, 1)[0];
+
+                if (removedLink) {
+                    const systemEl = document.querySelector(`#system-list div[data-id='${removedLink.systemItem.id}']`);
+                    if (systemEl) systemEl.classList.remove('linked');
+
+                    const giapEl = document.querySelector(`#giap-list div[data-id='${removedLink.giapItem.TOMBAMENTO}']`);
+                    if (giapEl) giapEl.classList.remove('linked');
+                }
+                renderCreatedLinks();
+                showNotification('Vínculo removido.', 'info');
+            });
+
 
             document.getElementById('import-giap-btn').addEventListener('click', async () => {
                 if (giapItemsForImport.length === 0) return showNotification('Nenhum item GIAP selecionado para importar.', 'warning');
@@ -2065,6 +2232,7 @@
                         Tipo: tipo, Unidade: unidade, Localização: '',
                         Fornecedor: giapItem['Nome Fornecedor'] || '', NF: giapItem.NF || '', 'Origem da Doação': '',
                         Estado: estado, Quantidade: 1, Observação: `Importado do GIAP. Unidade original: ${giapItem.Unidade || 'N/A'}`,
+                        etiquetaPendente: true,
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItem);
@@ -2087,10 +2255,10 @@
                 const kw = normalizeStr(document.getElementById('leftover-keyword').value);
                 const tfilter = document.getElementById('leftover-tombo').value.trim();
                 
-                const usedTombamentos = new Set(fullInventory.map(i => normalizeStr(i.Tombamento)).filter(Boolean));
+                const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
                 
                 const sob = giapInventory.filter(g => {
-                    const tombo = normalizeStr(g.TOMBAMENTO);
+                    const tombo = normalizeTombo(g.TOMBAMENTO);
                     if (!tombo || tombo.includes('permuta')) return false;
 
                     const giapDesc = normalizeStr(g.Descrição || g.Espécie || '');
@@ -2116,11 +2284,24 @@
                 showNotification(`${sob.length} tombos sobrando listados.`, 'success');
             });
             
-            const subNavButtons = document.querySelectorAll('#content-importacao .sub-nav-btn');
-            subNavButtons.forEach(button => {
+            const subNavButtonsConciliar = document.querySelectorAll('#content-conciliar .sub-nav-btn');
+            subNavButtonsConciliar.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const subTab = e.currentTarget.dataset.subtabConciliar;
+                    subNavButtonsConciliar.forEach(btn => btn.classList.toggle('active', btn.dataset.subtabConciliar === subTab));
+                    document.getElementById('subtab-conciliar-conciliacao_main').classList.toggle('hidden', subTab !== 'conciliacao_main');
+                    document.getElementById('subtab-conciliar-itens_a_tombar').classList.toggle('hidden', subTab !== 'itens_a_tombar');
+                    if(subTab === 'itens_a_tombar') {
+                        renderItensATombar();
+                    }
+                });
+            });
+
+            const subNavButtonsImport = document.querySelectorAll('#content-importacao .sub-nav-btn');
+            subNavButtonsImport.forEach(button => {
                 button.addEventListener('click', (e) => {
                     const subTab = e.currentTarget.dataset.subtab;
-                    subNavButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.subtab === subTab));
+                    subNavButtonsImport.forEach(btn => btn.classList.toggle('active', btn.dataset.subtab === subTab));
                     document.getElementById('subtab-content-substituir').classList.toggle('hidden', subTab !== 'substituir');
                     document.getElementById('subtab-content-edit-by-desc').classList.toggle('hidden', subTab !== 'edit-by-desc'); // Novo
                     document.getElementById('subtab-content-massa').classList.toggle('hidden', subTab !== 'massa');
@@ -2176,6 +2357,7 @@
                             Tipo: massTransferTipo.value || '', Unidade: destinationUnit, Localização: '',
                             Fornecedor: giapItem['Nome Fornecedor'] || '', NF: giapItem.NF || '', 'Origem da Doação': '',
                             Estado: select.value, Quantidade: 1, Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`,
+                            etiquetaPendente: true,
                             createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                         };
                         batch.set(newItemRef, newItem);
@@ -2261,6 +2443,7 @@
                         'Origem da Doação': origem,
                         Quantidade: 1, Fornecedor: '', NF: '', 
                         Observação: 'Importado via substituição de planilha.',
+                        etiquetaPendente: (item.TOMBO && item.TOMBO.toLowerCase() !== 's/t'),
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItemData);
@@ -2312,7 +2495,59 @@
                 }
             });
 
-            // --- INÍCIO: Listeners para a Nova Ferramenta "Editar por Descrição" ---
+            // --- LISTENERS MODAL ESCOLHA DESCRIÇÃO ---
+            document.getElementById('desc-choice-cancel-btn').addEventListener('click', () => {
+                selSys = selGiap = null;
+                document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
+                closeDescriptionChoiceModal();
+            });
+            document.getElementById('desc-choice-keep-btn').addEventListener('click', () => {
+                addLinkToCreate(false);
+                closeDescriptionChoiceModal();
+            });
+            document.getElementById('desc-choice-update-btn').addEventListener('click', () => {
+                addLinkToCreate(true);
+                closeDescriptionChoiceModal();
+            });
+
+            // --- LISTENERS ABA "ITENS A TOMBAR" ---
+            document.getElementById('tombar-filter-tipo').addEventListener('change', () => {
+                 const tipo = document.getElementById('tombar-filter-tipo').value;
+                const unidades = [...new Set(fullInventory
+                    .filter(i => i.etiquetaPendente === true && (!tipo || i.Tipo === tipo))
+                    .map(i => i.Unidade).filter(Boolean))].sort();
+                const selU = document.getElementById('tombar-filter-unidade');
+                selU.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option>${u}</option>`).join('');
+                selU.disabled = false;
+                renderItensATombar();
+            });
+             document.getElementById('tombar-filter-unidade').addEventListener('change', renderItensATombar);
+             document.getElementById('itens-a-tombar-container').addEventListener('click', async (e) => {
+                const btn = e.target.closest('.confirmar-tombamento-btn');
+                if (!btn) return;
+                
+                const id = btn.dataset.id;
+                btn.disabled = true;
+                btn.textContent = 'Salvando...';
+
+                try {
+                    const docRef = doc(db, 'patrimonio', id);
+                    await updateDoc(docRef, { etiquetaPendente: false });
+                    
+                    const itemInInventory = fullInventory.find(i => i.id === id);
+                    if(itemInInventory) itemInInventory.etiquetaPendente = false;
+
+                    showNotification('Tombamento confirmado!', 'success');
+                    renderItensATombar();
+                } catch (error) {
+                    console.error('Erro ao confirmar tombamento:', error);
+                    showNotification('Erro ao confirmar.', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Confirmar Tombamento';
+                }
+             });
+
+            // --- LISTENERS "EDITAR POR DESCRIÇÃO" ---
             document.getElementById('preview-edit-by-desc-btn').addEventListener('click', () => {
                 const unidade = document.getElementById('edit-by-desc-unit').value;
                 const data = document.getElementById('edit-by-desc-data').value;
@@ -2335,7 +2570,6 @@
                         const inventoryInUnit = fullInventory.filter(i => i.Unidade === unidade);
                         const existingTombos = new Map(fullInventory.map(i => [normalizeTombo(i.Tombamento), i]));
 
-                        // Cria um "pool" de itens disponíveis para evitar múltiplas correspondências para o mesmo item
                         const availableItems = inventoryInUnit.map(item => ({ item, isMatched: false }));
                         
                         updatesToProcess = pastedData.map((row, rowIndex) => {
@@ -2346,13 +2580,9 @@
                             const pastedEstado = parseEstadoEOrigem((row.estado || '').trim()).estado;
 
                             if (!pastedDesc) {
-                                return { 
-                                    id: rowIndex, pastedData: {}, systemItem: null, 
-                                    status: 'empty_row', matchType: 'n/a' 
-                                };
+                                return { id: rowIndex, status: 'empty_row' };
                             }
                             
-                            // Calcula um score de correspondência para todos os itens disponíveis
                             const potentialMatches = availableItems
                                 .filter(wrapper => !wrapper.isMatched)
                                 .map(wrapper => {
@@ -2367,7 +2597,7 @@
                                     
                                     return { wrapper, score };
                                 })
-                                .filter(match => match.score > 60) // Limiar mínimo de score
+                                .filter(match => match.score > 60) 
                                 .sort((a, b) => b.score - a.score);
 
                             let bestMatchWrapper = null;
@@ -2375,7 +2605,7 @@
                             
                             if (potentialMatches.length > 0) {
                                 bestMatchWrapper = potentialMatches[0].wrapper;
-                                bestMatchWrapper.isMatched = true; // Reserva o item
+                                bestMatchWrapper.isMatched = true; 
                                 
                                 if (potentialMatches[0].score > 140) {
                                     matchType = 'exact';
@@ -2505,6 +2735,10 @@
                         }
                     }
 
+                    if(upd.pastedData.tombamento && upd.pastedData.tombamento.toLowerCase() !== 's/t') {
+                        updatePayload.etiquetaPendente = true;
+                    }
+
                     batch.update(docRef, updatePayload);
                 });
 
@@ -2522,7 +2756,7 @@
             // --- FIM: Listeners da Nova Ferramenta ---
 
 
-            // --- NOVO: Event Listeners para a Aba de Notas Fiscais ---
+            // --- Listeners para a Aba de Notas Fiscais ---
             const debouncedRenderNf = debounce(renderNfList, 300);
             document.getElementById('nf-search').addEventListener('input', debouncedRenderNf);
             document.getElementById('nf-item-search').addEventListener('input', debouncedRenderNf);
@@ -2542,5 +2776,4 @@
     </script>
 </body>
 </html>
-
 
