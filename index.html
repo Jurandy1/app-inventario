@@ -3,83 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auditoria e Edição - Sistema de Patrimônio</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>DIRETORIA TÉCNICA DE ALMOXARIFADO E PATRIMÔNIO - SEMCAS</title>
     
+    <!-- Scripts e Links -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Estilos -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .table-container { max-height: calc(100vh - 420px); }
-        .reconciliation-container { max-height: calc(100vh - 550px); }
+        :root {
+            --primary-blue: #1e40af;
+            --secondary-blue: #3b82f6;
+            --light-blue: #60a5fa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .btn-primary { background-color: var(--primary-blue); color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-success:hover { background-color: #059669; }
+        .btn-danger { background-color: var(--error); color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-secondary { background-color: #e2e8f0; color: #475569; }
+        .btn-secondary:hover { background-color: #cbd5e1; }
+
+        .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background: #d1fae5; color: #059669; }
+        .badge-blue { background: #dbeafe; color: #2563eb; }
+        .badge-yellow { background: #fef3c7; color: #d97706; }
+        .badge-red { background: #fee2e2; color: #dc2626; }
+
+        .header-banner {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
         .nav-btn {
             padding: 0.75rem 1rem;
             border-bottom: 3px solid transparent;
             transition: all 0.2s ease;
             font-weight: 600;
             color: #475569;
-        }
-        .nav-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
-        .saving-spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #3b82f6;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
+            white-space: nowrap;
             display: inline-block;
+            text-decoration: none;
+            cursor: pointer;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; }
-        .fade-in { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .is-dirty { background-color: #fef9c3 !important; }
+        .nav-btn:hover { background-color: #f8fafc; }
+        .nav-btn.active { color: var(--secondary-blue); border-bottom-color: var(--secondary-blue); }
         
-        #map-system-unit-select, #map-giap-unit-multiselect {
-            height: 100%; 
-            min-width: 500px;
-        }
-
-        .select-container {
-            height: 450px;
-            overflow: auto;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            background-color: white;
-        }
-        
-        .select-container select {
-            border: none;
-            padding: 0.5rem;
-            width: 100%;
-        }
-
         .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-container { transition: all 0.3s ease; max-height: 90vh; }
+
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .reconciliation-list-item { cursor: pointer; transition: background-color 0.2s; }
-        .reconciliation-list-item:hover { background-color: #eff6ff; }
-        .reconciliation-list-item.selected { background-color: #dbeafe; border-left: 4px solid #3b82f6; font-weight: 600; }
-        .reconciliation-list-item.selected-for-import { background-color: #e0e7ff; border-left: 4px solid #4f46e5; }
-        .reconciliation-list-item.linked { background-color: #dcfce7; color: #166534; pointer-events: none; border-left: 4px solid #22c55e; }
-        
-        .sub-nav-btn {
-            padding: 0.5rem 1rem;
-            border: 1px solid transparent;
-            border-bottom: 0;
-            margin-bottom: -1px;
-            border-radius: 6px 6px 0 0;
-            font-weight: 600;
-            color: #475569;
-            cursor: pointer;
-            background-color: #f8fafc;
+        .loading-spinner, .btn-spinner {
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid var(--secondary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        .sub-nav-btn.active {
-            background-color: white;
-            border-color: #e2e8f0;
-            color: #3b82f6;
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            margin: auto;
         }
+        .btn-spinner {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .notification-toast {
             position: fixed;
@@ -98,605 +119,216 @@
         .notification-toast.success { background-color: #10b981; }
         .notification-toast.error { background-color: #ef4444; }
         .notification-toast.info { background-color: #3b82f6; }
-        .notification-toast.warning { background-color: #f59e0b; }
-        .created-link-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .delete-link-btn {
-            background: none;
-            border: none;
-            color: #ef4444;
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 50%;
-        }
-        .delete-link-btn:hover {
-            background-color: #fee2e2;
-        }
+
     </style>
 </head>
 <body class="text-slate-700 antialiased">
-    <div id="auth-gate" class="hidden">
 
-        <header class="bg-white shadow-md sticky top-0 z-50">
-            <div class="container mx-auto p-4 flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <div>
-                        <h1 class="text-2xl font-bold text-slate-800">Auditoria e Edição do Inventário</h1>
-                        <p id="feedback-status" class="text-sm font-semibold text-slate-600">Pronto para começar.</p>
-                    </div>
-                    <button id="force-refresh-btn" title="Forçar Atualização dos Dados" class="p-2 rounded-md hover:bg-slate-100 text-slate-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                    </button>
-                </div>
-                <div id="user-info-edit" class="text-right">
-                    <p id="user-email-edit" class="font-semibold"></p>
-                    <p class="text-xs text-green-600 font-bold">Modo de Edição Ativado</p>
-                    <button id="logout-btn" class="text-sm text-red-600 hover:underline">Sair</button>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Navegação por Abas -->
-        <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[88px]">
-            <div class="container mx-auto px-4">
-                <div id="edit-nav" class="flex space-x-1 overflow-x-auto">
-                    <button class="nav-btn active" data-tab="edicao">✏️ Inventário Editável</button>
-                    <button class="nav-btn" data-tab="unidades">🔗 Ligar Unidades</button>
-                    <button class="nav-btn" data-tab="conciliar">🤝 Conciliar Itens</button>
-                    <button class="nav-btn" data-tab="sobrando">⚠️ Tombos Sobrando</button>
-                    <button class="nav-btn" data-tab="transferencias">🚨 Transferências</button>
-                    <button class="nav-btn" data-tab="importacao">🔄 Importação e Substituição</button>
-                    <button class="nav-btn" data-tab="notas_fiscais">📋 Notas Fiscais</button>
-                    <button class="nav-btn" data-tab="giap">📋 Planilha GIAP</button>
-                </div>
-            </div>
-        </nav>
-
-        <main class="container mx-auto p-4">
-            
-            <!-- ABA: Inventário Editável -->
-            <div id="content-edicao" class="fade-in">
-                 <div class="card">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                            <label for="edit-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
-                            <select id="edit-filter-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                        </div>
-                        <div>
-                            <label for="edit-filter-unidade" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
-                            <select id="edit-filter-unidade" class="w-full p-2 border rounded-lg bg-white"></select>
-                             <div class="flex justify-between items-center mt-1">
-                                <p id="unit-item-count" class="text-sm font-semibold text-slate-600"></p>
-                                <button type="button" id="add-item-to-unit-btn" class="hidden text-sm bg-green-100 text-green-700 px-3 py-1 rounded-md hover:bg-green-200">
-                                    + Adicionar Item
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <label for="edit-filter-estado" class="block text-sm font-medium mb-1">Filtrar por Estado</label>
-                            <select id="edit-filter-estado" class="w-full p-2 border rounded-lg bg-white"></select>
-                        </div>
-                        <div>
-                            <label for="edit-filter-descricao" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
-                            <input type="text" id="edit-filter-descricao" class="w-full p-2 border rounded-lg" placeholder="Digite para buscar...">
-                        </div>
-                    </div>
-                    <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 flex items-center gap-2" disabled>
-                        <span id="save-btn-spinner" class="hidden saving-spinner"></span>
-                        <span id="save-btn-text">Salvar Alterações</span>
-                    </button>
-                </div>
-                <div class="card mt-6 p-0 overflow-hidden">
-                    <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1900px]">
-                            <thead class="bg-slate-100 sticky top-0">
-                                <tr>
-                                    <th class="p-3 text-left font-semibold">Ações</th>
-                                    <th class="p-3 text-left font-semibold">Tombamento</th>
-                                    <th class="p-3 text-left font-semibold">Descrição</th>
-                                    <th class="p-3 text-left font-semibold">Tipo</th>
-                                    <th class="p-3 text-left font-semibold">Unidade</th>
-                                    <th class="p-3 text-left font-semibold">Localização</th>
-                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
-                                    <th class="p-3 text-left font-semibold">NF</th>
-                                    <th class="p-3 text-left font-semibold">Origem da Doação</th>
-                                    <th class="p-3 text-left font-semibold">Estado</th>
-                                    <th class="p-3 text-left font-semibold">Quantidade</th>
-                                    <th class="p-3 text-left font-semibold">Observação</th>
-                                </tr>
-                            </thead>
-                            <tbody id="edit-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ABA: Ligar Unidades -->
-            <div id="content-unidades" class="hidden fade-in">
-                <div class="card">
-                    <h2 class="text-xl font-bold text-slate-800 mb-2">Mapeamento de Unidades</h2>
-                    <p class="text-sm text-slate-600 mb-4">Ligue uma ou mais 'Unidades do Sistema' a uma ou mais 'Unidades da Planilha'. Use Ctrl/Shift+Click para múltiplas seleções.</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="map-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo (Sistema)</label>
-                            <select id="map-filter-tipo" class="w-full p-2 border rounded-lg bg-white mb-4"></select>
-                            <label for="map-system-unit-select" class="block text-sm font-medium mb-1">Unidade(s) do Sistema</label>
-                            <div class="select-container">
-                                <select id="map-system-unit-select" multiple></select>
-                            </div>
-                        </div>
-                        <div>
-                             <label for="map-giap-unit-multiselect" class="block text-sm font-medium mb-1">Unidade(s) da Planilha GIAP</label>
-                             <input type="text" id="map-giap-filter" class="w-full p-2 border rounded-lg my-2" placeholder="Pesquisar unidade da planilha...">
-                            <div class="select-container">
-                                <select id="map-giap-unit-multiselect" multiple></select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <button id="save-mapping-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Salvar Ligação</button>
-                    </div>
-                    <div class="mt-6 border-t pt-4">
-                        <h3 class="font-bold text-slate-700 mb-2">Ligações Salvas</h3>
-                        <div id="saved-mappings-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ABA: Conciliar Itens -->
-            <div id="content-conciliar" class="hidden fade-in">
-                <div class="card">
-                    <div class="flex border-b mb-6">
-                        <button class="sub-nav-btn active" data-subtab-conciliar="conciliacao_main">Conciliação</button>
-                        <button class="sub-nav-btn" data-subtab-conciliar="itens_a_tombar">Itens S/T a Tombar</button>
-                    </div>
-                    
-                    <div id="subtab-conciliar-conciliacao_main">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
-                        <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo. O sistema irá sugerir os melhores tombos para o item selecionado.</p>
-                        <div class="flex flex-wrap items-end gap-2 mb-4">
-                            <div class="flex-grow">
-                                <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
-                                <select id="filter-tipo" class="w-full border p-2 rounded-lg mt-1">
-                                    <option value="">Todos os Tipos</option>
-                                </select>
-                            </div>
-                            <div class="flex-grow">
-                                <label for="filter-unidade" class="text-sm font-medium">Unidade</label>
-                                <select id="filter-unidade" class="w-full border p-2 rounded-lg mt-1">
-                                    <option value="">Selecione o Tipo Primeiro</option>
-                                </select>
-                            </div>
-                            <button id="load-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                                Carregar
-                            </button>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento no Sistema</h3>
-                                <input type="text" id="system-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                <div id="system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
-                            </div>
-                            <div>
-                                <h3 class="font-semibold text-slate-800 mb-2">Tombos Disponíveis (GIAP)</h3>
-                                <input type="text" id="giap-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                <div id="giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
-                            </div>
-                        </div>
-                        <div id="quick-actions" class="mt-6 border-t pt-4 hidden">
-                            <h3 class="font-semibold text-slate-800 mb-2">Vínculos Criados</h3>
-                            <div id="created-links" class="space-y-2 mb-4"></div>
-                            <div class="flex items-center gap-2">
-                                <button id="save-links" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Vínculos</button>
-                                <button id="clear-selections" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Limpar Seleções</button>
-                            </div>
-                        </div>
-                        <!-- Seção de Importação GIAP -->
-                        <div id="giap-import-section" class="mt-6 border-t pt-4">
-                            <h3 class="font-semibold text-slate-800 mb-2">📥 Importar Tombos do GIAP para esta Unidade</h3>
-                            <p class="text-sm text-slate-600 mb-4">Selecione um ou mais itens da lista "Tombos Disponíveis" (sem selecionar um item da lista à esquerda) para importá-los diretamente.</p>
-                            <div class="flex items-end gap-4">
-                                <div>
-                                    <label for="import-estado-select" class="block text-sm font-medium mb-1">Estado dos Itens a Importar</label>
-                                    <select id="import-estado-select" class="w-full p-2 border rounded-lg bg-white">
-                                        <option>Novo</option>
-                                        <option>Bom</option>
-                                        <option>Regular</option>
-                                        <option>Avariado</option>
-                                    </select>
-                                </div>
-                                <button id="import-giap-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-slate-400" disabled>Importar <span id="giap-import-count">0</span> Selecionados</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="subtab-conciliar-itens_a_tombar" class="hidden">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">Itens S/T com Novo Tombo (Aguardando Etiqueta)</h2>
-                        <p class="text-sm text-slate-600 mb-4">Esta é uma lista de controle de itens que eram S/T e foram conciliados. Após aplicar a etiqueta física com o novo número de tombo, confirme para remover o item da lista.</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                             <div>
-                                <label for="tombar-filter-tipo" class="block text-sm font-medium mb-1">Filtrar por Tipo</label>
-                                <select id="tombar-filter-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                            </div>
-                            <div>
-                                <label for="tombar-filter-unidade" class="block text-sm font-medium mb-1">Filtrar por Unidade</label>
-                                <select id="tombar-filter-unidade" class="w-full p-2 border rounded-lg bg-white" disabled></select>
-                            </div>
-                        </div>
-                        <div id="itens-a-tombar-container" class="mt-4"></div>
-                    </div>
-                </div>
-            </div>
-
-
-            <!-- ABA: Tombos Sobrando -->
-            <div id="content-sobrando" class="hidden fade-in">
-                <div class="card">
-                     <h2 class="text-xl font-bold text-slate-800 mb-2">Tombamentos da Planilha Sem Vínculo</h2>
-                     <p class="text-sm text-slate-600 mb-4">Tombamentos da planilha que ainda não foram associados a nenhum item. Use os filtros para encontrar possíveis correspondências.</p>
-                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div>
-                          <label for="leftover-keyword" class="block text-sm font-medium mb-1">Buscar por Descrição</label>
-                          <input type="text" id="leftover-keyword" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira, mesa...">
-                        </div>
-                        <div>
-                          <label for="leftover-tombo" class="block text-sm font-medium mb-1">Filtrar por Tombamento</label>
-                          <input type="text" id="leftover-tombo" class="w-full p-2 border rounded-lg" placeholder="Ex: 14023...">
-                        </div>
-                        <div class="self-end">
-                          <button id="suggest-sobrando" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar Sobrando</button>
-                        </div>
-                      </div>
-                     <div class="mt-4 border-t pt-4">
-                        <h3 class="font-bold">Resultados (<span id="total-sobrando">0</span>)</h3>
-                        <div id="sobrando-list" class="reconciliation-container overflow-y-auto space-y-2 mt-2"></div>
-                     </div>
-                </div>
-            </div>
-
-            <!-- ABA: Transferências -->
-            <div id="content-transferencias" class="hidden fade-in">
-                <div class="card">
-                     <h2 class="text-xl font-bold text-slate-800 mb-2">Transferências Pendentes</h2>
-                     <p class="text-sm text-slate-600 mb-4">Itens agrupados por unidade de origem. Clique em uma unidade para expandir e ver os itens que precisam ser transferidos.</p>
-                     <div id="pending-transfers-container" class="mt-4 space-y-2"></div>
-                </div>
-            </div>
-            
-            <!-- ABA: Importação e Substituição -->
-            <div id="content-importacao" class="hidden fade-in">
-                <div class="card">
-                    <div class="flex border-b mb-6">
-                        <button class="sub-nav-btn active" data-subtab="substituir">Substituir Inventário</button>
-                        <button class="sub-nav-btn" data-subtab="edit-by-desc">Editar por Descrição</button> <!-- NOVA FERRAMENTA -->
-                        <button class="sub-nav-btn" data-subtab="massa">Importar por Tombamento</button>
-                        <button class="sub-nav-btn" data-subtab="add_giap">Adicionar Unidade GIAP</button>
-                    </div>
-            
-                    <!-- Sub-Aba: Substituir Inventário -->
-                    <div id="subtab-content-substituir">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">Substituir Inventário da Unidade por Planilha</h2>
-                        <p class="text-sm text-slate-600 mb-4">Esta ferramenta <strong class="text-red-600">APAGARÁ</strong> todos os itens da unidade selecionada e os substituirá pelos dados colados abaixo. Use com muito cuidado.</p>
-                        
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label for="replace-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
-                                <select id="replace-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                            </div>
-                            <div>
-                                <label for="replace-unit" class="block text-sm font-medium mb-1">Unidade de Destino (a ser substituída)</label>
-                                <select id="replace-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label for="replace-data" class="block text-sm font-medium mb-1">Cole os dados do Excel aqui</label>
-                            <p class="text-xs text-slate-500 mb-2">As colunas devem estar na ordem: UNIDADE, ITEM, TOMBO, LOCAL, ESTADO DE CONSERVAÇÃO</p>
-                            <textarea id="replace-data" rows="8" class="w-full p-2 border rounded-lg font-mono text-xs" placeholder="Copie as colunas do Excel e cole aqui..."></textarea>
-                        </div>
-                        <button id="preview-replace-btn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Visualizar Dados</button>
-
-                        <div id="replace-results" class="hidden mt-6 border-t pt-4">
-                            <h3 class="font-bold text-slate-700 mb-2">Pré-visualização dos Itens a Serem Criados (<span id="replace-preview-count">0</span>)</h3>
-                            <div id="replace-preview-list" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg"></div>
-                            <div class="mt-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
-                                <div class="flex items-start">
-                                    <input type="checkbox" id="replace-confirm-checkbox" class="mt-1 h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
-                                    <label for="replace-confirm-checkbox" class="ml-3 block text-sm font-medium text-red-800">
-                                        Eu entendo que <strong class="font-bold">TODOS OS ITENS</strong> da unidade selecionada serão <strong class="font-bold">PERMANENTEMENTE APAGADOS</strong> e substituídos por esta nova lista.
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="mt-4">
-                                <button id="confirm-replace-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 disabled:bg-slate-400" disabled>Confirmar e Substituir Inventário</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- INÍCIO: Nova Sub-Aba: Editar por Descrição -->
-                    <div id="subtab-content-edit-by-desc" class="hidden">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">Editar Tombamentos por Descrição (com Lógica Aprimorada)</h2>
-                        <p class="text-sm text-slate-600 mb-4">
-                            Esta ferramenta inteligente atualiza itens existentes em uma unidade. Ela localiza os itens por <strong class="text-blue-600">Descrição similar</strong> e outros campos, depois atualiza Tombamento, Localização e Estado.
-                        </p>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label for="edit-by-desc-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
-                                <select id="edit-by-desc-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                            </div>
-                            <div>
-                                <label for="edit-by-desc-unit" class="block text-sm font-medium mb-1">Unidade de Destino (a ser atualizada)</label>
-                                <select id="edit-by-desc-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label for="edit-by-desc-data" class="block text-sm font-medium mb-1">Cole os dados do Excel aqui (com cabeçalho)</label>
-                            <p class="text-xs text-slate-500 mb-2">
-                                O sistema identificará as colunas pelos cabeçalhos: <strong>ITEM (ou Descrição)</strong>, <strong>TOMBO (ou Tombamento)</strong>, <strong>LOCAL (ou Localização)</strong>, <strong>ESTADO DE CONSERVAÇÃO (ou Estado)</strong>.
-                            </p>
-                            <textarea id="edit-by-desc-data" rows="8" class="w-full p-2 border rounded-lg font-mono text-xs" placeholder="Copie as colunas do Excel, incluindo o cabeçalho, e cole aqui..."></textarea>
-                        </div>
-                        <button id="preview-edit-by-desc-btn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Visualizar Dados para Atualização</button>
-
-                        <div id="edit-by-desc-results" class="hidden mt-6 border-t pt-4">
-                             <h3 class="font-bold text-slate-700 mb-2">Pré-visualização das Atualizações (<span id="edit-by-desc-preview-count">0</span> itens)</h3>
-                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados ou a correspondência é ambígua. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso por outro item.</p>
-                            <div id="edit-by-desc-preview-table-container" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg">
-                                <!-- A tabela de pré-visualização será inserida aqui -->
-                            </div>
-                             <div class="mt-4">
-                                <button id="confirm-edit-by-desc-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:bg-slate-400">Confirmar e Atualizar Itens</button>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- FIM: Nova Sub-Aba -->
-
-                    <!-- Sub-Aba: Importar em Massa (funcionalidade antiga) -->
-                    <div id="subtab-content-massa" class="hidden">
-                         <h2 class="text-xl font-bold text-slate-800 mb-2">Importar Itens por Tombamento (GIAP)</h2>
-                         <p class="text-sm text-slate-600 mb-4">Cole uma lista de tombamentos, escolha a unidade de destino e o sistema criará os itens baseado nos dados da planilha GIAP.</p>
-                        <div class="space-y-4">
-                            <div>
-                                <label for="mass-transfer-tombos" class="block text-sm font-medium mb-1">Números de Tombamento (separados por vírgula)</label>
-                                <textarea id="mass-transfer-tombos" rows="4" class="w-full p-2 border rounded-lg" placeholder="140230, 14233, 12345..."></textarea>
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="mass-transfer-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade de Destino</label>
-                                    <select id="mass-transfer-tipo" class="w-full p-2 border rounded-lg bg-white"></select>
-                                </div>
-                                <div>
-                                    <label for="mass-transfer-unit" class="block text-sm font-medium mb-1">Unidade de Destino</label>
-                                    <select id="mass-transfer-unit" class="w-full p-2 border rounded-lg bg-white" disabled></select>
-                                </div>
-                            </div>
-                            <button id="mass-transfer-search-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar Tombamentos</button>
-                        </div>
-                        <div id="mass-transfer-results" class="hidden mt-6 border-t pt-4">
-                            <h3 class="font-bold text-slate-700 mb-2">Itens a serem criados</h3>
-                            <div class="flex items-center gap-4 mb-4">
-                                 <label for="mass-transfer-set-all-status" class="block text-sm font-medium">Definir Estado para Todos:</label>
-                                 <select id="mass-transfer-set-all-status" class="p-2 border rounded-lg bg-white">
-                                    <option>Novo</option>
-                                    <option>Bom</option>
-                                    <option>Regular</option>
-                                    <option>Avariado</option>
-                                 </select>
-                            </div>
-                            <div id="mass-transfer-list" class="space-y-2"></div>
-                            <div class="mt-6">
-                                <button id="mass-transfer-confirm-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Confirmar Criação em Massa</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sub-Aba: Adicionar Unidade GIAP -->
-                     <div id="subtab-content-add_giap" class="hidden">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">Adicionar Nova Unidade (Padrão GIAP)</h2>
-                        <p class="text-sm text-slate-600 mb-4">Adicione aqui uma nova unidade que ainda não existe na planilha GIAP. Ela ficará disponível na aba "Ligar Unidades".</p>
-                        <div class="space-y-4 max-w-md">
-                            <div>
-                                <label for="add-giap-number" class="block text-sm font-medium mb-1">Número da Unidade (opcional)</label>
-                                <input type="text" id="add-giap-number" class="w-full p-2 border rounded-lg" placeholder="Ex: 140.3">
-                            </div>
-                            <div>
-                                <label for="add-giap-name" class="block text-sm font-medium mb-1">Nome da Nova Unidade</label>
-                                <input type="text" id="add-giap-name" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS VILA ESPERANÇA (NOVO)" required>
-                            </div>
-                            <button id="save-giap-unit-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Salvar Nova Unidade</button>
-                        </div>
-                     </div>
-                </div>
-            </div>
-
-            <!-- ABA: Notas Fiscais -->
-            <div id="content-notas_fiscais" class="hidden fade-in">
-                <div class="card">
-                    <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
-                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, agrupadas por categoria. Verifique quais itens já foram alocados no inventário.</p>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b">
-                        <div>
-                            <label for="nf-search" class="block text-sm font-medium mb-1">Pesquisar por Nº da NF</label>
-                            <input type="text" id="nf-search" placeholder="Digite o número..." class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label for="nf-item-search" class="block text-sm font-medium mb-1">Pesquisar por Item</label>
-                            <input type="text" id="nf-item-search" placeholder="Digite o nome do item..." class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label for="nf-tipo-entrada" class="block text-sm font-medium mb-1">Tipo de Entrada</label>
-                            <select id="nf-tipo-entrada" class="w-full p-2 border rounded-lg bg-white">
-                                <option value="">Todas</option>
-                                <option value="Compra">Compra</option>
-                                <option value="Doação">Doação</option>
-                            </select>
-                        </div>
-                        <div class="self-end">
-                            <button id="clear-nf-filters-btn" class="w-full bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300">Limpar Filtros</button>
-                        </div>
-                        <div>
-                            <label for="nf-date-start" class="block text-sm font-medium mb-1">Data de Início (Cadastro)</label>
-                            <input type="date" id="nf-date-start" class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label for="nf-date-end" class="block text-sm font-medium mb-1">Data de Fim (Cadastro)</label>
-                            <input type="date" id="nf-date-end" class="w-full p-2 border rounded-lg">
-                        </div>
-                    </div>
-
-                    <div id="notas-fiscais-container" class="mt-4"></div>
-                </div>
-            </div>
-
-
-            <!-- ABA: Planilha GIAP -->
-            <div id="content-giap" class="hidden fade-in">
-                <div class="card p-0 overflow-hidden">
-                    <div class="table-container overflow-y-auto">
-                        <table class="w-full text-sm min-w-[1800px]">
-                            <thead class="bg-slate-100 sticky top-0">
-                                <tr>
-                                    <th class="p-3 text-left font-semibold">TOMBAMENTO</th>
-                                    <th class="p-3 text-left font-semibold">Descrição</th>
-                                    <th class="p-3 text-left font-semibold">Cadastro</th>
-                                    <th class="p-3 text-left font-semibold">NF</th>
-                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
-                                    <th class="p-3 text-left font-semibold">Tipo Entrada</th>
-                                    <th class="p-3 text-left font-semibold">Unidade</th>
-                                    <th class="p-3 text-left font-semibold">Valor NF</th>
-                                    <th class="p-3 text-left font-semibold">Espécie</th>
-                                </tr>
-                            </thead>
-                            <tbody id="giap-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-    
-    <!-- Modals -->
-    <div id="sync-confirm-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
-        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
-        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
-             <div class="p-4 border-b">
-                <h3 class="text-xl font-semibold">Confirmar Sincronização</h3>
-             </div>
-             <div class="p-6 space-y-4">
-                <p>O item <strong id="sync-item-tombo" class="font-mono"></strong> foi encontrado na planilha GIAP. Deseja atualizar a descrição?</p>
+    <!-- Header -->
+    <header class="header-banner sticky top-0 z-50 text-white p-4">
+        <div class="container mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <img src="https://www.saoluis.ma.gov.br/img/logo_mobile.png" alt="Logo Prefeitura" class="h-14 bg-white p-1 rounded-md shadow-md">
                 <div>
-                    <p class="text-sm font-medium text-gray-500">Descrição Atual no Sistema:</p>
-                    <p id="sync-current-desc" class="p-2 bg-gray-100 rounded-md text-sm"></p>
+                    <h1 class="text-xl md:text-2xl font-bold leading-tight">Diretoria de Almoxarifado e Patrimônio</h1>
+                    <p class="text-sm opacity-90">SEMCAS - São Luís</p>
                 </div>
-                 <div>
-                    <p class="text-sm font-medium text-green-700">Nova Descrição da Planilha:</p>
-                    <p id="sync-new-desc" class="p-2 bg-green-50 rounded-md text-sm font-semibold"></p>
+            </div>
+            <!-- Auth Section -->
+            <div id="auth-section">
+                <div id="user-info" class="hidden items-center gap-4">
+                    <span id="user-email" class="text-sm font-medium hidden md:block"></span>
+                    <button id="logout-btn" class="btn bg-red-500 hover:bg-red-600 text-white text-sm">Sair</button>
                 </div>
-                <p class="text-sm text-slate-600">Os campos "Fornecedor" e "NF" serão atualizados em ambos os casos.</p>
-             </div>
-             <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
-                <button type="button" id="sync-cancel-btn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancelar</button>
-                <button type="button" id="sync-keep-desc-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Manter Descrição Atual</button>
-                <button type="button" id="sync-update-all-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Sim, Atualizar Tudo</button>
-             </div>
+                <button id="open-login-modal-btn" class="btn bg-white/20 hover:bg-white/30 text-white text-sm">Login</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sub-Header de Status -->
+    <div class="bg-white shadow-sm border-b border-slate-200">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h2 class="font-bold text-lg text-slate-800">Sistema de Patrimônio <span class="text-sm font-normal">v.12.1-GS</span></h2>
+            <div class="flex items-center gap-2">
+                <div id="status-feedback" class="font-semibold text-sm text-slate-600">Carregando...</div>
+                <button id="force-refresh-btn-index" title="Forçar Atualização dos Dados" class="p-2 rounded-md hover:bg-slate-100 text-slate-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 
-    <div id="add-item-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
-        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
-        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
-            <form id="add-item-form">
-                <div class="flex items-center justify-between p-4 border-b">
-                    <h3 id="add-modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3>
-                    <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal-add">&times;</button>
+    <!-- Navegação por Abas -->
+    <nav class="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky z-40 top-[92px] md:top-[88px]">
+        <div class="container mx-auto px-4">
+            <div id="main-nav" class="flex space-x-1 overflow-x-auto">
+                <button class="nav-btn active" data-tab="dashboard">📊 Dashboard</button>
+                <button class="nav-btn" data-tab="patrimonio">💼 Patrimônio</button>
+                <button id="tab-notas" class="nav-btn" style="display:none;" data-tab="notas">📋 Notas Fiscais</button>
+                <button id="nav-history" class="nav-btn hidden" data-tab="historico">📜 Histórico</button>
+                <a id="nav-edit-link" href="edit.html" target="_blank" class="nav-btn hidden">✏️ Auditoria e Edição</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Dashboard -->
+        <div id="content-dashboard" class="tab-content fade-in">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Total de Itens</p><p id="kpi-total-itens" class="text-4xl font-bold text-blue-600 mt-2">0</p></div>
+                <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Unidades Mapeadas</p><p id="kpi-total-unidades" class="text-4xl font-bold text-blue-600 mt-2">0</p></div>
+                <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Itens Avariados</p><p id="kpi-total-avariados" class="text-4xl font-bold text-red-600 mt-2">0</p></div>
+                 <div class="card text-center"><p class="text-sm text-slate-500 uppercase">Itens Novos</p><p id="kpi-total-novos" class="text-4xl font-bold text-green-600 mt-2">0</p></div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card"><h3 class="text-lg font-semibold text-slate-800 mb-4">Distribuição por Estado</h3><div class="relative h-96"><canvas id="dashboardEstadoChart"></canvas></div></div>
+                <div class="card"><h3 class="text-lg font-semibold text-slate-800 mb-4">Top 10 Unidades por Nº de Itens</h3><div class="relative h-96"><canvas id="dashboardTipoChart"></canvas></div></div>
+            </div>
+        </div>
+        
+        <!-- Patrimônio -->
+        <div id="content-patrimonio" class="tab-content hidden fade-in">
+             <div class="card mb-8">
+                 <form id="patrimonio-filters-form">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                        <div><label for="filtro-tipo-unidade" class="block text-sm font-medium mb-1">Tipo de Unidade</label><select id="filtro-tipo-unidade" class="w-full p-2 border rounded-lg bg-white"></select></div>
+                        <div><label for="filtro-unidade" class="block text-sm font-medium mb-1">Unidade</label><select id="filtro-unidade" class="w-full p-2 border rounded-lg bg-white" disabled></select></div>
+                        <div><label for="filtro-estado" class="block text-sm font-medium mb-1">Estado</label><select id="filtro-estado" class="w-full p-2 border rounded-lg bg-white"></select></div>
+                    </div>
+                    <div class="mt-4 border-t pt-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                             <div class="md:col-span-2"><label for="filtro-busca" class="block text-sm font-medium mb-1">Busca Rápida (Descrição, Tombamento, Localização)</label><input type="text" id="filtro-busca" placeholder="Digite para buscar..." class="w-full p-2 border rounded-lg"></div>
+                             <div><label class="block text-sm font-medium mb-1">&nbsp;</label><button type="button" id="reset-filters-btn" class="w-full btn btn-secondary">Limpar Filtros</button></div>
+                        </div>
+                    </div>
+                 </form>
+                <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div id="pagination-summary" class="text-sm font-semibold text-slate-600"></div>
+                    <div id="admin-actions-patrimonio" class="hidden w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                        <button id="open-export-modal-btn" class="w-full sm:w-auto btn btn-success">Exportar PDF</button>
+                        <button id="open-add-modal-btn" class="w-full sm:w-auto btn btn-primary">Adicionar Item</button>
+                    </div>
                 </div>
-                <div class="p-6 space-y-4">
+            </div>
+            
+            <main id="main-content-area" class="mt-2">
+                 <div class="card p-0 overflow-x-auto">
+                    <table class="table w-full text-sm">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="p-3 text-left">Tomb.</th>
+                                <th class="p-3 text-left">Descrição</th>
+                                <th class="p-3 text-left">Unidade</th>
+                                <th class="p-3 text-left">Fornecedor</th>
+                                <th class="p-3 text-left">Doação</th>
+                                <th class="p-3 text-left">Estado</th>
+                                <th id="table-header-actions" class="p-3 text-left hidden">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body"></tbody>
+                    </table>
+                </div>
+                <div id="pagination-controls" class="flex items-center justify-center mt-6"></div>
+            </main>
+        </div>
+        
+        <!-- Histórico -->
+        <div id="content-historico" class="tab-content hidden fade-in">
+             <div class="card">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Histórico de Alterações</h3>
+                <div id="history-container" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+             </div>
+        </div>
+
+        <!-- Notas Fiscais -->
+        <div id="content-notas" class="tab-content hidden fade-in">
+            <div class="card">
+                <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
+                <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, agrupadas por categoria. Verifique quais itens já foram alocados no inventário.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b">
                     <div>
-                        <label for="add-item-unidade" class="block text-sm font-medium mb-1">Unidade</label>
-                        <input type="text" id="add-item-unidade" class="w-full p-2 border rounded-lg bg-slate-100" readonly>
+                        <label for="nf-search-index" class="block text-sm font-medium mb-1">Pesquisar por Nº da NF</label>
+                        <input type="text" id="nf-search-index" placeholder="Digite o número..." class="w-full p-2 border rounded-lg">
                     </div>
                     <div>
-                        <label for="add-item-tipo" class="block text-sm font-medium mb-1">Tipo</label>
-                        <input type="text" id="add-item-tipo" class="w-full p-2 border rounded-lg bg-slate-100" readonly>
-                    </div>
-                    <hr>
-                    <div>
-                        <label for="add-item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label>
-                        <input type="text" id="add-item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T">
+                        <label for="nf-item-search-index" class="block text-sm font-medium mb-1">Pesquisar por Item</label>
+                        <input type="text" id="nf-item-search-index" placeholder="Digite o nome do item..." class="w-full p-2 border rounded-lg">
                     </div>
                     <div>
-                        <label for="add-item-descricao" class="block text-sm font-medium mb-1">Descrição</label>
-                        <input type="text" id="add-item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória" required>
-                    </div>
-                    <div>
-                        <label for="add-item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label>
-                        <select id="add-item-estado" class="w-full p-2 border rounded-lg bg-white" required>
-                            <option>Novo</option>
-                            <option>Bom</option>
-                            <option>Regular</option>
-                            <option>Avariado</option>
+                        <label for="nf-tipo-entrada-index" class="block text-sm font-medium mb-1">Tipo de Entrada</label>
+                        <select id="nf-tipo-entrada-index" class="w-full p-2 border rounded-lg bg-white">
+                            <option value="">Todas</option>
+                            <option value="Compra">Compra</option>
+                            <option value="Doação">Doação</option>
                         </select>
                     </div>
+                     <div class="self-end">
+                         <button id="clear-filters-nf-index" class="btn btn-secondary w-full">Limpar Filtros</button>
+                    </div>
+                    <div>
+                        <label for="nf-date-start-index" class="block text-sm font-medium mb-1">Data de Início (Cadastro)</label>
+                        <input type="date" id="nf-date-start-index" class="w-full p-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label for="nf-date-end-index" class="block text-sm font-medium mb-1">Data de Fim (Cadastro)</label>
+                        <input type="date" id="nf-date-end-index" class="w-full p-2 border rounded-lg">
+                    </div>
                 </div>
-                <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
-                    <button type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 js-close-modal-add">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar Item</button>
+
+                <div id="lista-notas" class="mt-4"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAIS -->
+    <div id="login-modal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div>
+        <div class="modal-container bg-white w-full max-w-md mx-auto rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <form id="login-form">
+                <div class="flex items-center justify-between p-5 border-b">
+                    <h3 class="text-xl font-semibold text-slate-800">Acesso Restrito</h3>
+                    <button type="button" class="p-2 rounded-full text-slate-500 hover:bg-slate-200 js-close-modal" aria-label="Fechar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div id="login-error" class="hidden p-3 text-sm font-medium text-red-700 bg-red-100 rounded-lg"></div>
+                    <div>
+                        <label for="login-email" class="block text-sm font-medium mb-1 text-slate-700">Email</label>
+                        <input type="email" id="login-email" name="email" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required autofocus>
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-sm font-medium mb-1 text-slate-700">Senha</label>
+                        <input type="password" id="login-password" name="password" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                </div>
+                <div class="flex justify-end p-5 border-t bg-slate-50 rounded-b-lg">
+                    <button type="submit" id="btn-login" class="btn btn-primary w-full py-3 text-base flex items-center justify-center disabled:bg-slate-400">
+                        <span id="login-btn-text">Entrar</span>
+                        <span id="login-btn-spinner" class="hidden btn-spinner"></span>
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL DE ESCOLHA DE DESCRIÇÃO - NOVO -->
-    <div id="desc-choice-modal" class="modal fixed inset-0 z-[70] flex items-center justify-center p-4 hidden">
-        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
-        <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95">
-             <div class="p-4 border-b">
-                <h3 class="text-xl font-semibold">Escolha a Descrição do Item</h3>
-             </div>
-             <div class="p-6 space-y-4">
-                <p>Qual descrição você prefere para o item <strong id="desc-choice-tombo" class="font-mono"></strong>?</p>
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Descrição Atual no Sistema:</p>
-                    <p id="desc-choice-current" class="p-2 bg-gray-100 rounded-md text-sm"></p>
-                </div>
-                 <div>
-                    <p class="text-sm font-medium text-blue-700">Nova Descrição da Planilha GIAP:</p>
-                    <p id="desc-choice-new" class="p-2 bg-blue-50 rounded-md text-sm font-semibold"></p>
-                </div>
-             </div>
-             <div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2">
-                <button type="button" id="desc-choice-cancel-btn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancelar</button>
-                <button type="button" id="desc-choice-keep-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Manter Descrição Atual</button>
-                <button type="button" id="desc-choice-update-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Usar Descrição da Planilha</button>
-             </div>
-        </div>
-    </div>
-    
-    <!-- Full Page Overlay for saving -->
-    <div id="full-page-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
-        <div class="text-center text-white">
-            <div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-white mx-auto"></div>
-            <p id="overlay-message" class="mt-4 text-lg font-semibold">Salvando... Recarregando...</p>
-        </div>
-    </div>
-
-    <div id="loading-or-error-screen" class="flex items-center justify-center h-screen">
-        <div class="text-center"><div class="w-16 h-16 border-8 border-dashed rounded-full animate-spin border-blue-600 mx-auto"></div><p class="mt-4 text-slate-600">Carregando e analisando dados...</p></div>
-    </div>
+    <div id="item-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-2xl rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="item-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 id="modal-title" class="text-xl font-semibold">Adicionar Novo Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 overflow-y-auto" style="max-height: 70vh;"> <input type="hidden" id="item-id"> <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"> <div><label for="item-tombamento" class="block text-sm font-medium mb-1">Tombamento</label><input type="text" id="item-tombamento" class="w-full p-2 border rounded-lg" placeholder="Nº de tombamento ou S/T"></div><div><label for="item-tipo" class="block text-sm font-medium mb-1">Tipo de Unidade</label><input type="text" id="item-tipo" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS, CREAS, SEDE" required></div><div class="sm:col-span-2"><label for="item-descricao" class="block text-sm font-medium mb-1">Descrição</label><input type="text" id="item-descricao" class="w-full p-2 border rounded-lg" placeholder="Ex: Cadeira giratória, Mesa de escritório" required></div><div><label for="item-unidade" class="block text-sm font-medium mb-1">Unidade</label><input type="text" id="item-unidade" class="w-full p-2 border rounded-lg" placeholder="Ex: CRAS - Anil" required></div><div><label for="item-quantidade" class="block text-sm font-medium mb-1">Quantidade</label><input type="number" id="item-quantidade" value="1" min="1" class="w-full p-2 border rounded-lg" required></div><div><label for="item-localizacao" class="block text-sm font-medium mb-1">Localização</label><input type="text" id="item-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala da coordenação"></div><div><label for="item-estado" class="block text-sm font-medium mb-1">Estado de Conservação</label><select id="item-estado" class="w-full p-2 border rounded-lg bg-white" required><option>Bom</option><option>Regular</option><option>Avariado</option><option>Novo</option></select></div><div class="sm:col-span-2"><label for="item-fornecedor" class="block text-sm font-medium mb-1">Fornecedor</label><input type="text" id="item-fornecedor" class="w-full p-2 border rounded-lg" placeholder="Nome do fornecedor"></div><div class="sm:col-span-2"><label for="item-origem-da-doacao" class="block text-sm font-medium mb-1">Origem da Doação</label><input type="text" id="item-origem-da-doacao" class="w-full p-2 border rounded-lg" placeholder="Deixe em branco se não for doação"></div><div class="sm:col-span-2"><label for="item-observacao" class="block text-sm font-medium mb-1">Observação</label><textarea id="item-observacao" rows="3" class="w-full p-2 border rounded-lg" placeholder="Qualquer informação adicional"></textarea></div></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> <button type="submit" id="save-item-btn" class="btn btn-primary">Salvar Item</button> </div></form> </div></div>
+    <div id="transfer-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60 opacity-0"></div> <div class="modal-container bg-white w-full max-w-lg rounded-lg shadow-2xl flex flex-col transform scale-95 opacity-0"> <form id="transfer-form"> <div class="flex items-center justify-between p-4 border-b"> <h3 class="text-xl font-semibold">Transferir Item</h3> <button type="button" class="p-2 rounded-full hover:bg-slate-200 js-close-modal">&times;</button> </div><div class="p-6 space-y-4"> <input type="hidden" id="transfer-item-id"> <div> <p class="text-sm text-slate-500">Item</p> <p id="transfer-item-description" class="font-bold text-slate-800"></p> </div><div> <p class="text-sm text-slate-500">Unidade Atual</p> <p id="transfer-item-current-unit" class="font-bold text-slate-800"></p> </div><hr> <h4 class="font-semibold text-slate-800 pt-2">Selecione o Novo Destino</h4> <div><label for="transfer-tipo" class="block text-sm font-medium mb-1">Novo Tipo de Unidade</label><select id="transfer-tipo" class="w-full p-2 border rounded-lg bg-white" required></select></div><div><label for="transfer-unidade" class="block text-sm font-medium mb-1">Nova Unidade</label><select id="transfer-unidade" class="w-full p-2 border rounded-lg bg-white" disabled required></select></div><div><label for="transfer-localizacao" class="block text-sm font-medium mb-1">Nova Localização na Unidade</label><input type="text" id="transfer-localizacao" class="w-full p-2 border rounded-lg" placeholder="Ex: Sala 02, Recepção" required></div></div><div class="flex justify-end p-4 border-t bg-slate-50 rounded-b-lg space-x-2"> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> <button type="submit" class="btn btn-primary">Confirmar Transferência</button> </div></form> </div></div>
+    <div id="delete-confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden"> <div class="modal-overlay absolute inset-0 bg-black/60"></div> <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95"> <div class="p-6 text-center"> <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /> </svg> <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3> <p id="delete-item-info" class="mb-5 text-sm font-bold text-gray-800"></p> <button id="confirm-delete-btn" type="button" class="btn btn-danger mr-2">Sim, excluir</button> <button type="button" class="btn btn-secondary js-close-modal">Cancelar</button> </div></div></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut, getIdToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, getIdToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
         // *** PASSO MAIS IMPORTANTE: COLE A URL DO SEU SCRIPT AQUI ***
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAT4UCkbJTbXUsGPKZBqsw8257aNLecXKjMIPeX-v9MKbCTsbUYNF38RY4vQSFDsElPg/exec';
 
@@ -712,837 +344,642 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        let fullInventory = [], giapInventory = [], customGiapUnits = [];
-        let giapMap = new Map();
-        let unitMapping = {};
-        let dirtyItems = new Map();
-        let normalizedSystemUnits = new Map();
-        let padroesConciliacao = []; // IA LEARNING
-        let linksToCreate = []; // Armazena vínculos pendentes
-        let dataCache = null; // Cache de sessão
-        
-        let selSys = null, selGiap = null;
-        let giapItemsForImport = [];
-        let itemsToReplace = [];
-        let processedNfData = {}; // To store processed NF data
-        let updatesToProcess = []; // For the new "Edit by Desc" tool
+        // --- ESTADO DA APLICAÇÃO ---
+        let patrimonioFullList = [], historicoFullList = [], giapInventory = [];
+        let processedNfData = {};
+        let isLoggedIn = false;
+        let dashboardEstadoChart, dashboardTipoChart;
+        let patrimonioFilteredList = [], patrimonioCurrentPage = 1;
+        const patrimonioItemsPerPage = 25;
+        let dataCache = null; // Cache para dados da sessão
 
-        // --- DOM Elements ---
-        const loadingScreen = document.getElementById('loading-or-error-screen');
-        const authGate = document.getElementById('auth-gate');
-        const feedbackStatus = document.getElementById('feedback-status');
-        const forceRefreshBtn = document.getElementById('force-refresh-btn');
+        // --- ELEMENTOS DO DOM ---
+        const statusFeedbackEl = document.getElementById('status-feedback');
+        const tableBodyEl = document.getElementById('inventory-table-body');
+        const paginationControlsEl = document.getElementById('pagination-controls');
+        const paginationSummaryEl = document.getElementById('pagination-summary');
+        const filtroTipoUnidadeEl = document.getElementById('filtro-tipo-unidade');
+        const filtroUnidadeEl = document.getElementById('filtro-unidade');
+        const filtroEstadoEl = document.getElementById('filtro-estado');
+        const filtroBuscaEl = document.getElementById('filtro-busca');
+        const resetFiltersBtn = document.getElementById('reset-filters-btn');
+        const itemModal = document.getElementById('item-modal');
+        const openAddModalBtn = document.getElementById('open-add-modal-btn');
+        const itemForm = document.getElementById('item-form');
+        const loginModal = document.getElementById('login-modal');
+        const openLoginModalBtn = document.getElementById('open-login-modal-btn');
+        const loginForm = document.getElementById('login-form');
+        const transferModal = document.getElementById('transfer-modal');
+        const transferForm = document.getElementById('transfer-form');
+        const userInfoEl = document.getElementById('user-info');
+        const userEmailEl = document.getElementById('user-email');
         const logoutBtn = document.getElementById('logout-btn');
-        const navButtons = document.querySelectorAll('#edit-nav .nav-btn');
-        const contentPanes = document.querySelectorAll('main > div[id^="content-"]');
+        const adminActionsPatrimonio = document.getElementById('admin-actions-patrimonio');
+        const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const navButtons = document.querySelectorAll('#main-nav > .nav-btn, #main-nav > a.nav-btn');
+        const contentPanes = document.querySelectorAll('main > .tab-content');
+        const historyContainer = document.getElementById('history-container');
         
-        const editTableBody = document.getElementById('edit-table-body');
-        const saveAllChangesBtn = document.getElementById('save-all-changes-btn');
-        const editFilterTipo = document.getElementById('edit-filter-tipo');
-        const editFilterUnidade = document.getElementById('edit-filter-unidade');
-        const editFilterEstado = document.getElementById('edit-filter-estado');
-        const editFilterDescricao = document.getElementById('edit-filter-descricao');
-        const mapFilterTipo = document.getElementById('map-filter-tipo');
-        const mapSystemUnitSelect = document.getElementById('map-system-unit-select');
-        const mapGiapUnitMultiselect = document.getElementById('map-giap-unit-multiselect');
-        const mapGiapFilter = document.getElementById('map-giap-filter');
-        const saveMappingBtn = document.getElementById('save-mapping-btn');
-        const savedMappingsContainer = document.getElementById('saved-mappings-container');
-        const pendingTransfersContainer = document.getElementById('pending-transfers-container');
-        const giapTableBody = document.getElementById('giap-table-body');
-        const fullPageOverlay = document.getElementById('full-page-overlay');
-        const overlayMessage = document.getElementById('overlay-message');
-
-        const syncConfirmModal = document.getElementById('sync-confirm-modal');
-        const syncUpdateAllBtn = document.getElementById('sync-update-all-btn');
-        const syncKeepDescBtn = document.getElementById('sync-keep-desc-btn');
-        const syncCancelBtn = document.getElementById('sync-cancel-btn');
-
-        const descChoiceModal = document.getElementById('desc-choice-modal');
-
-
-        // --- Funções Utilitárias ---
-        const normalizeStr = (str) => (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-        const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
+        // --- FUNÇÕES UTILITÁRIAS ---
+        const normalizeStr = (str) => (str || '').toString().trim().toLowerCase();
+        const debounce = (func, delay) => {
+            let timer;
+            return function (...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => func.apply(this, args), delay);
+            };
+        };
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         
-        function levenshteinDistance(s1, s2) {
-            const len1 = s1.length; const len2 = s2.length;
-            if (Math.abs(len1 - len2) > 20) return Math.max(len1, len2);
-            const matrix = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(0));
-            for (let i = 0; i <= len1; i++) matrix[0][i] = i;
-            for (let j = 0; j <= len2; j++) matrix[j][0] = j;
-            for (let j = 1; j <= len2; j++) {
-                for (let i = 1; i <= len1; i++) {
-                    const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-                    matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
-                }
-            }
-            return matrix[len2][len1];
+        function showNotification(message, type = 'info', duration = 3000) {
+            const notification = document.createElement('div');
+            notification.className = `notification-toast ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.classList.add('show'), 10);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 500);
+            }, duration);
         }
 
-        function calculateSimilarity(str1, str2) {
-            const s1 = normalizeStr(str1); const s2 = normalizeStr(str2);
-            if (s1 === s2) return 1.0;
-            if (s1.includes(s2) || s2.includes(s1)) return 0.92;
-            const words1 = new Set(s1.split(/\s+/).filter(w => w.length > 2)); const words2 = new Set(s2.split(/\s+/).filter(w => w.length > 2));
-            if (words1.size === 0 && words2.size === 0) return 0;
-            const intersection = new Set([...words1].filter(w => words2.has(w))); const union = new Set([...words1, ...words2]);
-            const jaccardScore = union.size > 0 ? intersection.size / union.size : 0;
-            let substringBonus = 0; const minLen = Math.min(s1.length, s2.length);
-            for (let size = Math.min(8, minLen); size >= 4; size--) {
-                let found = false;
-                for (let i = 0; i <= s1.length - size; i++) {
-                    const substr = s1.substring(i, i + size);
-                    if (s2.includes(substr)) { substringBonus = Math.max(substringBonus, (size / Math.max(s1.length, s2.length)) * 0.3); found = true; break; }
-                }
-                if (found) break;
-            }
-            let levBonus = 0;
-            if (s1.length < 50 && s2.length < 50) {
-                const distance = levenshteinDistance(s1, s2); const maxLen = Math.max(s1.length, s2.length);
-                levBonus = maxLen > 0 ? (1 - distance / maxLen) * 0.2 : 0;
-            }
-            return Math.min(jaccardScore * 0.6 + substringBonus + levBonus, 1.0);
-        }
-
-        function suggestGiapMatchesComAprendizado(systemItem) {
-            let { giapItems } = getConciliationData();
-            if (!giapItems || giapItems.length === 0) { renderList('giap-list', [], 'TOMBAMENTO', 'Descrição'); return; }
-            const systemDesc = `${systemItem.Descrição || ''} ${systemItem.Fornecedor || ''}`.trim();
-            const scoredItems = giapItems.map(giapItem => {
-                const giapDesc = `${giapItem.Descrição || ''} ${giapItem.Espécie || ''} ${giapItem['Nome Fornecedor'] || ''}`.trim();
-                let baseScore = calculateSimilarity(systemDesc, giapDesc);
-                if (systemItem.Fornecedor && systemItem.Fornecedor !== '-' && giapItem['Nome Fornecedor'] && giapItem['Nome Fornecedor'] !== '-') {
-                    const fornecedorMatch = calculateSimilarity(systemItem.Fornecedor, giapItem['Nome Fornecedor']);
-                    if (fornecedorMatch > 0.7) { baseScore += 0.15; }
-                }
-                return { item: giapItem, baseScore: Math.min(baseScore, 1.0), bonusScore: 0 };
-            });
-            if (padroesConciliacao.length > 0) {
-                padroesConciliacao.forEach(padrao => {
-                    const similaridadeComPadrao = calculateSimilarity(systemDesc, `${padrao.descricaoSistema} ${padrao.fornecedorSistema}`);
-                    if (similaridadeComPadrao > 0.7) {
-                        scoredItems.forEach(scored => {
-                            const giapDescCompleta = `${scored.item.Descrição || ''} ${scored.item.Espécie || ''} ${scored.item['Nome Fornecedor'] || ''}`;
-                            const similaridadeComPadraoGiap = calculateSimilarity(giapDescCompleta, `${padrao.descricaoGIAP} ${padrao.fornecedorGIAP}`);
-                            if (similaridadeComPadraoGiap > 0.6) { const boost = similaridadeComPadrao * similaridadeComPadraoGiap * 0.2; scored.bonusScore += boost; }
-                        });
-                    }
-                });
-            }
-            scoredItems.forEach(scored => { scored.finalScore = Math.min(scored.baseScore + scored.bonusScore, 1.0); });
-            scoredItems.sort((a, b) => b.finalScore - a.finalScore);
-            const topScore = scoredItems.length > 0 ? scoredItems[0].finalScore : 0;
-            const suggestionMap = new Map(scoredItems.map(si => [si.item.TOMBAMENTO, si.finalScore]));
-            renderList('giap-list', scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore: topScore });
-        }
-        
-        const normalizeTombo = (tombo) => {
-            if (!tombo) return ''; let str = String(tombo).trim();
-            if (str.endsWith('.0')) { str = str.slice(0, -2); } return str;
+        const getNormalizedEstado = (estadoStr) => {
+            const normalized = normalizeStr(estadoStr);
+            if (['avariado', 'quebrado', 'defeito', 'danificado', 'ruim'].some(k => normalized.includes(k))) return 'Avariado';
+            if (normalized === 'novo') return 'Novo';
+            if (normalized === 'bom' || normalized === 'otimo') return 'Bom';
+            if (normalized === 'regular') return 'Regular';
+            return 'Avariado';
         };
 
-        function parseEstadoEOrigem(texto) {
-            const textoCru = (texto || '').trim(); if (!textoCru) return { estado: 'Regular', origem: '' };
-            const validEstados = ['Novo', 'Bom', 'Regular', 'Avariado']; let estadoFinal = 'Regular'; let origemFinal = '';
-            for (const estado of validEstados) {
-                if (normalizeStr(textoCru).startsWith(normalizeStr(estado))) {
-                    estadoFinal = estado; let resto = textoCru.substring(estado.length).trim();
-                    if ((resto.startsWith('(') && resto.endsWith(')')) || (resto.startsWith('[') && resto.endsWith(']'))) { resto = resto.substring(1, resto.length - 1).trim(); } else if (resto.startsWith('-')) { resto = resto.substring(1).trim(); }
-                    if (resto) { const restoNormalizado = normalizeStr(resto); if (restoNormalizado.startsWith('doação') || restoNormalizado.startsWith('doacao')) { origemFinal = resto.replace(/^(doação|doacao)\s*/i, '').trim(); } }
-                    return { estado: estadoFinal, origem: origemFinal };
-                }
-            }
-            for (const estado of validEstados) { if (normalizeStr(textoCru) === normalizeStr(estado)) { return { estado: estado, origem: '' }; } }
-            return { estado: 'Regular', origem: '' };
+        function getStateColor(state) {
+            const normalizedEstado = getNormalizedEstado(state);
+            return { 'Novo': 'badge-green', 'Bom': 'badge-blue', 'Regular': 'badge-yellow', 'Avariado': 'badge-red' }[normalizedEstado] || 'bg-slate-200';
         }
-
-        function showNotification(message, type = 'info', duration = 3000) {
-            const notification = document.createElement('div'); notification.className = `notification-toast ${type}`; notification.textContent = message; document.body.appendChild(notification);
-            setTimeout(() => notification.classList.add('show'), 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, duration);
-        }
-
-        function showOverlay(message) { overlayMessage.textContent = message; fullPageOverlay.classList.remove('hidden'); }
-        function hideOverlay() { fullPageOverlay.classList.add('hidden'); }
-
+        
         async function postData(functionName, payload) {
-            if (!auth.currentUser) { throw new Error("Usuário não autenticado."); }
+            if (!auth.currentUser) {
+                throw new Error("Usuário não autenticado. Faça login para realizar esta ação.");
+            }
             const token = await getIdToken(auth.currentUser);
             const response = await fetch(SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ func: functionName, authToken: token, data: payload })
+                headers: {
+                    'Content-Type': 'text/plain', // Usar text/plain para evitar pre-flight CORS
+                },
+                body: JSON.stringify({
+                    func: functionName,
+                    authToken: token,
+                    data: payload
+                })
             });
-            if (!response.ok) { throw new Error(`Erro na requisição: ${response.statusText}`); }
+            if (!response.ok) {
+                throw new Error(`Erro de rede ao comunicar com o servidor: ${response.statusText}`);
+            }
             const result = await response.json();
-            if (result.status === 'error') { throw new Error(result.message); }
+            if (result.status === 'error') {
+                throw new Error(result.message || 'Ocorreu um erro no servidor.');
+            }
             return result.data;
         }
 
-        onAuthStateChanged(auth, user => {
-            document.getElementById('user-email-edit').textContent = user ? user.email : '';
-            authGate.classList.toggle('hidden', !user);
-            loadingScreen.classList.toggle('hidden', user);
-            if(user) { if(!dataCache) loadData(); }
-            else { loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Acesso Negado</h2><p>Você precisa estar logado.</p></div>`; }
-        });
-
-        async function loadData(forceRefresh = false) {
-             if (SCRIPT_URL.includes('COLE_A_URL')) {
-                loadingScreen.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-600">Configuração Incompleta</h2><p>A URL do App Script não foi definida no arquivo.</p></div>`;
-                return;
-            }
-            loadingScreen.classList.remove('hidden');
-            if (!forceRefresh && dataCache) {
-                feedbackStatus.textContent = 'Carregando dados do cache da sessão...';
-                processLoadedData(dataCache);
-                showNotification('Dados carregados do cache da sessão.', 'info');
-                loadingScreen.classList.add('hidden');
-                return;
-            }
+        async function logAction(action, details) {
+            if (!isLoggedIn) return;
             try {
-                feedbackStatus.textContent = 'Buscando dados da planilha...';
+                await postData('logAction', { action, details });
+            } catch (error) { console.error("Falha ao registrar ação no histórico:", error); }
+        }
+
+        async function loadAllData(forceRefresh = false) {
+            if (SCRIPT_URL.includes('COLE_A_URL')) {
+                statusFeedbackEl.textContent = 'ERRO: URL do Script não configurada.';
+                tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><p class="text-red-600 font-bold">A URL do App Script não foi definida no código HTML.</p></td></tr>`;
+                return;
+            }
+            
+            tableBodyEl.innerHTML = `<tr><td colspan="7" class="text-center p-10"><div class="loading-spinner"></div><p class="mt-4">Carregando dados...</p></td></tr>`;
+            
+            if (!forceRefresh && dataCache) {
+                 statusFeedbackEl.textContent = 'Carregando dados do cache da sessão...';
+                 processLoadedData(dataCache);
+                 showNotification('Dados carregados do cache da sessão.', 'info');
+                 return;
+            }
+
+            try {
+                statusFeedbackEl.textContent = 'Buscando dados da planilha...';
                 const response = await fetch(`${SCRIPT_URL}?func=getAllData`);
-                if (!response.ok) throw new Error(`Erro de rede: ${response.statusText}`);
+                if (!response.ok) { throw new Error(`Erro de rede: ${response.statusText}`); }
                 const result = await response.json();
-                if (result.status === 'error') throw new Error(result.message);
-                
-                dataCache = result.data;
+                if (result.status === 'error') { throw new Error(result.message); }
+                dataCache = result.data; // Armazena em cache
                 processLoadedData(dataCache);
                 showNotification('Dados atualizados com sucesso!', 'success');
-            } catch(e) {
-                feedbackStatus.textContent = `Erro: ${e.message}`;
-            } finally {
-                loadingScreen.classList.add('hidden');
+            } catch (error) {
+                 console.error("Erro ao carregar dados: ", error);
+                 statusFeedbackEl.textContent = `Erro ao carregar: ${error.message}`;
+                 showNotification('Falha ao carregar dados da planilha.', 'error');
             }
         }
-
+        
         function processLoadedData(data) {
-            fullInventory = data.patrimonio || [];
+            patrimonioFullList = data.patrimonio || [];
             giapInventory = data.giap || [];
-            unitMapping = data.unitMapping || {};
-            customGiapUnits = data.customGiapUnits || [];
-            padroesConciliacao = data.learningPatterns || [];
-
-            giapMap = new Map(giapInventory.map(item => [normalizeTombo(item['TOMBAMENTO']), item]));
-            normalizedSystemUnits.clear();
-            fullInventory.forEach(item => { if (item.Unidade) { const n = normalizeStr(item.Unidade); if (!normalizedSystemUnits.has(n)) { normalizedSystemUnits.set(n, item.Unidade.trim()); } } });
+            historicoFullList = data.historico || [];
             
-            feedbackStatus.textContent = `Pronto. ${fullInventory.length} itens carregados.`;
+            statusFeedbackEl.textContent = `Pronto. ${patrimonioFullList.length} itens carregados.`;
             initializeUI();
         }
-        
+
         function initializeUI() {
-            populateEditableInventoryTab();
-            populateUnitMappingTab();
-            populateReconciliationTab();
-            populatePendingTransfersTab();
-            populateImportAndReplaceTab();
-            populateGiapTab();
-            populateNfTab();
-        }
-
-        function renderEditableTable() {
-             const tipo = editFilterTipo.value; const unidade = editFilterUnidade.value; const estado = editFilterEstado.value; const desc = normalizeStr(editFilterDescricao.value);
-            const filtered = fullInventory.filter(item => (!tipo || item.Tipo === tipo) && (!unidade || item.Unidade === unidade) && (!estado || item.Estado === estado) && (!desc || normalizeStr(item.Descrição).includes(desc)));
-            document.getElementById('unit-item-count').textContent = unidade ? `${filtered.length} iten(s)` : '';
-            document.getElementById('add-item-to-unit-btn').classList.toggle('hidden', !unidade);
-            const isSpecificFilterApplied = !!(unidade || desc || estado);
-            const itemsToRender = isSpecificFilterApplied ? filtered : filtered.slice(0, 200);
-            const headers = ['Ações', 'Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
-            const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
-            
-            editTableBody.innerHTML = itemsToRender.map(item => {
-                const itemData = dirtyItems.get(item.id) || item; const isDirty = dirtyItems.has(item.id);
-                const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
-                const cells = headers.map(h => {
-                    if (h === 'Ações') return `<td class="p-2 border-b"><button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg></button></td>`;
-                    if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
-                    const value = escapeHtml(itemData[h]); const inputType = (h === 'Quantidade') ? 'number' : 'text';
-                    return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
-                }).join('');
-                return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${cells}</tr>`;
-            }).join('');
-            if(!isSpecificFilterApplied && filtered.length > 200) { editTableBody.innerHTML += `<tr><td colspan="${headers.length}" class="text-center p-4 font-semibold text-orange-600">Apenas os primeiros 200 de ${filtered.length} resultados são exibidos. Refine sua busca.</td></tr>`; }
-        }
-
-        function populateEditableInventoryTab() {
-            const updateUnidades = () => {
-                const selectedTipo = editFilterTipo.value;
-                const unidades = [...new Set(fullInventory.filter(i => !selectedTipo || i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
-                editFilterUnidade.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-            };
-            const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
-            editFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-            const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
-            editFilterEstado.innerHTML = '<option value="">Todos os Estados</option>' + estadoOptions.map(e => `<option value="${e}">${e}</option>`).join('');
-            const debouncedRenderTable = debounce(renderEditableTable, 300);
-            editFilterTipo.onchange = () => { updateUnidades(); renderEditableTable(); };
-            editFilterUnidade.onchange = renderEditableTable;
-            editFilterEstado.onchange = renderEditableTable;
-            editFilterDescricao.oninput = debouncedRenderTable;
-            updateUnidades();
-            renderEditableTable();
-        }
-
-        function populateUnitMappingTab() {
-            const systemTypes = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
-            mapFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + systemTypes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-            updateSystemUnitOptions();
-            renderSavedMappings();
-            updateGiapUnitOptions();
-        }
-
-        function updateSystemUnitOptions() {
-            const selectedType = mapFilterTipo.value;
-            const linkedSystemUnits = Object.keys(unitMapping);
-            const systemUnits = [...normalizedSystemUnits.values()].filter(unit => {
-                const item = fullInventory.find(i => i.Unidade === unit); const isCorrectType = !selectedType || item?.Tipo === selectedType;
-                return isCorrectType && !linkedSystemUnits.includes(unit);
-            }).sort();
-            mapSystemUnitSelect.innerHTML = systemUnits.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
-        }
-
-        function updateGiapUnitOptions() {
-            const filterText = normalizeStr(mapGiapFilter.value);
-            let allGiapUnitsFromSheet = [...new Set(giapInventory.map(i => i.Unidade).filter(Boolean))];
-            let allGiapUnits = [...new Set([...allGiapUnitsFromSheet, ...customGiapUnits.map(u => u.name)])].sort();
-            const selectedSystemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value);
-            const allLinkedGiapUnits = new Set(Object.values(unitMapping).flat());
-            const currentMapping = new Set();
-            selectedSystemUnits.forEach(unit => { if (unitMapping[unit]) { unitMapping[unit].forEach(giapUnit => currentMapping.add(giapUnit)); } });
-            if (filterText) { allGiapUnits = allGiapUnits.filter(unit => normalizeStr(unit).includes(filterText)); }
-            const keywords = new Set();
-            selectedSystemUnits.forEach(unit => { unit.split('/').forEach(part => keywords.add(normalizeStr(part.trim()))); });
-            const suggestions = []; const available = []; const usedByOthers = [];
-            allGiapUnits.forEach(unit => {
-                const optionHtml = `<option value="${escapeHtml(unit)}">${escapeHtml(unit)}</option>`;
-                const isSuggestion = keywords.size > 0 && Array.from(keywords).some(kw => kw && normalizeStr(unit).includes(kw));
-                if (!allLinkedGiapUnits.has(unit) || currentMapping.has(unit)) { if (isSuggestion && !filterText) { suggestions.push(optionHtml); } else { available.push(optionHtml); } } else { usedByOthers.push(optionHtml); }
-            });
-            const suggestionHeader = suggestions.length > 0 ? `<optgroup label="Sugestões">` : ''; const suggestionFooter = suggestions.length > 0 ? `</optgroup>` : '';
-            const usedHeader = usedByOthers.length > 0 ? `<optgroup label="Já Mapeadas (em outras unidades)">` : ''; const usedFooter = usedByOthers.length > 0 ? `</optgroup>` : '';
-            mapGiapUnitMultiselect.innerHTML = suggestionHeader + suggestions.join('') + suggestionFooter + available.join('') + usedHeader + usedByOthers.join('') + usedFooter;
-        }
-
-        function renderSavedMappings() {
-            const mappedUnits = Object.keys(unitMapping).filter(key => unitMapping[key]?.length > 0).sort();
-            savedMappingsContainer.innerHTML = mappedUnits.length > 0 ? mappedUnits.map(systemUnit => `
-                <div class="p-2 border rounded-md bg-slate-50 flex justify-between items-center">
-                    <div><strong class="text-sm">${escapeHtml(systemUnit)}</strong><p class="text-xs text-slate-600">→ ${unitMapping[systemUnit].join(', ')}</p></div>
-                    <button class="delete-mapping-btn text-red-500 hover:text-red-700 p-1" data-system-unit="${escapeHtml(systemUnit)}"><svg class="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg></button>
-                </div>`).join('') : `<p class="text-sm text-slate-500">Nenhuma ligação salva ainda.</p>`;
-        }
-        
-        function populatePendingTransfersTab() {
-             const pendingTransfers = fullInventory.filter(item => {
-                const tombo = item.Tombamento?.trim();
-                if (!tombo || normalizeStr(tombo).includes('permuta') || tombo.toLowerCase() === 's/t') return false;
-                const giapItem = giapMap.get(tombo); if (!giapItem) return false;
-                const systemUnit = (item.Unidade || '').trim(); const giapUnit = giapItem.Unidade; if (!systemUnit || !giapUnit) return false;
-                if (!unitMapping[systemUnit] || unitMapping[systemUnit].length === 0) { return normalizeStr(systemUnit) !== normalizeStr(giapUnit); }
-                const mappedGiapUnits = unitMapping[systemUnit];
-                return !mappedGiapUnits.map(u => normalizeStr(u)).includes(normalizeStr(giapUnit));
-            });
-            const groupedTransfers = pendingTransfers.reduce((acc, item) => {
-                const tipo = item.Tipo || 'Sem Tipo'; if (!acc[tipo]) acc[tipo] = {};
-                const unit = item.Unidade || 'Unidade Desconhecida'; if (!acc[tipo][unit]) { acc[tipo][unit] = []; } acc[tipo][unit].push(item); return acc;
-            }, {});
-            const tipos = Object.keys(groupedTransfers).sort();
-            if (tipos.length === 0) { pendingTransfersContainer.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhuma transferência pendente encontrada.</p>`;
-            } else {
-                pendingTransfersContainer.innerHTML = tipos.map(tipo => {
-                    const units = Object.keys(groupedTransfers[tipo]).sort();
-                    const unitsHtml = units.map(unit => {
-                        const items = groupedTransfers[tipo][unit];
-                        const itemsHtml = items.map(item => {
-                            const giapItem = giapMap.get(item.Tombamento.trim()); const giapUnitName = giapItem ? giapItem.Unidade : 'N/A';
-                            return `<div class="p-3 border-t text-sm flex justify-between items-center">
-                                        <div><label class="flex items-center"><input type="checkbox" class="h-4 w-4 rounded border-gray-300 transfer-item-checkbox" data-id="${item.id}" data-giap-unit="${escapeHtml(giapUnitName)}"><span class="ml-3"><strong>${escapeHtml(item.Descrição)}</strong> (T: ${escapeHtml(item.Tombamento)})</span></label></div>
-                                        <div class="text-right"><p class="text-xs text-slate-500">Destino na Planilha</p><p class="font-semibold text-red-600">${escapeHtml(giapUnitName)}</p></div>
-                                    </div>`;
-                        }).join('');
-                        return `<details class="bg-white rounded-lg shadow-sm border mt-2"><summary class="p-4 font-semibold cursor-pointer flex justify-between items-center hover:bg-slate-50"><span>${escapeHtml(unit)}</span><span class="text-sm font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">${items.length} ${items.length > 1 ? 'itens' : 'item'}</span></summary><div class="px-4 pb-2 border-t"><div class="py-2 flex justify-between items-center"><label class="flex items-center text-sm font-medium"><input type="checkbox" class="h-4 w-4 mr-2 select-all-in-unit">Selecionar Todos</label><div class="flex gap-2"><button class="keep-selected-btn text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-md hover:bg-yellow-200">Manter na Unidade</button><button class="transfer-selected-btn text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200">Transferir Selecionados</button></div></div>${itemsHtml}</div></details>`;
-                    }).join('');
-                    return `<div class="mb-4"><h3 class="text-lg font-bold text-slate-700 p-2 bg-slate-200 rounded-t-lg">${tipo}</h3>${unitsHtml}</div>`;
-                }).join('');
+            populateFilters(patrimonioFullList);
+            applyPatrimonioFiltersAndRender();
+            if (document.getElementById('content-dashboard').offsetParent) {
+                 renderDashboard(patrimonioFullList);
+            }
+            if (isLoggedIn) {
+                document.getElementById('tab-notas').style.display = 'inline-block';
+                populateNfTab();
+                renderHistory();
             }
         }
-        
+
+        // --- Funções da Aba Notas Fiscais ---
         function parsePtBrDate(dateStr) {
-            if (!dateStr || typeof dateStr !== 'string') return new Date(0); 
+            if (!dateStr || typeof dateStr !== 'string') return new Date(0);
             const parts = dateStr.split('/');
-            if (parts.length === 3) { return new Date(parts[2], parts[1] - 1, parts[0]); } return new Date(0);
+            if (parts.length === 3) {
+                return new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+            return new Date(0);
         }
 
         function populateNfTab() {
             if (giapInventory.length === 0) return;
-            const giapWithNf = giapInventory.filter(item => item.NF && item.NF.trim() !== '').sort((a, b) => parsePtBrDate(b.Cadastro) - parsePtBrDate(a.Cadastro));
+            const giapWithNf = giapInventory
+                .filter(item => item.NF && item.NF.trim() !== '')
+                .sort((a, b) => parsePtBrDate(b.Cadastro) - parsePtBrDate(a.Cadastro));
             processedNfData = giapWithNf.reduce((acc, item) => {
                 const nf = item.NF.trim();
-                if (!acc[nf]) { acc[nf] = { items: [], fornecedor: item['Nome Fornecedor'] || 'Não especificado', tipoEntrada: item['Tipo Entrada'] || 'N/A', dataCadastro: item.Cadastro }; }
-                acc[nf].items.push(item); return acc;
+                if (!acc[nf]) {
+                    acc[nf] = {
+                        items: [],
+                        fornecedor: item['Nome Fornecedor'] || 'Não especificado',
+                        tipoEntrada: item['Tipo Entrada'] || 'N/A',
+                        dataCadastro: item.Cadastro
+                    };
+                }
+                acc[nf].items.push(item);
+                return acc;
             }, {});
-            renderNfList(); 
+            renderNfList();
         }
 
         function renderNfList() {
-            const container = document.getElementById('notas-fiscais-container'); container.innerHTML = '';
-            const tomboMap = new Map(fullInventory.map(item => [item.Tombamento?.trim(), item]));
-            const nfSearchTerm = document.getElementById('nf-search').value.toLowerCase(); const nfItemSearchTerm = document.getElementById('nf-item-search').value.toLowerCase();
-            const nfTipoEntrada = document.getElementById('nf-tipo-entrada').value; const startDateStr = document.getElementById('nf-date-start').value; const endDateStr = document.getElementById('nf-date-end').value;
-            const startDate = startDateStr ? new Date(startDateStr) : null; const endDate = endDateStr ? new Date(endDateStr) : null;
-            if (endDate) { endDate.setHours(23, 59, 59, 999); } if (startDate) { startDate.setHours(0, 0, 0, 0); }
+            const container = document.getElementById('lista-notas');
+            container.innerHTML = '';
+            if (Object.keys(processedNfData).length === 0) return; 
+
+            const tomboMap = new Map(patrimonioFullList.map(item => [item.Tombamento?.trim(), item]));
+            
+            const nfSearchTerm = document.getElementById('nf-search-index').value.toLowerCase();
+            const nfItemSearchTerm = document.getElementById('nf-item-search-index').value.toLowerCase();
+            const nfTipoEntrada = document.getElementById('nf-tipo-entrada-index').value;
+            const startDateStr = document.getElementById('nf-date-start-index').value;
+            const endDateStr = document.getElementById('nf-date-end-index').value;
+
+            const startDate = startDateStr ? new Date(startDateStr) : null;
+            const endDate = endDateStr ? new Date(endDateStr) : null;
+            if (endDate) { endDate.setHours(23, 59, 59, 999); }
+            if (startDate) { startDate.setHours(0, 0, 0, 0); }
+
             const filteredNfs = Object.keys(processedNfData).filter(nf => {
                 const nfGroup = processedNfData[nf];
+                
                 if (nfSearchTerm && !nf.toLowerCase().includes(nfSearchTerm)) return false;
-                if (nfItemSearchTerm) { const itemMatch = nfGroup.items.some(item => (item.Descrição || '').toLowerCase().includes(nfItemSearchTerm) || (item.Espécie || '').toLowerCase().includes(nfItemSearchTerm)); if (!itemMatch) return false; }
+                
+                if (nfItemSearchTerm) {
+                    const itemMatch = nfGroup.items.some(item => 
+                        (item.Descrição || '').toLowerCase().includes(nfItemSearchTerm) || 
+                        (item.Espécie || '').toLowerCase().includes(nfItemSearchTerm)
+                    );
+                    if (!itemMatch) return false;
+                }
+
                 if (nfTipoEntrada && nfGroup.tipoEntrada !== nfTipoEntrada) return false;
-                const nfDate = parsePtBrDate(nfGroup.dataCadastro); if (startDate && nfDate < startDate) return false; if (endDate && nfDate > endDate) return false;
+                
+                const nfDate = parsePtBrDate(nfGroup.dataCadastro);
+                if (startDate && nfDate < startDate) return false;
+                if (endDate && nfDate > endDate) return false;
+                
                 return true;
             });
-            if (filteredNfs.length === 0) { container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhuma nota fiscal encontrada com os filtros aplicados.</p>`; return; }
+
+            if (filteredNfs.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center p-4">Nenhuma nota fiscal encontrada com os filtros aplicados.</p>`;
+                return;
+            }
+
             const categorizedNfs = filteredNfs.reduce((acc, nfKey) => {
-                const nfGroup = processedNfData[nfKey]; const category = nfGroup.tipoEntrada || 'Outros';
-                if (!acc[category]) { acc[category] = []; } acc[category].push(nfKey); return acc;
+                const nfGroup = processedNfData[nfKey];
+                const category = nfGroup.tipoEntrada || 'Outros';
+                if (!acc[category]) {
+                    acc[category] = [];
+                }
+                acc[category].push(nfKey);
+                return acc;
             }, {});
+
             const categories = Object.keys(categorizedNfs).sort();
             categories.forEach(category => {
-                const categoryHeader = document.createElement('h3'); categoryHeader.className = 'text-lg font-bold text-slate-700 p-2 bg-slate-100 rounded-t-lg mt-6 first:mt-0'; categoryHeader.textContent = category; container.appendChild(categoryHeader);
+                const categoryHeader = document.createElement('h3');
+                categoryHeader.className = 'text-lg font-bold text-slate-700 p-2 bg-slate-100 rounded-t-lg mt-6 first:mt-0';
+                categoryHeader.textContent = category;
+                container.appendChild(categoryHeader);
+
                 const nfsInCategory = categorizedNfs[category];
                 nfsInCategory.forEach(nf => {
-                    const nfGroup = processedNfData[nf]; const nfDetails = document.createElement('details'); nfDetails.className = 'bg-white rounded-lg shadow-sm border mb-3 border-t-0 rounded-t-none'; nfDetails.open = false;
+                    const nfGroup = processedNfData[nf];
+                    const nfDetails = document.createElement('details');
+                    nfDetails.className = 'bg-white rounded-lg shadow-sm border mb-3 border-t-0 rounded-t-none';
+                    nfDetails.open = false;
+                    
                     const itemSummaryText = nfGroup.items.slice(0, 2).map(i => escapeHtml(i.Descrição || i.Espécie)).join(', ') + (nfGroup.items.length > 2 ? '...' : '');
-                    const nfSummary = document.createElement('summary'); nfSummary.className = 'p-4 font-semibold cursor-pointer grid grid-cols-1 md:grid-cols-3 gap-4 items-center hover:bg-slate-50';
-                    nfSummary.innerHTML = `<div class="md:col-span-2"><p class="text-xs text-slate-500">NF: <strong class="text-blue-700 text-sm">${escapeHtml(nf)}</strong> | Fornecedor: <strong>${escapeHtml(nfGroup.fornecedor)}</strong></p><p class="text-xs text-slate-500 mt-1 truncate">Itens: ${itemSummaryText}</p></div><div><p class="text-xs text-slate-500">Data Cadastro</p><strong>${escapeHtml(nfGroup.dataCadastro)}</strong></div>`;
-                    nfDetails.appendChild(nfSummary); const itemsListContainer = document.createElement('div'); itemsListContainer.className = 'p-4 border-t border-slate-200 space-y-2';
+                    
+                    const nfSummary = document.createElement('summary');
+                    nfSummary.className = 'p-4 font-semibold cursor-pointer grid grid-cols-1 md:grid-cols-3 gap-4 items-center hover:bg-slate-50';
+                    nfSummary.innerHTML = `
+                        <div class="md:col-span-2">
+                            <p class="text-xs text-slate-500">NF: <strong class="text-blue-700 text-sm">${escapeHtml(nf)}</strong> | Fornecedor: <strong>${escapeHtml(nfGroup.fornecedor)}</strong></p>
+                            <p class="text-xs text-slate-500 mt-1 truncate">Itens: ${itemSummaryText}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-500">Data Cadastro</p>
+                            <strong>${escapeHtml(nfGroup.dataCadastro)}</strong>
+                        </div>
+                    `;
+                    nfDetails.appendChild(nfSummary);
+
+                    const itemsListContainer = document.createElement('div');
+                    itemsListContainer.className = 'p-4 border-t border-slate-200 space-y-2';
                     nfGroup.items.forEach(item => {
-                        const tombo = item.TOMBAMENTO?.trim(); const allocatedItem = tombo ? giapMap.get(tombo) : undefined;
+                        const tombo = item.TOMBAMENTO?.trim();
+                        const allocatedItem = tombo ? tomboMap.get(tombo) : undefined;
                         let allocationHtml = `<span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Não Alocado</span>`;
                         if (allocatedItem) {
-                            const systemItem = fullInventory.find(i => i.Tombamento?.trim() === tombo);
-                             if (systemItem) { allocationHtml = `<div><span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado</span><p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(systemItem.Unidade)}</strong> (${escapeHtml(systemItem.Tipo)})</p></div>`; }
+                            allocationHtml = `
+                                <div>
+                                    <span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado</span>
+                                    <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(allocatedItem.Unidade)}</strong> (${escapeHtml(allocatedItem.Tipo)})</p>
+                                </div>`;
                         }
-                        const itemDiv = document.createElement('div'); itemDiv.className = 'p-3 border rounded-md flex justify-between items-center bg-slate-50/50';
-                        itemDiv.innerHTML = `<div class="flex-1"><p class="font-bold text-slate-800">${escapeHtml(item.Descrição || item.Espécie)}</p><p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p></div><div class="text-right ml-4">${allocationHtml}</div>`;
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'p-3 border rounded-md flex justify-between items-center bg-slate-50/50';
+                        itemDiv.innerHTML = `
+                            <div class="flex-1">
+                                <p class="font-bold text-slate-800">${escapeHtml(item.Descrição || item.Espécie)}</p>
+                                <p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p>
+                            </div>
+                            <div class="text-right ml-4">${allocationHtml}</div>`;
                         itemsListContainer.appendChild(itemDiv);
                     });
-                    nfDetails.appendChild(itemsListContainer); container.appendChild(nfDetails);
+                    nfDetails.appendChild(itemsListContainer);
+                    container.appendChild(nfDetails);
                 });
             });
         }
+        
+        onAuthStateChanged(auth, (user) => {
+            isLoggedIn = !!user;
+            updateUIVisibility();
+            if(!dataCache) loadAllData();
+            if (isLoggedIn) {
+                document.getElementById('tab-notas').style.display = 'inline-block';
+            } else {
+                 document.getElementById('tab-notas').style.display = 'none';
+            }
+        });
 
-        function populateGiapTab() {
-            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie'];
-            giapTableBody.innerHTML = giapInventory.map(item => `<tr class="border-b">${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}</tr>`).join('');
+        function updateUIVisibility() {
+            const loggedInElements = [adminActionsPatrimonio, document.getElementById('table-header-actions'), document.getElementById('nav-edit-link'), document.getElementById('nav-history')];
+            
+            if (isLoggedIn) {
+                userEmailEl.textContent = auth.currentUser.email;
+                userInfoEl.classList.remove('hidden'); userInfoEl.classList.add('flex');
+                openLoginModalBtn.classList.add('hidden');
+                loggedInElements.forEach(el => el && el.classList.remove('hidden'));
+            } else {
+                userEmailEl.textContent = '';
+                userInfoEl.classList.add('hidden'); userInfoEl.classList.remove('flex');
+                openLoginModalBtn.classList.remove('hidden');
+                loggedInElements.forEach(el => el && el.classList.add('hidden'));
+            }
+            document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+            if(patrimonioFullList.length > 0) applyPatrimonioFiltersAndRender();
+        }
+
+        function populateFilters(items) {
+            const tipos = [...new Set(items.map(item => item.Tipo).filter(Boolean))].sort();
+            filtroTipoUnidadeEl.innerHTML = '<option value="">TODOS OS TIPOS</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            const estados = ['Novo', 'Bom', 'Regular', 'Avariado'];
+            filtroEstadoEl.innerHTML = '<option value="">TODOS OS ESTADOS</option>' + estados.map(e => `<option value="${e}">${e}</option>`).join('');
         }
         
-        function populateImportAndReplaceTab() {
-            const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort();
-            const selects = [document.getElementById('mass-transfer-tipo'), document.getElementById('replace-tipo'), document.getElementById('edit-by-desc-tipo')];
-            selects.forEach(select => { if(select) select.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join(''); });
-            const setupUnitSelect = (tipoSelectId, unitSelectId) => {
-                 document.getElementById(tipoSelectId).addEventListener('change', () => {
-                    const selectedTipo = document.getElementById(tipoSelectId).value; const unitSelect = document.getElementById(unitSelectId);
-                    if (!selectedTipo) { unitSelect.innerHTML = ''; unitSelect.disabled = true; return; }
-                    const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
-                    unitSelect.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join(''); unitSelect.disabled = false;
+        function applyPatrimonioFiltersAndRender() {
+            if(!patrimonioFullList) return;
+            const tipo = filtroTipoUnidadeEl.value;
+            const unidade = filtroUnidadeEl.value;
+            const estado = filtroEstadoEl.value;
+            const busca = normalizeStr(filtroBuscaEl.value);
+
+            patrimonioFilteredList = patrimonioFullList.filter(item => {
+                const descMatch = !busca || normalizeStr(item.Descrição).includes(busca);
+                const tomboMatch = !busca || normalizeStr(item.Tombamento).includes(busca);
+                const localMatch = !busca || normalizeStr(item.Localização).includes(busca);
+
+                return (!tipo || item.Tipo === tipo) &&
+                       (!unidade || item.Unidade === unidade) &&
+                       (!estado || getNormalizedEstado(item.Estado) === estado) &&
+                       (descMatch || tomboMatch || localMatch);
+            });
+            patrimonioCurrentPage = 1;
+            renderPatrimonioTable();
+        }
+
+        function renderPatrimonioTable() {
+            const startIndex = (patrimonioCurrentPage - 1) * patrimonioItemsPerPage;
+            const itemsToDisplay = patrimonioFilteredList.slice(startIndex, startIndex + patrimonioItemsPerPage);
+            
+            const actionButtonsHTML = (itemId) => !isLoggedIn ? '' : `<td class="px-3 py-2 space-x-2"><button class="transfer-btn p-1 text-green-600 hover:text-green-800" data-id="${itemId}" title="Transferir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5a1.5 1.5 0 0 1-1.5-1.5V2a.5.5 0 0 0-.5-.5z"/></svg></button><button class="edit-btn p-1 text-blue-600 hover:text-blue-800" data-id="${itemId}" title="Editar Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg></button><button class="delete-btn p-1 text-red-600 hover:text-red-800" data-id="${itemId}" title="Excluir Item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></td>`;
+
+            tableBodyEl.innerHTML = itemsToDisplay.length === 0 
+                ? `<tr><td colspan="${isLoggedIn ? 7 : 6}" class="text-center py-10 text-slate-500">Nenhum item encontrado com os filtros atuais.</td></tr>`
+                : itemsToDisplay.map(item => `
+                    <tr class="border-b border-slate-200 hover:bg-slate-50">
+                        <td class="px-3 py-2 font-mono text-xs">${item.Tombamento || 'S/T'}</td>
+                        <td class="px-3 py-2 font-medium text-slate-900">${item.Descrição || 'N/A'}</td>
+                        <td class="px-3 py-2">${item.Unidade || 'N/A'}</td>
+                        <td class="px-3 py-2 text-xs">${item.Fornecedor || 'N/A'}</td>
+                        <td class="px-3 py-2 text-xs">${item['Origem da Doação'] || 'N/A'}</td>
+                        <td class="px-3 py-2"><span class="badge ${getStateColor(item.Estado)}">${item.Estado || 'N/A'}</span></td>
+                        ${actionButtonsHTML(item.id)}
+                    </tr>`).join('');
+            renderPatrimonioPagination();
+        }
+        
+        function renderPatrimonioPagination() {
+            const totalPages = Math.ceil(patrimonioFilteredList.length / patrimonioItemsPerPage);
+            const startItem = (patrimonioCurrentPage - 1) * patrimonioItemsPerPage + 1;
+            const endItem = Math.min(startItem + patrimonioItemsPerPage - 1, patrimonioFilteredList.length);
+            
+            paginationSummaryEl.textContent = patrimonioFilteredList.length > 0 ? `Mostrando ${startItem}-${endItem} de ${patrimonioFilteredList.length} itens.` : 'Nenhum item para exibir.';
+
+            paginationControlsEl.innerHTML = totalPages <= 1 ? '' : `<div class="inline-flex"><button data-page="${patrimonioCurrentPage - 1}" class="px-4 py-2 text-sm border rounded-l-lg" ${patrimonioCurrentPage === 1 ? 'disabled' : ''}>Anterior</button><button data-page="${patrimonioCurrentPage + 1}" class="px-4 py-2 text-sm border rounded-r-lg" ${patrimonioCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button></div>`;
+        }
+        
+        const openModal = (modalEl) => {
+            if (!modalEl) return;
+            modalEl.classList.remove('hidden');
+            setTimeout(() => {
+                modalEl.querySelector('.modal-overlay')?.classList.remove('opacity-0');
+                modalEl.querySelector('.modal-container')?.classList.remove('opacity-0', 'scale-95');
+            }, 10);
+        };
+        const closeModal = (modalEl) => {
+            if (!modalEl) return;
+            modalEl.querySelector('.modal-overlay')?.classList.add('opacity-0');
+            modalEl.querySelector('.modal-container')?.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => { modalEl.classList.add('hidden'); }, 300);
+        };
+
+        function openItemModal(item = null) {
+            itemForm.reset();
+            document.getElementById('modal-title').textContent = item ? 'Editar Item' : 'Adicionar Novo Item';
+            document.getElementById('item-id').value = item ? item.id : '';
+            if (item) {
+                Object.keys(item).forEach(key => {
+                    const formKey = `item-${key.toLowerCase().replace(/\s/g, '-').replace('ç', 'c').replace('ã', 'a')}`;
+                    const element = document.getElementById(formKey);
+                    if (element) element.value = item[key];
                 });
+            }
+            openModal(itemModal);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if(!isLoggedIn) return;
+            const id = itemForm['item-id'].value;
+            const itemData = {
+                id: id,
+                Tombamento: itemForm['item-tombamento'].value, Tipo: itemForm['item-tipo'].value, 'Descrição': itemForm['item-descricao'].value, 
+                Unidade: itemForm['item-unidade'].value, Quantidade: parseInt(itemForm['item-quantidade'].value), Localização: itemForm['item-localizacao'].value, 
+                Estado: itemForm['item-estado'].value, Fornecedor: itemForm['item-fornecedor'].value, 'Origem da Doação': itemForm['item-origem-da-doacao'].value, 
+                Observação: itemForm['item-observacao'].value
             };
-            setupUnitSelect('mass-transfer-tipo', 'mass-transfer-unit'); setupUnitSelect('replace-tipo', 'replace-unit'); setupUnitSelect('edit-by-desc-tipo', 'edit-by-desc-unit');
-        }
-       
-        function populateReconciliationTab() {
-            const tipos = [...new Set(fullInventory.map(item => item.Tipo).filter(Boolean))].sort(); const sel = document.getElementById('filter-tipo');
-            sel.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-            const tombarFilterTipo = document.getElementById('tombar-filter-tipo');
-            tombarFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-        }
-
-        function renderList(containerId, arr, keyField, primaryLabelField, suggestionInfo = null) {
-            const container = document.getElementById(containerId); container.innerHTML = '';
-            if (!arr || arr.length === 0) { container.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado.</p>`; return; }
-            arr.forEach((item, index) => {
-                const id = item[keyField]; const div = document.createElement('div'); div.className = 'reconciliation-list-item card p-2 text-sm'; div.dataset.id = id;
-                let detailsHtml = '';
-                if (containerId === 'system-list') {
-                    const fornecedor = escapeHtml(item.Fornecedor || 'N/D'); const estado = escapeHtml(item.Estado || 'N/A'); const obs = escapeHtml(item.Observação || 'Nenhuma');
-                    detailsHtml = `<strong>${escapeHtml(item[primaryLabelField])}</strong><p class="text-xs text-slate-500 mt-1">Fornecedor: ${fornecedor} | Estado: <strong>${estado}</strong></p><p class="text-xs text-slate-400 mt-1">Obs: ${obs}</p>`;
-                } else {
-                    const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A'); const dataCadastro = escapeHtml(item.Cadastro || 'N/D'); const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
-                    const tombo = escapeHtml(item[keyField]); const valorNf = escapeHtml(item['Valor NF'] || 'N/A');
-                    detailsHtml = `<div class="flex justify-between items-start"><div class="flex-1"><strong>${tombo} - ${descricao}</strong><p class="text-xs text-slate-500 mt-1">Cadastro: <strong>${dataCadastro}</strong> | Fornecedor: <strong>${fornecedor}</strong></p></div><div class="text-right ml-2"><p class="text-xs text-slate-500">Valor NF</p><strong class="text-sm text-green-700">${valorNf}</strong></div></div>`;
-                }
-                div.innerHTML = detailsHtml;
-                if (suggestionInfo && suggestionInfo.suggestions.has(id)) {
-                    const score = suggestionInfo.suggestions.get(id);
-                    if (index === 0 && score > 0.7) { div.style.backgroundColor = '#dbeafe'; div.style.borderLeft = '4px solid #3b82f6'; } 
-                    else if (score > 0.5) { div.style.backgroundColor = '#e0f2fe'; div.style.borderLeft = '4px solid #0ea5e9'; }
-                }
-                div.onclick = (event) => handleSelect(containerId, id, item, event.currentTarget); container.append(div);
-            });
+            const action = id ? 'Edição' : 'Criação';
+            
+            try {
+                const functionToCall = id ? 'updateItem' : 'addNewItem';
+                await postData(functionToCall, { item: itemData });
+                
+                await logAction(action, { itemId: id || 'novo', itemDesc: itemData['Descrição'], details: `Item ${id ? 'editado' : 'criado'}: ${itemData['Descrição']}` });
+                closeModal(itemModal);
+                dataCache = null; // Invalida o cache
+                loadAllData(true);
+            } catch (error) { console.error("Erro ao salvar o item: ", error); showNotification(`Erro ao salvar: ${error.message}`, 'error');}
         }
         
-        function getConciliationData() {
-            const unidade = document.getElementById('filter-unidade').value.trim(); if (!unidade) return { systemItems: [], giapItems: [] };
-            const systemFilterText = normalizeStr(document.getElementById('system-list-filter').value); const giapFilterText = normalizeStr(document.getElementById('giap-list-filter').value);
-            const usedTombamentos = new Set(fullInventory.map(i => normalizeStr(i.Tombamento)).filter(Boolean));
-            linksToCreate.forEach(link => usedTombamentos.add(normalizeTombo(link.giapItem.TOMBAMENTO)));
-            const mappedGiapUnits = unitMapping[unidade] || [unidade];
-            const systemItems = fullInventory.filter(i => {
-                const tombo = (i.Tombamento || '').trim(); const isPending = linksToCreate.some(l => l.systemItem.id === i.id);
-                return !isPending && i.Unidade === unidade && (!tombo || tombo.toLowerCase() === 's/t') && !normalizeStr(tombo).includes('permuta') && normalizeStr(i.Descrição).includes(systemFilterText);
-            });
-            const giapItems = giapInventory.filter(g => {
-                const tomboTrimmed = normalizeTombo(g.TOMBAMENTO); const giapDesc = normalizeStr(g.Descrição || g.Espécie);
-                return tomboTrimmed && !usedTombamentos.has(tomboTrimmed) && mappedGiapUnits.map(normalizeStr).includes(normalizeStr(g.Unidade)) && giapDesc.includes(giapFilterText);
-            });
-            return { systemItems, giapItems };
+        function openDeleteModal(id) {
+            const item = patrimonioFullList.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('delete-item-info').textContent = `${item.Descrição} (Tomb: ${item.Tombamento || 'S/T'})`;
+            confirmDeleteBtn.dataset.id = id;
+            openModal(deleteConfirmModal);
+        }
+        
+        async function handleDelete() {
+            if(!isLoggedIn) return;
+            const id = confirmDeleteBtn.dataset.id;
+            const item = patrimonioFullList.find(i => i.id === id);
+            try {
+                await postData('deleteItem', { id });
+                await logAction('Exclusão', { itemId: id, itemDesc: item.Descrição, details: `Item excluído: ${item.Descrição}` });
+                closeModal(deleteConfirmModal);
+                dataCache = null;
+                loadAllData(true);
+            } catch(error) { console.error("Erro ao excluir item: ", error); showNotification(`Erro ao excluir: ${error.message}`, 'error'); }
         }
 
-        function handleSelect(containerId, id, obj, element) {
-            if (element.classList.contains('linked')) return;
-            if (containerId === 'system-list') {
-                clearGiapImportSelection(); selSys = { id, obj }; selGiap = null;
-                document.querySelectorAll('#giap-list .selected').forEach(el => el.classList.remove('selected'));
-                document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
-                element.classList.add('selected'); suggestGiapMatchesComAprendizado(obj); 
-            } else if (containerId === 'giap-list' && selSys) {
-                selGiap = { tomb: id, obj };
-                document.querySelectorAll('#giap-list .selected, #giap-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
-                element.classList.add('selected'); openDescriptionChoiceModal();
-            } else if (containerId === 'giap-list' && !selSys) {
-                element.classList.toggle('selected-for-import');
-                const index = giapItemsForImport.findIndex(item => item.TOMBAMENTO === id);
-                if (index > -1) { giapItemsForImport.splice(index, 1); } else { giapItemsForImport.push(obj); }
-                updateImportButton();
+        function openTransferModal(id) {
+            const item = patrimonioFullList.find(i => i.id === id);
+            if (!item) return;
+            transferForm.reset();
+            transferForm['transfer-item-id'].value = id;
+            document.getElementById('transfer-item-description').textContent = item.Descrição;
+            document.getElementById('transfer-item-current-unit').textContent = `${item.Unidade} (${item.Localização || 'N/D'})`;
+            const tipos = [...new Set(patrimonioFullList.map(i => i.Tipo).filter(Boolean))].sort();
+            transferForm['transfer-tipo'].innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+            openModal(transferModal);
+        }
+
+        function updateUnidadeFilter(tipoSelectEl, unidadeSelectEl) {
+            const selectedTipo = tipoSelectEl.value;
+            unidadeSelectEl.innerHTML = selectedTipo ? '<option value="">TODAS AS UNIDADES</option>' + [...new Set(patrimonioFullList.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort().map(u => `<option value="${u}">${u}</option>`).join('') : '<option value="">Selecione um Tipo</option>';
+            unidadeSelectEl.disabled = !selectedTipo;
+        }
+
+        async function handleTransferSubmit(e) {
+            e.preventDefault();
+            if(!isLoggedIn) return;
+            const id = transferForm['transfer-item-id'].value;
+            const newUnidade = transferForm['transfer-unidade'].value;
+            const originalItem = patrimonioFullList.find(i => i.id === id);
+            const updatedData = { 
+                id: id,
+                Tipo: transferForm['transfer-tipo'].value, 
+                Unidade: newUnidade, 
+                Localização: transferForm['transfer-localizacao'].value 
+            };
+            try {
+                await postData('transferItem', { item: updatedData });
+                await logAction('Transferência', { itemId: id, itemDesc: originalItem.Descrição, details: `De '${originalItem.Unidade}' para '${newUnidade}'` });
+                closeModal(transferModal);
+                dataCache = null;
+                loadAllData(true);
+            } catch (error) { console.error("Erro ao transferir item:", error); showNotification(`Erro ao transferir: ${error.message}`, 'error');}
+        }
+        
+        function switchTab(tabName) {
+            if(tabName === 'edit') return;
+            navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('hidden', pane.id !== `content-${tabName}`));
+            if (tabName === 'dashboard' && patrimonioFullList.length > 0) renderDashboard(patrimonioFullList);
+            if (tabName === 'historico') renderHistory();
+            if (tabName === 'notas') renderNfList();
+        }
+        
+        function renderHistory() {
+            if(!isLoggedIn) {
+                historyContainer.innerHTML = `<p class="text-slate-500">Acesso negado.</p>`;
+                return;
+            }
+            historyContainer.innerHTML = historicoFullList.length > 0 
+                ? historicoFullList.map(h => `
+                    <div class="p-3 border rounded-md bg-slate-50 text-sm">
+                        <p><strong>${h.action}:</strong> ${h.itemDesc || ''} <span class="text-xs text-slate-500">(${h.itemId || ''})</span></p>
+                        <p class="text-xs text-slate-600">${h.details}</p>
+                        <div class="text-right text-xs text-slate-400 mt-1">${h.user} em ${h.timestamp ? new Date(h.timestamp).toLocaleString('pt-BR') : ''}</div>
+                    </div>
+                `).join('')
+                : `<p class="text-slate-500">Nenhum histórico encontrado.</p>`;
+        }
+
+
+        function renderDashboard(items) {
+            if (!items || items.length === 0) return;
+            const kpi = (id, value) => document.getElementById(id).textContent = value;
+            kpi('kpi-total-itens', items.reduce((s, i) => s + (parseInt(i.Quantidade) || 1), 0));
+            kpi('kpi-total-unidades', new Set(items.map(i => i.Unidade)).size);
+            const estadosCount = items.reduce((a, i) => { const n = getNormalizedEstado(i.Estado); a[n] = (a[n] || 0) + (parseInt(i.Quantidade) || 1); return a; }, {});
+            kpi('kpi-total-avariados', estadosCount['Avariado'] || 0);
+            kpi('kpi-total-novos', estadosCount['Novo'] || 0);
+
+            // Chart rendering
+            const estadoCtx = document.getElementById('dashboardEstadoChart').getContext('2d');
+            if (dashboardEstadoChart) dashboardEstadoChart.destroy();
+            dashboardEstadoChart = new Chart(estadoCtx, { type: 'doughnut', data: { labels: Object.keys(estadosCount), datasets: [{ data: Object.values(estadosCount), backgroundColor: ['#ef4444', '#10b981', '#3b82f6', '#f59e0b'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+            const unidadesCount = items.reduce((a, i) => { const u = i.Unidade || 'N/D'; a[u] = (a[u] || 0) + 1; return a; }, {});
+            const sortedUnidades = Object.entries(unidadesCount).sort(([,a],[,b]) => b-a).slice(0, 10);
+            const tipoCtx = document.getElementById('dashboardTipoChart').getContext('2d');
+            if (dashboardTipoChart) dashboardTipoChart.destroy();
+            dashboardTipoChart = new Chart(tipoCtx, { type: 'bar', data: { labels: sortedUnidades.map(u => u[0]), datasets: [{ label: 'Itens', data: sortedUnidades.map(u => u[1]), backgroundColor: '#3b82f6' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false } });
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            if (!email || !password) { showNotification('Preencha e-mail e senha.', 'error'); return; }
+            
+            const loginBtn = document.getElementById('btn-login'); const btnText = document.getElementById('login-btn-text'); const btnSpinner = document.getElementById('login-btn-spinner');
+            loginBtn.disabled = true; btnText.classList.add('hidden'); btnSpinner.classList.remove('hidden');
+            const loginErrorEl = loginForm.querySelector('#login-error'); loginErrorEl.classList.add('hidden');
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                closeModal(loginModal);
+            } catch (error) {
+                let errorMessage = "Ocorreu um erro desconhecido. Tente novamente.";
+                switch (error.code) {
+                    case 'auth/user-not-found': case 'auth/wrong-password': case 'auth/invalid-credential': errorMessage = "E-mail ou senha incorretos."; break;
+                    case 'auth/invalid-email': errorMessage = "O formato do e-mail é inválido."; break;
+                    case 'auth/too-many-requests': errorMessage = "Acesso bloqueado temporariamente. Tente mais tarde."; break;
+                }
+                loginErrorEl.textContent = errorMessage;
+                loginErrorEl.classList.remove('hidden');
+            } finally {
+                loginBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
             }
         }
-
-        function updateImportButton() {
-            const count = giapItemsForImport.length; const btn = document.getElementById('import-giap-btn');
-            document.getElementById('giap-import-count').textContent = count; btn.disabled = count === 0;
-        }
-
-        function clearGiapImportSelection() {
-            giapItemsForImport = []; document.querySelectorAll('#giap-list .selected-for-import').forEach(el => el.classList.remove('selected-for-import')); updateImportButton();
-        }
         
-        function addLinkToCreate(useGiapDescription) {
-            const link = { systemItem: selSys.obj, giapItem: selGiap.obj, useGiapDescription }; linksToCreate.push(link); renderCreatedLinks();
-            document.querySelector(`#system-list div[data-id='${selSys.id}']`).classList.add('linked'); document.querySelector(`#giap-list div[data-id='${selGiap.tomb}']`).classList.add('linked');
-            selSys = selGiap = null; document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
-        }
-
-        function renderCreatedLinks() {
-            const container = document.getElementById('created-links');
-            container.innerHTML = linksToCreate.map((link, index) => {
-                const systemDesc = link.systemItem.Descrição; const giapDesc = link.giapItem.Descrição || link.giapItem.Espécie; const finalDesc = link.useGiapDescription ? giapDesc : systemDesc;
-                return `<div class="created-link-item card link-success p-2 text-sm bg-green-50 border-l-4 border-green-500"><span><strong>S/T:</strong> ${escapeHtml(systemDesc)} ↔ <strong>Tombo:</strong> ${escapeHtml(link.giapItem.TOMBAMENTO)}<br><span class="text-xs text-blue-700">Descrição a ser salva: "${escapeHtml(finalDesc)}"</span></span><button class="delete-link-btn" data-index="${index}" title="Remover Vínculo"><svg class="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg></button></div>`;
-            }).join('');
-        }
-        
-        function renderConciliationLists() {
-            const unidade = document.getElementById('filter-unidade').value.trim();
-            if (!unidade) { document.getElementById('system-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Selecione uma unidade e clique em carregar.</p>`; document.getElementById('giap-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Selecione uma unidade e clique em carregar.</p>`; return; }
-            const { systemItems, giapItems } = getConciliationData();
-            renderList('system-list', systemItems, 'id', 'Descrição'); renderList('giap-list', giapItems, 'TOMBAMENTO', 'Descrição');
-        }
-
-        function openAddItemModal(defaults = {}) {
-            const modal = document.getElementById('add-item-modal'); const form = document.getElementById('add-item-form'); form.reset();
-            document.getElementById('add-item-unidade').value = defaults.Unidade || ''; document.getElementById('add-item-tipo').value = defaults.Tipo || '';
-            modal.classList.remove('hidden'); setTimeout(() => { modal.querySelector('.modal-overlay')?.classList.remove('opacity-0'); modal.querySelector('.modal-container')?.classList.remove('opacity-0', 'scale-95'); }, 10);
-        }
-
-        function closeAddItemModal() {
-            const modal = document.getElementById('add-item-modal'); modal.querySelector('.modal-overlay')?.classList.add('opacity-0'); modal.querySelector('.modal-container')?.classList.add('opacity-0', 'scale-95');
-            setTimeout(() => { modal.classList.add('hidden'); }, 300);
-        }
-
-        function openDescriptionChoiceModal() {
-            if (!selSys || !selGiap) return;
-            document.getElementById('desc-choice-tombo').textContent = selGiap.tomb; document.getElementById('desc-choice-current').textContent = selSys.obj.Descrição;
-            document.getElementById('desc-choice-new').textContent = selGiap.obj.Descrição || selGiap.obj.Espécie;
-            descChoiceModal.classList.remove('hidden');
-        }
-
-        function closeDescriptionChoiceModal() { descChoiceModal.classList.add('hidden'); }
-
-        function renderItensATombar() {
-            const container = document.getElementById('itens-a-tombar-container');
-            const tipo = document.getElementById('tombar-filter-tipo').value; const unidade = document.getElementById('tombar-filter-unidade').value;
-            const itemsPendentes = fullInventory.filter(item => item.etiquetaPendente === true && (!tipo || item.Tipo === tipo) && (!unidade || item.Unidade === unidade));
-            if (itemsPendentes.length === 0) { container.innerHTML = '<p class="text-slate-500 text-center p-4">Nenhum item pendente de tombamento com os filtros selecionados.</p>'; return; }
-            const groupedByTipo = itemsPendentes.reduce((acc, item) => { const tipoKey = item.Tipo || 'Sem Tipo'; if (!acc[tipoKey]) acc[tipoKey] = []; acc[tipoKey].push(item); return acc; }, {});
-            let html = '';
-            for (const tipo of Object.keys(groupedByTipo).sort()) {
-                html += `<h3 class="text-lg font-bold text-slate-700 p-2 bg-slate-100 rounded-t-lg mt-4">${tipo}</h3>`;
-                const groupedByUnidade = groupedByTipo[tipo].reduce((acc, item) => { const unidadeKey = item.Unidade || 'Sem Unidade'; if (!acc[unidadeKey]) acc[unidadeKey] = []; acc[unidadeKey].push(item); return acc; }, {});
-                for (const unidade of Object.keys(groupedByUnidade).sort()) {
-                    html += `<details class="bg-white rounded-lg shadow-sm border mb-2" open><summary class="p-4 font-semibold cursor-pointer hover:bg-slate-50">${unidade}</summary><div class="p-2 border-t"><table class="w-full text-sm"><thead><tr class="border-b"><th class="p-2 text-left">Descrição</th><th class="p-2 text-left">Novo Tombo</th><th class="p-2 text-left">Ação</th></tr></thead><tbody>`;
-                    groupedByUnidade[unidade].forEach(item => { html += `<tr class="border-b hover:bg-green-50"><td class="p-2">${escapeHtml(item.Descrição)}</td><td class="p-2 font-mono">${escapeHtml(item.Tombamento)}</td><td class="p-2"><button data-id="${item.id}" class="confirmar-tombamento-btn text-xs bg-green-100 text-green-700 px-3 py-1 rounded-md hover:bg-green-200">Confirmar Tombamento</button></td></tr>`; });
-                    html += `</tbody></table></div></details>`;
-                }
-            }
-            container.innerHTML = html;
-        }
-
-        // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
-            forceRefreshBtn.addEventListener('click', () => { showNotification('Forçando atualização do servidor...', 'info'); loadData(true); });
-            logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = 'index.html'));
-            navButtons.forEach(button => { button.addEventListener('click', (e) => { const tabName = e.currentTarget.dataset.tab; navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName)); contentPanes.forEach(pane => pane.classList.toggle('hidden', !pane.id.includes(tabName))); }); });
-            
-            saveAllChangesBtn.addEventListener('click', async () => {
-                if (dirtyItems.size === 0) return; showOverlay(`Salvando ${dirtyItems.size} alterações...`);
-                const payload = Array.from(dirtyItems.entries()).map(([id, data]) => ({ id, ...data }));
-                try {
-                    await postData('saveAllChanges', payload);
-                    dirtyItems.clear(); saveAllChangesBtn.disabled = true;
-                    showNotification(`${payload.length} alterações salvas! Recarregando...`, 'success');
-                    setTimeout(() => loadData(true), 1500);
-                } catch (error) { showNotification(`Erro ao salvar: ${error.message}`, 'error');
-                } finally { hideOverlay(); }
-            });
-            
-            editTableBody.addEventListener('change', (e) => {
-                const input = e.target.closest('input, select'); if (!input) return;
-                const row = input.closest('tr'); const docId = row.dataset.docId; const field = input.dataset.field; const value = (input.type === 'number' ? Number(input.value) : input.value);
-                if (field === 'Tombamento' && value && !normalizeStr(String(value)).includes('permuta') && String(value).toLowerCase() !== 's/t') { const duplicate = fullInventory.find(item => item.id !== docId && item.Tombamento === value); if (duplicate) { showNotification(`Atenção: Tombamento ${value} já alocado na unidade ${duplicate.Unidade}.`, 'warning', 5000); } }
-                const currentUpdates = dirtyItems.get(docId) || {};
-                dirtyItems.set(docId, { ...currentUpdates, [field]: value });
-                row.classList.add('is-dirty'); saveAllChangesBtn.disabled = false;
-            });
-
-            editTableBody.addEventListener('click', (e) => {
-                const syncBtn = e.target.closest('.sync-giap-btn'); if (!syncBtn) return;
-                const docId = syncBtn.dataset.docId; const row = document.getElementById(`row-${docId}`); if (!row) return;
-                const tomboInput = row.querySelector('[data-field="Tombamento"]'); const tomboValue = tomboInput.value.trim();
-                if (!tomboValue) { showNotification('O campo Tombamento está vazio.', 'warning'); return; }
-                const giapItem = giapMap.get(tomboValue);
-                if (giapItem) {
-                    const currentDesc = row.querySelector('[data-field="Descrição"]').value; const newDesc = giapItem.Descrição || giapItem.Espécie || '';
-                    document.getElementById('sync-item-tombo').textContent = tomboValue; document.getElementById('sync-current-desc').textContent = currentDesc; document.getElementById('sync-new-desc').textContent = newDesc;
-                    syncUpdateAllBtn.dataset.docId = docId; syncKeepDescBtn.dataset.docId = docId;
-                    syncConfirmModal.classList.remove('hidden');
-                } else { showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error'); }
-            });
-
-            const handleSync = (docId, updateDescription) => {
-                 const row = document.getElementById(`row-${docId}`); if (!row) return;
-                const tomboValue = row.querySelector('[data-field="Tombamento"]').value.trim(); const giapItem = giapMap.get(tomboValue); if (!giapItem) return;
-                const descInput = row.querySelector('[data-field="Descrição"]'); const fornInput = row.querySelector('[data-field="Fornecedor"]'); const nfInput = row.querySelector('[data-field="NF"]');
-                const newDesc = giapItem.Descrição || giapItem.Espécie || ''; const newForn = giapItem['Nome Fornecedor'] || ''; const newNf = giapItem.NF || '';
-                if (updateDescription) { descInput.value = newDesc; } fornInput.value = newForn; nfInput.value = newNf;
-                const currentUpdates = dirtyItems.get(docId) || {};
-                const updatedItem = { ...currentUpdates, Fornecedor: newForn, NF: newNf };
-                if (updateDescription) { updatedItem.Descrição = newDesc; }
-                dirtyItems.set(docId, updatedItem); row.classList.add('is-dirty'); saveAllChangesBtn.disabled = false;
-                syncConfirmModal.classList.add('hidden'); showNotification(`Dados do Tombo ${tomboValue} sincronizados!`, 'success');
-            };
-
-            syncUpdateAllBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, true));
-            syncKeepDescBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, false));
-            syncCancelBtn.addEventListener('click', () => syncConfirmModal.classList.add('hidden'));
-
-            document.getElementById('add-item-to-unit-btn').addEventListener('click', () => { openAddItemModal({ Tipo: document.getElementById('edit-filter-tipo').value, Unidade: document.getElementById('edit-filter-unidade').value }); });
-
-            document.getElementById('add-item-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const newItem = {
-                    Tombamento: document.getElementById('add-item-tombamento').value, Descrição: document.getElementById('add-item-descricao').value, Estado: document.getElementById('add-item-estado').value,
-                    Unidade: document.getElementById('add-item-unidade').value, Tipo: document.getElementById('add-item-tipo').value, Localização: '', Fornecedor: '', NF: '', 'Origem da Doação': '', Quantidade: 1,
-                    Observação: 'Adicionado via edição rápida.',
-                };
-                try {
-                    showOverlay('Salvando novo item...'); await postData('addNewItem', { item: newItem });
-                    showNotification('Item adicionado com sucesso! Recarregando...', 'success'); setTimeout(() => loadData(true), 1500);
-                } catch (error) { hideOverlay(); showNotification(`Erro: ${error.message}`, 'error'); }
-            });
-
-            document.querySelectorAll('.js-close-modal-add').forEach(btn => btn.addEventListener('click', closeAddItemModal));
-            mapFilterTipo.addEventListener('change', updateSystemUnitOptions);
-            mapSystemUnitSelect.addEventListener('change', updateGiapUnitOptions);
-            mapGiapFilter.addEventListener('input', debounce(updateGiapUnitOptions, 300));
-            
-            saveMappingBtn.addEventListener('click', async () => {
-                const systemUnits = Array.from(mapSystemUnitSelect.selectedOptions).map(opt => opt.value.trim()); if (systemUnits.length === 0) return showNotification("Selecione uma ou mais Unidades do Sistema.", "warning");
-                const giapUnits = Array.from(mapGiapUnitMultiselect.selectedOptions).map(opt => opt.value);
-                const newMapping = {}; systemUnits.forEach(systemUnit => { newMapping[systemUnit] = giapUnits; });
-                try {
-                    feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Salvando...`;
-                    const updatedMappings = await postData('saveMapping', { newMapping });
-                    unitMapping = updatedMappings; showNotification('Mapeamento salvo!', 'success'); feedbackStatus.textContent = `Mapeamento salvo!`; populateUnitMappingTab();
-                } catch (error) { showNotification(`Erro ao salvar: ${error.message}`, 'error'); }
-            });
-            
-            savedMappingsContainer.addEventListener('click', async (e) => {
-                const deleteBtn = e.target.closest('.delete-mapping-btn');
-                if (deleteBtn) {
-                    const systemUnit = (deleteBtn.dataset.systemUnit || '').trim();
-                    try {
-                        feedbackStatus.innerHTML = `<div class="saving-spinner inline-block mr-2"></div> Removendo...`;
-                        const updatedMappings = await postData('deleteMapping', { systemUnit });
-                        unitMapping = updatedMappings; showNotification(`Ligação removida.`, 'success'); feedbackStatus.textContent = `Ligação removida.`; populateUnitMappingTab();
-                    } catch (error) { showNotification(`Erro ao remover: ${error.message}`, 'error'); }
-                }
-            });
-
-            pendingTransfersContainer.addEventListener('click', async (e) => {
-                const target = e.target;
-                if (target.classList.contains('select-all-in-unit')) { const detailsContent = target.closest('details'); const checkboxes = detailsContent.querySelectorAll('.transfer-item-checkbox'); checkboxes.forEach(cb => cb.checked = target.checked); return; }
-                const actionButton = target.closest('.keep-selected-btn, .transfer-selected-btn'); if (!actionButton) return;
-                const detailsContent = actionButton.closest('details'); const selectedCheckboxes = detailsContent.querySelectorAll('.transfer-item-checkbox:checked');
-                if (selectedCheckboxes.length === 0) { showNotification('Nenhum item selecionado para a ação.', 'warning'); return; }
-                
-                const isTransfer = actionButton.classList.contains('transfer-selected-btn');
-                const items = Array.from(selectedCheckboxes).map(cb => ({ id: cb.dataset.id, giapUnit: cb.dataset.giapUnit }));
-                const actionDescription = `${isTransfer ? 'Transferindo' : 'Mantendo'} ${items.length} iten(s)...`;
-                
-                showOverlay(actionDescription);
-                try {
-                    await postData('handleTransferAction', { items, isTransfer });
-                    showNotification('Ação concluída com sucesso! A página será recarregada.', 'success'); setTimeout(() => loadData(true), 1500);
-                } catch (error) { hideOverlay(); showNotification(`Erro: ${error.message}`, 'error'); }
-            });
-            
-            document.getElementById('filter-tipo').addEventListener('change', () => {
-                const tipo = document.getElementById('filter-tipo').value;
-                const unidades = [...new Set(fullInventory.filter(i => !tipo || i.Tipo === tipo).map(i => i.Unidade).filter(Boolean))].sort();
-                const selU = document.getElementById('filter-unidade'); selU.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option>${u}</option>`).join('');
-            });
-
-            document.getElementById('load-conciliar').addEventListener('click', () => {
-                const unidade = document.getElementById('filter-unidade').value.trim(); if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
-                const mappedGiapUnits = unitMapping[unidade] || [unidade];
-                if(mappedGiapUnits.length === 1 && mappedGiapUnits[0] === unidade && !unitMapping[unidade]) { showNotification('Esta unidade não está mapeada. Vá para a aba "Ligar Unidades".', 'warning'); }
-                document.getElementById('system-list-filter').value = ''; document.getElementById('giap-list-filter').value = ''; linksToCreate = []; renderCreatedLinks(); renderConciliationLists();
-                clearGiapImportSelection(); document.getElementById('quick-actions').classList.remove('hidden'); selSys = selGiap = null;
-            });
-
-            const debouncedRenderConciliation = debounce(renderConciliationLists, 300);
-            document.getElementById('system-list-filter').addEventListener('input', debouncedRenderConciliation); document.getElementById('giap-list-filter').addEventListener('input', debouncedRenderConciliation);
-            document.getElementById('clear-selections').addEventListener('click', () => { selSys = selGiap = null; document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected')); showNotification('Seleções limpas.', 'info'); });
-            
-            document.getElementById('save-links').addEventListener('click', async () => {
-                if (linksToCreate.length === 0) return showNotification('Nenhum novo link para salvar.', 'info');
-                showOverlay(`Salvando ${linksToCreate.length} links...`);
-                try {
-                    await postData('performConciliation', { links: linksToCreate });
-                    showNotification(`${linksToCreate.length} links salvos! A página será recarregada.`, 'success');
-                    setTimeout(() => loadData(true), 2000);
-                } catch (error) { hideOverlay(); showNotification(`Erro: ${error.message}`, 'error'); }
-            });
-
-            document.getElementById('created-links').addEventListener('click', (e) => {
-                const deleteBtn = e.target.closest('.delete-link-btn'); if (!deleteBtn) return;
-                const index = parseInt(deleteBtn.dataset.index, 10); const removedLink = linksToCreate.splice(index, 1)[0];
-                if (removedLink) {
-                    const systemEl = document.querySelector(`#system-list div[data-id='${removedLink.systemItem.id}']`); if (systemEl) systemEl.classList.remove('linked');
-                    const giapEl = document.querySelector(`#giap-list div[data-id='${removedLink.giapItem.TOMBAMENTO}']`); if (giapEl) giapEl.classList.remove('linked');
-                } renderCreatedLinks(); showNotification('Vínculo removido.', 'info');
-            });
-
-            document.getElementById('import-giap-btn').addEventListener('click', async () => {
-                if (giapItemsForImport.length === 0) return showNotification('Nenhum item GIAP selecionado para importar.', 'warning');
-                const tipo = document.getElementById('filter-tipo').value; const unidade = document.getElementById('filter-unidade').value.trim();
-                if (!unidade || !tipo) return showNotification('Selecione um Tipo e uma Unidade de destino nos filtros acima.', 'warning');
-                const estado = document.getElementById('import-estado-select').value;
-                showOverlay(`Importando ${giapItemsForImport.length} itens...`);
-                try {
-                    await postData('importGiapItems', { items: giapItemsForImport, tipo, unidade, estado });
-                    showNotification(`${giapItemsForImport.length} itens importados! A página será recarregada.`, 'success');
-                    setTimeout(() => loadData(true), 2000);
-                } catch (e) { hideOverlay(); showNotification(`Erro: ${e.message}`, 'error'); }
-            });
-            
-            document.getElementById('suggest-sobrando').addEventListener('click', () => {
-                const kw = normalizeStr(document.getElementById('leftover-keyword').value); const tfilter = document.getElementById('leftover-tombo').value.trim();
-                const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
-                const sob = giapInventory.filter(g => {
-                    const tombo = normalizeTombo(g.TOMBAMENTO); if (!tombo || tombo.includes('permuta')) return false;
-                    const giapDesc = normalizeStr(g.Descrição || g.Espécie || '');
-                    return !usedTombamentos.has(tombo) && (!tfilter || tombo.includes(tfilter)) && (!kw || giapDesc.includes(kw));
-                });
-                document.getElementById('total-sobrando').textContent = sob.length; const list = document.getElementById('sobrando-list'); list.innerHTML = '';
-                if (sob.length > 0) { sob.forEach(g => { const d = document.createElement('div'); d.className = 'card p-2 mb-1 text-sm'; d.textContent = `Tombo: ${g.TOMBAMENTO} - ${g.Descrição || g.Espécie} (Unidade GIAP: ${g.Unidade})`; list.append(d); });
-                } else { list.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado com os filtros aplicados.</p>`; }
-                showNotification(`${sob.length} tombos sobrando listados.`, 'success');
-            });
-            
-            const subNavButtonsConciliar = document.querySelectorAll('#content-conciliar .sub-nav-btn');
-            subNavButtonsConciliar.forEach(button => { button.addEventListener('click', (e) => { const subTab = e.currentTarget.dataset.subtabConciliar; subNavButtonsConciliar.forEach(btn => btn.classList.toggle('active', btn.dataset.subtabConciliar === subTab)); document.getElementById('subtab-conciliar-conciliacao_main').classList.toggle('hidden', subTab !== 'conciliacao_main'); document.getElementById('subtab-conciliar-itens_a_tombar').classList.toggle('hidden', subTab !== 'itens_a_tombar'); if(subTab === 'itens_a_tombar') { renderItensATombar(); } }); });
-
-            const subNavButtonsImport = document.querySelectorAll('#content-importacao .sub-nav-btn');
-            subNavButtonsImport.forEach(button => { button.addEventListener('click', (e) => { const subTab = e.currentTarget.dataset.subtab; subNavButtonsImport.forEach(btn => btn.classList.toggle('active', btn.dataset.subtab === subTab)); document.getElementById('subtab-content-substituir').classList.toggle('hidden', subTab !== 'substituir'); document.getElementById('subtab-content-edit-by-desc').classList.toggle('hidden', subTab !== 'edit-by-desc'); document.getElementById('subtab-content-massa').classList.toggle('hidden', subTab !== 'massa'); document.getElementById('subtab-content-add_giap').classList.toggle('hidden', subTab !== 'add_giap'); }); });
-            
-            document.getElementById('mass-transfer-search-btn').addEventListener('click', () => {
-                const tombos = document.getElementById('mass-transfer-tombos').value.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
-                const existingTombos = new Set(fullInventory.map(i => i.Tombamento?.trim()));
-                const foundItems = []; const notFound = [];
-                tombos.forEach(tombo => { const giapItem = giapMap.get(tombo); if (giapItem && !existingTombos.has(tombo)) foundItems.push(giapItem); else notFound.push(tombo); });
-                if (notFound.length > 0) showNotification(`Não encontrados ou já existem: ${notFound.join(', ')}`, 'warning');
-                const resultsEl = document.getElementById('mass-transfer-results');
-                if (foundItems.length > 0) {
-                    const listEl = document.getElementById('mass-transfer-list'); const estadoOptions = ['Novo', 'Bom', 'Regular', 'Avariado'];
-                    listEl.innerHTML = foundItems.map(item => `<div class="p-2 border rounded-md bg-slate-50 grid grid-cols-3 gap-4 items-center"><div class="col-span-2"><strong>${escapeHtml(item.TOMBAMENTO)}</strong> - ${escapeHtml(item.Descrição || item.Espécie)}</div><div><select data-tombo="${escapeHtml(item.TOMBAMENTO)}" class="mass-transfer-status w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option>${opt}</option>`).join('')}</select></div></div>`).join('');
-                    resultsEl.classList.remove('hidden');
-                } else { resultsEl.classList.add('hidden'); }
-            });
-
-            document.getElementById('mass-transfer-set-all-status').addEventListener('change', (e) => { document.querySelectorAll('.mass-transfer-status').forEach(select => select.value = e.target.value); });
-            
-            document.getElementById('mass-transfer-confirm-btn').addEventListener('click', async () => {
-                const destinationUnit = document.getElementById('mass-transfer-unit').value; if (!destinationUnit) return showNotification('Selecione uma unidade de destino.', 'warning');
-                const tipo = document.getElementById('mass-transfer-tipo').value;
-                const itemsToCreate = Array.from(document.querySelectorAll('.mass-transfer-status')).map(select => ({ tombo: select.dataset.tombo, estado: select.value }));
-                if (itemsToCreate.length === 0) return; showOverlay(`Criando ${itemsToCreate.length} itens...`);
-                try {
-                    await postData('massImportByTombamento', { items: itemsToCreate, unidade: destinationUnit, tipo });
-                    showNotification(`${itemsToCreate.length} itens criados! Recarregando...`, 'success'); setTimeout(() => loadData(true), 1500);
-                } catch (e) { hideOverlay(); showNotification(`Erro: ${e.message}`, 'error'); }
-            });
-
-            document.getElementById('preview-replace-btn').addEventListener('click', () => { /* Logic is unchanged */ });
-            document.getElementById('replace-confirm-checkbox').addEventListener('change', (e) => { document.getElementById('confirm-replace-btn').disabled = !e.target.checked; });
-            document.getElementById('confirm-replace-btn').addEventListener('click', async () => { /* Logic adapted to use postData */ });
-            document.getElementById('save-giap-unit-btn').addEventListener('click', async () => { /* Logic adapted to use postData */ });
-
-            document.getElementById('desc-choice-cancel-btn').addEventListener('click', () => { selSys = selGiap = null; document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected')); closeDescriptionChoiceModal(); });
-            document.getElementById('desc-choice-keep-btn').addEventListener('click', () => { addLinkToCreate(false); closeDescriptionChoiceModal(); });
-            document.getElementById('desc-choice-update-btn').addEventListener('click', () => { addLinkToCreate(true); closeDescriptionChoiceModal(); });
-
-            document.getElementById('tombar-filter-tipo').addEventListener('change', () => {
-                 const tipo = document.getElementById('tombar-filter-tipo').value;
-                const unidades = [...new Set(fullInventory.filter(i => i.etiquetaPendente === true && (!tipo || i.Tipo === tipo)).map(i => i.Unidade).filter(Boolean))].sort();
-                const selU = document.getElementById('tombar-filter-unidade'); selU.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option>${u}</option>`).join('');
-                selU.disabled = false; renderItensATombar();
-            });
-             document.getElementById('tombar-filter-unidade').addEventListener('change', renderItensATombar);
-             document.getElementById('itens-a-tombar-container').addEventListener('click', async (e) => {
-                const btn = e.target.closest('.confirmar-tombamento-btn'); if (!btn) return;
-                const id = btn.dataset.id; btn.disabled = true; btn.textContent = 'Salvando...';
-                try {
-                    await postData('confirmTombamento', { id });
-                    showNotification('Tombamento confirmado!', 'success'); loadData(true);
-                } catch (error) { showNotification(`Erro: ${error.message}`, 'error'); btn.disabled = false; btn.textContent = 'Confirmar Tombamento'; }
-             });
-
-            document.getElementById('preview-edit-by-desc-btn').addEventListener('click', () => { /* Logic is unchanged */ });
-            document.getElementById('edit-by-desc-preview-table-container').addEventListener('change', (e) => { /* Logic is unchanged */ });
-            document.getElementById('confirm-edit-by-desc-btn').addEventListener('click', async () => { /* Logic adapted to use postData */ });
+            const debouncedFilter = debounce(applyPatrimonioFiltersAndRender, 300);
+            filtroTipoUnidadeEl.addEventListener('change', () => { updateUnidadeFilter(filtroTipoUnidadeEl, filtroUnidadeEl); debouncedFilter(); });
+            [filtroUnidadeEl, filtroEstadoEl].forEach(el => el.addEventListener('change', debouncedFilter));
+            filtroBuscaEl.addEventListener('input', debouncedFilter);
 
             const debouncedRenderNf = debounce(renderNfList, 300);
-            document.getElementById('nf-search').addEventListener('input', debouncedRenderNf);
-            document.getElementById('nf-item-search').addEventListener('input', debouncedRenderNf);
-            document.getElementById('nf-tipo-entrada').addEventListener('change', renderNfList);
-            document.getElementById('nf-date-start').addEventListener('change', renderNfList);
-            document.getElementById('nf-date-end').addEventListener('change', renderNfList);
-            document.getElementById('clear-nf-filters-btn').addEventListener('click', () => {
-                document.getElementById('nf-search').value = ''; document.getElementById('nf-item-search').value = ''; document.getElementById('nf-tipo-entrada').value = '';
-                document.getElementById('nf-date-start').value = ''; document.getElementById('nf-date-end').value = ''; renderNfList();
+            document.getElementById('nf-search-index').addEventListener('input', debouncedRenderNf);
+            document.getElementById('nf-item-search-index').addEventListener('input', debouncedRenderNf);
+            document.getElementById('nf-tipo-entrada-index').addEventListener('change', renderNfList);
+            document.getElementById('nf-date-start-index').addEventListener('change', renderNfList);
+            document.getElementById('nf-date-end-index').addEventListener('change', renderNfList);
+            document.getElementById('clear-filters-nf-index').addEventListener('click', () => {
+              document.getElementById('nf-search-index').value = ''; document.getElementById('nf-item-search-index').value = '';
+              document.getElementById('nf-tipo-entrada-index').value = ''; document.getElementById('nf-date-start-index').value = '';
+              document.getElementById('nf-date-end-index').value = ''; renderNfList();
+            });
+
+            resetFiltersBtn.addEventListener('click', () => { document.getElementById('patrimonio-filters-form').reset(); filtroUnidadeEl.disabled = true; applyPatrimonioFiltersAndRender(); });
+            paginationControlsEl.addEventListener('click', (e) => { if(e.target.dataset.page) { patrimonioCurrentPage = parseInt(e.target.dataset.page); renderPatrimonioTable(); }});
+            tableBodyEl.addEventListener('click', (e) => {
+                const btn = e.target.closest('button'); if (!btn || !isLoggedIn) return;
+                const id = btn.dataset.id;
+                if (btn.classList.contains('edit-btn')) openItemModal(patrimonioFullList.find(i => i.id === id));
+                if (btn.classList.contains('delete-btn')) openDeleteModal(id);
+                if (btn.classList.contains('transfer-btn')) openTransferModal(id);
+            });
+            
+            openAddModalBtn.addEventListener('click', () => openItemModal());
+            itemForm.addEventListener('submit', handleFormSubmit);
+            loginForm.addEventListener('submit', handleLogin);
+            openLoginModalBtn.addEventListener('click', () => openModal(loginModal));
+            logoutBtn.addEventListener('click', () => signOut(auth));
+            transferForm.addEventListener('submit', handleTransferSubmit);
+            document.getElementById('transfer-tipo').addEventListener('change', (e) => updateUnidadeFilter(e.target, transferForm['transfer-unidade']));
+            confirmDeleteBtn.addEventListener('click', handleDelete);
+            
+            navButtons.forEach(button => button.addEventListener('click', (e) => {
+                e.preventDefault();
+                if(e.currentTarget.tagName === 'BUTTON') { switchTab(button.dataset.tab);
+                } else if (e.currentTarget.tagName === 'A') { window.open(e.currentTarget.href, '_blank'); }
+            }));
+
+            document.addEventListener('click', (e) => {
+                if (e.target.matches('.js-close-modal') || e.target.matches('.modal-overlay')) {
+                    closeModal(e.target.closest('.modal'));
+                }
+            });
+            
+            document.getElementById('force-refresh-btn-index').addEventListener('click', () => {
+                showNotification('Forçando atualização do servidor...', 'info');
+                dataCache = null; // Limpa o cache para forçar a busca
+                loadAllData(true);
             });
         });
     </script>
