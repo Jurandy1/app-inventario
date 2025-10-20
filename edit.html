@@ -255,43 +255,38 @@
             <div id="content-conciliar" class="hidden fade-in">
                 <div class="card">
                     <div class="flex border-b mb-6">
-                        <button class="sub-nav-btn active" data-subtab-conciliar="conciliacao_main">Conciliação</button>
+                        <button class="sub-nav-btn active" data-subtab-conciliar="conciliacao_unidade">Conciliação da Unidade</button>
+                        <button class="sub-nav-btn" data-subtab-conciliar="conciliacao_sobras">Conciliar com Sobras</button>
                         <button class="sub-nav-btn" data-subtab-conciliar="itens_a_tombar">Itens S/T a Tombar</button>
                     </div>
                     
-                    <div id="subtab-conciliar-conciliacao_main">
-                        <div id="reconciliation-view">
-                            <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
-                            <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo.</p>
-                            <div class="flex flex-wrap items-end gap-2 mb-4">
-                                <div class="flex-grow">
-                                    <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
-                                    <select id="filter-tipo" class="w-full border p-2 rounded-lg mt-1">
-                                        <option value="">Todos os Tipos</option>
-                                    </select>
-                                </div>
-                                <div class="flex-grow">
-                                    <label for="filter-unidade" class="text-sm font-medium">Unidade</label>
-                                    <select id="filter-unidade" class="w-full border p-2 rounded-lg mt-1">
-                                        <option value="">Selecione o Tipo Primeiro</option>
-                                    </select>
-                                </div>
-                                <button id="load-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                                    Carregar
-                                </button>
+                    <div id="subtab-conciliar-unidade">
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens por Unidade</h2>
+                        <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo.</p>
+                        <div class="flex flex-wrap items-end gap-2 mb-4">
+                            <div class="flex-grow">
+                                <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
+                                <select id="filter-tipo" class="w-full border p-2 rounded-lg mt-1"></select>
                             </div>
+                            <div class="flex-grow">
+                                <label for="filter-unidade" class="text-sm font-medium">Unidade</label>
+                                <select id="filter-unidade" class="w-full border p-2 rounded-lg mt-1" disabled></select>
+                            </div>
+                            <button id="load-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                Carregar
+                            </button>
+                        </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento no Sistema</h3>
-                                    <input type="text" id="system-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                    <div id="system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
-                                </div>
-                                <div>
-                                    <h3 class="font-semibold text-slate-800 mb-2">Tombos Disponíveis (GIAP) para <span id="giap-list-unit-name" class="text-blue-600 font-bold"></span></h3>
-                                    <input type="text" id="giap-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                    <div id="giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento no Sistema</h3>
+                                <input type="text" id="system-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
+                                <div id="system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800 mb-2">Tombos Disponíveis (GIAP) para <span id="giap-list-unit-name" class="text-blue-600 font-bold"></span></h3>
+                                <input type="text" id="giap-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
+                                <div id="giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
                             </div>
                         </div>
                         
@@ -301,11 +296,10 @@
                             <div class="flex items-center gap-2 flex-wrap">
                                 <button id="save-links" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Vínculos</button>
                                 <button id="clear-selections" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Limpar Seleções</button>
-                                <button id="finish-reconciliation-btn" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Salvar Inventário e Ver Sobras</button>
+                                <button id="finish-reconciliation-btn" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Salvar e Ir para Sobras</button>
                             </div>
                         </div>
                         
-                        <!-- Seção de Importação GIAP -->
                         <div id="giap-import-section" class="mt-6 border-t pt-4">
                             <h3 class="font-semibold text-slate-800 mb-2">📥 Importar Tombos do GIAP para esta Unidade</h3>
                             <p class="text-sm text-slate-600 mb-4">Selecione um ou mais itens da lista "Tombos Disponíveis" (sem selecionar um item da lista à esquerda) para importá-los diretamente como novos itens no sistema.</p>
@@ -320,6 +314,56 @@
                                     </select>
                                 </div>
                                 <button id="import-giap-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-slate-400" disabled>Importar <span id="giap-import-count">0</span> Selecionados</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="subtab-conciliar-sobras" class="hidden">
+                        <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar com Itens Sobrando</h2>
+                        <p class="text-sm text-slate-600 mb-4">Aqui você pode vincular itens S/T de uma unidade específica com tombos que sobraram de qualquer outra unidade do inventário geral.</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 border rounded-lg bg-slate-50">
+                            <div>
+                                <label for="sobras-filter-tipo" class="text-sm font-medium">Tipo da Unidade (Itens S/T)</label>
+                                <select id="sobras-filter-tipo" class="w-full border p-2 rounded-lg mt-1"></select>
+                            </div>
+                            <div>
+                                <label for="sobras-filter-unidade" class="text-sm font-medium">Unidade (Itens S/T)</label>
+                                <select id="sobras-filter-unidade" class="w-full border p-2 rounded-lg mt-1" disabled></select>
+                            </div>
+                            <div class="self-end">
+                                <button id="load-sobras-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full">Carregar Itens S/T</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento (Sistema)</h3>
+                                <input type="text" id="sobras-system-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
+                                <div id="sobras-system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800 mb-2">Tombos Sobrando (GIAP Geral)</h3>
+                                <div class="flex gap-2 mb-2">
+                                    <div class="flex-grow">
+                                         <label for="sobras-giap-type-filter" class="text-xs font-medium">Filtrar Sobras por Tipo</label>
+                                         <select id="sobras-giap-type-filter" class="w-full border p-2 rounded-lg mt-1 text-sm"></select>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <label for="sobras-giap-list-filter" class="text-xs font-medium">Buscar na Descrição</label>
+                                        <input type="text" id="sobras-giap-list-filter" class="w-full p-2 border rounded-lg mt-1" placeholder="Filtrar por descrição...">
+                                    </div>
+                                </div>
+                                <div id="sobras-giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                            </div>
+                        </div>
+
+                        <div id="sobras-quick-actions" class="mt-6 border-t pt-4 hidden">
+                            <h3 class="font-semibold text-slate-800 mb-2">Vínculos Criados nesta Sessão</h3>
+                            <div id="sobras-created-links" class="space-y-2 mb-4 max-h-40 overflow-y-auto"></div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button id="sobras-save-links" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Vínculos</button>
+                                <button id="sobras-clear-selections" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Limpar Seleções</button>
                             </div>
                         </div>
                     </div>
@@ -879,14 +923,18 @@
             }
         }
 
-        function suggestGiapMatchesComAprendizado(systemItem) {
-            let { giapItems } = getConciliationData();
-            if (!giapItems || giapItems.length === 0) {
-                renderList('giap-list', [], 'TOMBAMENTO', 'Descrição');
+        function suggestGiapMatchesComAprendizado(systemItem, giapSourceItems) {
+            const activeTab = document.getElementById('subtab-conciliar-sobras').classList.contains('hidden') ? 'unidade' : 'sobras';
+            const giapListId = activeTab === 'sobras' ? 'sobras-giap-list' : 'giap-list';
+            const context = activeTab === 'sobras' ? 'sobras' : 'default';
+
+            if (!giapSourceItems || giapSourceItems.length === 0) {
+                renderList(giapListId, [], 'TOMBAMENTO', 'Descrição', null, context);
                 return;
             }
+
             const systemDesc = `${systemItem.Descrição || ''} ${systemItem.Fornecedor || ''}`.trim();
-            const scoredItems = giapItems.map(giapItem => {
+            const scoredItems = giapSourceItems.map(giapItem => {
                 const giapDesc = `${giapItem.Descrição || ''} ${giapItem.Espécie || ''} ${giapItem['Nome Fornecedor'] || ''}`.trim();
                 let baseScore = calculateSimilarity(systemDesc, giapDesc);
                 if (systemItem.Fornecedor && systemItem.Fornecedor !== '-' && giapItem['Nome Fornecedor'] && giapItem['Nome Fornecedor'] !== '-') {
@@ -916,7 +964,8 @@
             scoredItems.sort((a, b) => b.finalScore - a.finalScore);
             const topScore = scoredItems.length > 0 ? scoredItems[0].finalScore : 0;
             const suggestionMap = new Map(scoredItems.map(si => [si.item.TOMBAMENTO, si.finalScore]));
-            renderList('giap-list', scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore: topScore });
+            
+            renderList(giapListId, scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore: topScore }, context);
         }
         
         // FIM DAS FUNÇÕES DE IA
@@ -1537,7 +1586,7 @@
             tombarFilterTipo.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
-        function renderList(containerId, arr, keyField, primaryLabelField, suggestionInfo = null) {
+        function renderList(containerId, arr, keyField, primaryLabelField, suggestionInfo = null, context = 'default') {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
             if (!arr || arr.length === 0) {
@@ -1551,7 +1600,7 @@
                 div.dataset.id = id;
 
                 let detailsHtml = '';
-                if (containerId === 'system-list') {
+                if (containerId.includes('system-list')) {
                     const fornecedor = escapeHtml(item.Fornecedor || 'N/D');
                     const estado = escapeHtml(item.Estado || 'N/A');
                     const obs = escapeHtml(item.Observação || 'Nenhuma');
@@ -1585,6 +1634,11 @@
                                 <strong class="text-sm text-green-700">${valorNf}</strong>
                             </div>
                         </div>`;
+                    
+                    if (context === 'sobras') {
+                        const unidadeOriginal = escapeHtml(item.Unidade || 'N/A');
+                        detailsHtml += `<p class="text-xs text-blue-600 font-semibold mt-1">Unidade GIAP Original: ${unidadeOriginal}</p>`;
+                    }
                 }
                 
                 div.innerHTML = detailsHtml;
@@ -1606,87 +1660,13 @@
             });
         }
         
-        function renderGlobalLeftoversInGiapList() {
-            document.getElementById('giap-list-unit-name').textContent = 'Inventário Geral'; // Update title
-            document.getElementById('giap-list-filter').value = ''; // Clear filter
-
+        function getGlobalLeftovers() {
             const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
-            const leftovers = giapInventory.filter(g => {
+            linksToCreate.forEach(link => usedTombamentos.add(normalizeTombo(link.giapItem.TOMBAMENTO)));
+            
+            return giapInventory.filter(g => {
                 const tombo = normalizeTombo(g.TOMBAMENTO);
                 return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo);
-            });
-
-            const giapUnitToSystemType = {};
-            // Create a map from GIAP unit name to System unit Type (CRAS, CREAS, etc.)
-            for (const systemUnit in unitMapping) {
-                const systemUnitType = fullInventory.find(i => i.Unidade === systemUnit)?.Tipo || 'Outros';
-                unitMapping[systemUnit].forEach(giapUnit => {
-                    giapUnitToSystemType[giapUnit] = systemUnitType;
-                });
-            }
-            
-            const groupedLeftovers = leftovers.reduce((acc, item) => {
-                const type = giapUnitToSystemType[item.Unidade] || 'Unidade Não Mapeada';
-                if (!acc[type]) {
-                    acc[type] = [];
-                }
-                acc[type].push(item);
-                return acc;
-            }, {});
-
-            const container = document.getElementById('giap-list');
-            container.innerHTML = ''; // Clear the list
-
-            if (leftovers.length === 0) {
-                container.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum tombo sobrando encontrado no inventário geral.</p>`;
-                return;
-            }
-            
-            // Render by sorted type keys
-            Object.keys(groupedLeftovers).sort().forEach(type => {
-                const items = groupedLeftovers[type];
-                const typeHeader = document.createElement('h3');
-                typeHeader.className = 'text-md font-bold text-slate-600 p-2 bg-slate-200 rounded-t-lg mt-3 first:mt-0 sticky top-0 z-10';
-                typeHeader.textContent = `${type} (${items.length})`;
-                container.appendChild(typeHeader);
-
-                items.forEach(item => {
-                    const id = item['TOMBAMENTO'];
-                    const div = document.createElement('div');
-                    div.className = 'reconciliation-list-item card p-2 text-sm border-t';
-                    div.dataset.id = id;
-
-                    const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
-                    const dataCadastro = escapeHtml(item.Cadastro || 'N/D');
-                    const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
-                    const tombo = escapeHtml(item['TOMBAMENTO']);
-                    const valorNf = escapeHtml(item['Valor NF'] || 'N/A');
-                    const nf = escapeHtml(item['NF'] || 'N/A');
-                    const unidadeOriginal = escapeHtml(item['Unidade'] || 'N/A');
-
-                    div.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <strong>${tombo} - ${descricao}</strong>
-                                <p class="text-xs text-blue-600 mt-1">
-                                    <strong>Unidade GIAP:</strong> ${unidadeOriginal}
-                                </p>
-                                <p class="text-xs text-slate-500 mt-1">
-                                    Cadastro: <strong>${dataCadastro}</strong> | NF: <strong>${nf}</strong>
-                                </p>
-                                 <p class="text-xs text-slate-500 mt-1">
-                                    Fornecedor: <strong>${fornecedor}</strong>
-                                </p>
-                            </div>
-                            <div class="text-right ml-2">
-                                <p class="text-xs text-slate-500">Valor NF</p>
-                                <strong class="text-sm text-green-700">${valorNf}</strong>
-                            </div>
-                        </div>`;
-                    
-                    div.onclick = (event) => handleSelect('giap-list', id, item, event.currentTarget);
-                    container.appendChild(div);
-                });
             });
         }
         
@@ -1727,24 +1707,29 @@
         function handleSelect(containerId, id, obj, element) {
             if (element.classList.contains('linked')) return;
 
-            if (containerId === 'system-list') {
+            const isSobrantesTab = containerId.startsWith('sobras-');
+            const systemListId = isSobrantesTab ? '#sobras-system-list' : '#system-list';
+            const giapListId = isSobrantesTab ? '#sobras-giap-list' : '#giap-list';
+
+            if (containerId.includes('system-list')) {
                 clearGiapImportSelection();
                 selSys = { id, obj };
                 selGiap = null; 
 
-                document.querySelectorAll('#giap-list .selected').forEach(el => el.classList.remove('selected'));
-                document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
+                document.querySelectorAll(`${giapListId} .selected`).forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll(`${systemListId} .selected, ${systemListId} .selected-for-import`).forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
                 
-                suggestGiapMatchesComAprendizado(obj); 
+                const giapSourceItems = isSobrantesTab ? getFilteredSobrantes() : getConciliationData().giapItems;
+                suggestGiapMatchesComAprendizado(obj, giapSourceItems);
 
-            } else if (containerId === 'giap-list' && selSys) {
+            } else if (containerId.includes('giap-list') && selSys) {
                 selGiap = { tomb: id, obj };
-                document.querySelectorAll('#giap-list .selected, #giap-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
+                document.querySelectorAll(`${giapListId} .selected, ${giapListId} .selected-for-import`).forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
                 openDescriptionChoiceModal();
 
-            } else if (containerId === 'giap-list' && !selSys) {
+            } else if (containerId.includes('giap-list') && !selSys && !isSobrantesTab) { // Import only on unit tab
                 element.classList.toggle('selected-for-import');
                 const index = giapItemsForImport.findIndex(item => item.TOMBAMENTO === id);
                 if (index > -1) {
@@ -1776,17 +1761,26 @@
                 useGiapDescription
             };
             linksToCreate.push(link);
-            renderCreatedLinks();
 
-            document.querySelector(`#system-list div[data-id='${selSys.id}']`).classList.add('linked');
-            document.querySelector(`#giap-list div[data-id='${selGiap.tomb}']`).classList.add('linked');
+            const activeTab = document.getElementById('subtab-conciliar-sobras').classList.contains('hidden') ? 'unidade' : 'sobras';
+            
+            if(activeTab === 'unidade') {
+                renderCreatedLinks();
+                document.querySelector(`#system-list div[data-id='${selSys.id}']`).classList.add('linked');
+                document.querySelector(`#giap-list div[data-id='${selGiap.tomb}']`).classList.add('linked');
+            } else {
+                renderCreatedLinks('sobras');
+                document.querySelector(`#sobras-system-list div[data-id='${selSys.id}']`).classList.add('linked');
+                document.querySelector(`#sobras-giap-list div[data-id='${selGiap.tomb}']`).classList.add('linked');
+            }
 
             selSys = selGiap = null;
             document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
         }
 
-        function renderCreatedLinks() {
-            const container = document.getElementById('created-links');
+        function renderCreatedLinks(context = 'unidade') {
+            const containerId = context === 'unidade' ? 'created-links' : 'sobras-created-links';
+            const container = document.getElementById(containerId);
             container.innerHTML = linksToCreate.map((link, index) => {
                 const systemDesc = link.systemItem.Descrição;
                 const giapDesc = link.giapItem.Descrição || link.giapItem.Espécie;
@@ -1955,7 +1949,7 @@
                     }
                     dirtyItems.clear();
                     showNotification(`${itemsToCache.length} alterações salvas!`, 'success');
-                    saveAllChangesBtn.disabled = true;
+                    saveAllChangesBtn.disabled = false;
                     renderEditableTable();
                 } catch (error) {
                     console.error("Erro ao salvar alterações em lote:", error);
@@ -2204,6 +2198,7 @@
                 }
             });
             
+            // --- LISTENERS DA ABA CONCILIAÇÃO ---
             document.getElementById('filter-tipo').addEventListener('change', () => {
                 const tipo = document.getElementById('filter-tipo').value;
                 const unidades = [...new Set(fullInventory
@@ -2211,6 +2206,7 @@
                     .map(i => i.Unidade).filter(Boolean))].sort();
                 const selU = document.getElementById('filter-unidade');
                 selU.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option>${u}</option>`).join('');
+                selU.disabled = false;
             });
 
             document.getElementById('load-conciliar').addEventListener('click', () => {
@@ -2218,7 +2214,6 @@
                 if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
                 
                 document.getElementById('giap-list-unit-name').textContent = unidade;
-
                 const mappedGiapUnits = unitMapping[unidade] || [unidade];
                 if(mappedGiapUnits.length === 1 && mappedGiapUnits[0] === unidade && !unitMapping[unidade]) {
                     showNotification('Esta unidade não está mapeada. Vá para a aba "Ligar Unidades".', 'warning');
@@ -2227,12 +2222,11 @@
                 document.getElementById('system-list-filter').value = '';
                 document.getElementById('giap-list-filter').value = '';
                 linksToCreate = [];
-                renderCreatedLinks();
+                renderCreatedLinks('unidade');
                 renderConciliationLists();
                 clearGiapImportSelection();
 
                 document.getElementById('quick-actions').classList.remove('hidden');
-                
                 selSys = selGiap = null;
             });
 
@@ -2242,11 +2236,11 @@
 
             document.getElementById('clear-selections').addEventListener('click', () => {
                 selSys = selGiap = null;
-                document.querySelectorAll('.reconciliation-list-item.selected').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('#system-list .selected').forEach(el => el.classList.remove('selected'));
                 showNotification('Seleções limpas.', 'info');
             });
             
-            async function savePendingLinks() {
+            async function savePendingLinks(context = 'unidade') {
                 if (linksToCreate.length === 0) return true;
 
                 showOverlay(`Salvando ${linksToCreate.length} vínculos...`);
@@ -2274,6 +2268,7 @@
                 try {
                     await batch.commit();
                     linksToCreate = [];
+                    renderCreatedLinks(context);
                     return true;
                 } catch (error) {
                     hideOverlay();
@@ -2284,30 +2279,33 @@
             }
             
             document.getElementById('save-links').addEventListener('click', async () => {
-                const success = await savePendingLinks();
+                const success = await savePendingLinks('unidade');
                 if (success) {
                     showNotification('Vínculos salvos! Atualizando listas...', 'success');
                     showOverlay('Atualizando dados...');
-                    await loadData(true); // Força a atualização dos dados
-                    document.getElementById('load-conciliar').click(); // Recarrega a visualização da unidade atual
+                    await loadData(true);
+                    document.getElementById('load-conciliar').click();
                     hideOverlay();
                 }
             });
 
             document.getElementById('finish-reconciliation-btn').addEventListener('click', async () => {
-                const success = await savePendingLinks();
+                const success = await savePendingLinks('unidade');
                 if (success) {
-                    hideOverlay();
-                    showNotification('Inventário salvo. Exibindo tombos sobrando de todas as unidades.', 'info');
-                    
-                    showOverlay('Recarregando inventário geral...');
+                    showOverlay('Inventário salvo. Recarregando e preparando conciliação de sobras...');
                     await loadData(true); 
+                    
+                    const subTab = 'conciliacao_sobras';
+                    document.querySelectorAll('#content-conciliar .sub-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.subtabConciliar === subTab));
+                    document.getElementById('subtab-conciliar-unidade').classList.add('hidden');
+                    document.getElementById('subtab-conciliar-sobras').classList.remove('hidden');
+                    document.getElementById('subtab-conciliar-itens_a_tombar').classList.add('hidden');
 
-                    renderGlobalLeftoversInGiapList();
+                    populateSobrantesTab();
                     hideOverlay();
+                    showNotification('Pronto para conciliar com os itens sobrando.', 'info');
                 }
             });
-
 
             document.getElementById('created-links').addEventListener('click', (e) => {
                 const deleteBtn = e.target.closest('.delete-link-btn');
@@ -2319,11 +2317,10 @@
                 if (removedLink) {
                     const systemEl = document.querySelector(`#system-list div[data-id='${removedLink.systemItem.id}']`);
                     if (systemEl) systemEl.classList.remove('linked');
-
                     const giapEl = document.querySelector(`#giap-list div[data-id='${removedLink.giapItem.TOMBAMENTO}']`);
                     if (giapEl) giapEl.classList.remove('linked');
                 }
-                renderCreatedLinks();
+                renderCreatedLinks('unidade');
                 showNotification('Vínculo removido.', 'info');
             });
 
@@ -2359,8 +2356,8 @@
                     clearGiapImportSelection();
                     
                     showOverlay('Atualizando dados...');
-                    await loadData(true); // Força a atualização dos dados
-                    document.getElementById('load-conciliar').click(); // Recarrega a visualização da unidade atual
+                    await loadData(true); 
+                    document.getElementById('load-conciliar').click();
                     hideOverlay();
 
                 } catch (e) {
@@ -2370,48 +2367,134 @@
                 }
             });
             
-            document.getElementById('suggest-sobrando').addEventListener('click', () => {
-                const kw = normalizeStr(document.getElementById('leftover-keyword').value);
-                const tfilter = document.getElementById('leftover-tombo').value.trim();
-                
-                const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
-                
-                const sob = giapInventory.filter(g => {
-                    const tombo = normalizeTombo(g.TOMBAMENTO);
-                    if (!tombo || tombo.includes('permuta')) return false;
+            // --- LISTENERS DA ABA CONCILIAR SOBRAS ---
+            
+            function populateSobrantesTab() {
+                const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
+                const sobrasTipoSelect = document.getElementById('sobras-filter-tipo');
+                sobrasTipoSelect.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
 
-                    const giapDesc = normalizeStr(g.Descrição || g.Espécie || '');
-                    
-                    return !usedTombamentos.has(tombo) &&
-                           (!tfilter || tombo.includes(tfilter)) &&
-                           (!kw || giapDesc.includes(kw));
-                });
+                const sobrasGiapTypeSelect = document.getElementById('sobras-giap-type-filter');
+                sobrasGiapTypeSelect.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+
+                sobrasTipoSelect.onchange = () => {
+                    const selectedTipo = sobrasTipoSelect.value;
+                    const sobrasUnidadeSelect = document.getElementById('sobras-filter-unidade');
+                    const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
+                    sobrasUnidadeSelect.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                    sobrasUnidadeSelect.disabled = !selectedTipo;
+                };
+
+                document.getElementById('sobras-system-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Selecione Tipo e Unidade e clique em Carregar.</p>`;
+                document.getElementById('sobras-giap-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Os tombos sobrando aparecerão aqui após carregar os itens do sistema.</p>`;
+            }
+
+            function getFilteredSobrantes() {
+                let allLeftovers = getGlobalLeftovers();
+                const giapTypeFilter = document.getElementById('sobras-giap-type-filter').value;
+                const giapDescFilter = normalizeStr(document.getElementById('sobras-giap-list-filter').value);
                 
-                document.getElementById('total-sobrando').textContent = sob.length;
-                const list = document.getElementById('sobrando-list');
-                list.innerHTML = '';
-                if (sob.length > 0) {
-                    sob.forEach(g => {
-                        const d = document.createElement('div');
-                        d.className = 'card p-2 mb-1 text-sm';
-                        d.textContent = `Tombo: ${g.TOMBAMENTO} - ${g.Descrição || g.Espécie} (Unidade GIAP: ${g.Unidade})`;
-                        list.append(d);
-                    });
-                } else {
-                   list.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum item encontrado com os filtros aplicados.</p>`;
+                const giapUnitToSystemType = {};
+                Object.keys(unitMapping).forEach(systemUnit => {
+                    const systemUnitType = (fullInventory.find(i => i.Unidade === systemUnit) || {}).Tipo;
+                    if(systemUnitType){
+                        unitMapping[systemUnit].forEach(giapUnit => { giapUnitToSystemType[giapUnit] = systemUnitType; });
+                    }
+                });
+
+                if (giapTypeFilter) {
+                    allLeftovers = allLeftovers.filter(item => (giapUnitToSystemType[item.Unidade] || 'Não Mapeado') === giapTypeFilter);
                 }
-                showNotification(`${sob.length} tombos sobrando listados.`, 'success');
+                
+                if (giapDescFilter) {
+                    allLeftovers = allLeftovers.filter(item => normalizeStr(item.Descrição || item.Espécie).includes(giapDescFilter));
+                }
+                return allLeftovers;
+            }
+
+            function renderSobrantesConciliation() {
+                const unidade = document.getElementById('sobras-filter-unidade').value;
+                if (!unidade) {
+                    showNotification('Selecione uma unidade para carregar os itens S/T.', 'warning');
+                    return;
+                }
+                linksToCreate = [];
+                renderCreatedLinks('sobras');
+
+                const systemFilterText = normalizeStr(document.getElementById('sobras-system-list-filter').value);
+                const systemItems = fullInventory.filter(i => {
+                    const tombo = (i.Tombamento || '').trim();
+                    return i.Unidade === unidade && (!tombo || tombo.toLowerCase() === 's/t') && !normalizeStr(tombo).includes('permuta') && normalizeStr(i.Descrição).includes(systemFilterText);
+                });
+                renderList('sobras-system-list', systemItems, 'id', 'Descrição', null, 'sobras');
+                document.getElementById('sobras-quick-actions').classList.remove('hidden');
+
+                const filteredSobrantes = getFilteredSobrantes();
+                renderList('sobras-giap-list', filteredSobrantes, 'TOMBAMENTO', 'Descrição', null, 'sobras');
+            }
+
+            document.getElementById('load-sobras-conciliar').addEventListener('click', renderSobrantesConciliation);
+            const debouncedRenderSobrantes = debounce(renderSobrantesConciliation, 300);
+            document.getElementById('sobras-system-list-filter').addEventListener('input', debouncedRenderSobrantes);
+            document.getElementById('sobras-giap-list-filter').addEventListener('input', debouncedRenderSobrantes);
+            document.getElementById('sobras-giap-type-filter').addEventListener('change', debouncedRenderSobrantes);
+
+            document.getElementById('sobras-save-links').addEventListener('click', async () => {
+                const success = await savePendingLinks('sobras');
+                if (success) {
+                    showNotification('Vínculos salvos! Atualizando listas...', 'success');
+                    showOverlay('Atualizando dados...');
+                    await loadData(true); 
+                    renderSobrantesConciliation();
+                    hideOverlay();
+                }
+            });
+
+             document.getElementById('sobras-clear-selections').addEventListener('click', () => {
+                selSys = selGiap = null;
+                document.querySelectorAll('#sobras-system-list .selected').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('#sobras-giap-list .selected').forEach(el => el.classList.remove('selected'));
+                showNotification('Seleções limpas.', 'info');
             });
             
+             document.getElementById('sobras-created-links').addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-link-btn');
+                if (!deleteBtn) return;
+                
+                const index = parseInt(deleteBtn.dataset.index, 10);
+                const removedLink = linksToCreate.splice(index, 1)[0];
+
+                if (removedLink) {
+                    const systemEl = document.querySelector(`#sobras-system-list div[data-id='${removedLink.systemItem.id}']`);
+                    if (systemEl) systemEl.classList.remove('linked');
+                    const giapEl = document.querySelector(`#sobras-giap-list div[data-id='${removedLink.giapItem.TOMBAMENTO}']`);
+                    if (giapEl) giapEl.classList.remove('linked');
+                }
+                renderCreatedLinks('sobras');
+                showNotification('Vínculo removido.', 'info');
+            });
+
+
+            // --- FIM DOS LISTENERS DA ABA CONCILIAR SOBRAS ---
+
             const subNavButtonsConciliar = document.querySelectorAll('#content-conciliar .sub-nav-btn');
             subNavButtonsConciliar.forEach(button => {
                 button.addEventListener('click', (e) => {
                     const subTab = e.currentTarget.dataset.subtabConciliar;
                     subNavButtonsConciliar.forEach(btn => btn.classList.toggle('active', btn.dataset.subtabConciliar === subTab));
-                    document.getElementById('subtab-conciliar-conciliacao_main').classList.toggle('hidden', subTab !== 'conciliacao_main');
+                    document.getElementById('subtab-conciliar-unidade').classList.toggle('hidden', subTab !== 'conciliacao_unidade');
+                    document.getElementById('subtab-conciliar-sobras').classList.toggle('hidden', subTab !== 'conciliacao_sobras');
                     document.getElementById('subtab-conciliar-itens_a_tombar').classList.toggle('hidden', subTab !== 'itens_a_tombar');
+                    
+                    linksToCreate = []; selSys = null; selGiap = null;
+
                     if(subTab === 'itens_a_tombar') {
                         renderItensATombar();
+                    } else if (subTab === 'conciliacao_sobras') {
+                        populateSobrantesTab();
+                    } else { // unidade
+                        document.getElementById('created-links').innerHTML = '';
+                        document.getElementById('quick-actions').classList.add('hidden');
                     }
                 });
             });
