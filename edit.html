@@ -782,6 +782,8 @@
         let padroesConciliacao = []; // IA LEARNING
         let linksToCreate = []; // Armazena vínculos pendentes
         let reconciledUnits = []; // Armazena unidades já finalizadas
+        let activeConciliationUnit = null;
+        let activeConciliationType = null;
         
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
@@ -2216,6 +2218,7 @@
             document.getElementById('filter-tipo').addEventListener('change', () => {
                 const tipo = document.getElementById('filter-tipo').value;
                 const unidades = [...new Set(fullInventory
+                    .filter(i => !reconciledUnits.includes(i.Unidade)) // Apenas unidades não finalizadas
                     .filter(i => !tipo || i.Tipo === tipo)
                     .map(i => i.Unidade).filter(Boolean))].sort();
                 const selU = document.getElementById('filter-unidade');
@@ -2225,6 +2228,7 @@
 
             document.getElementById('load-conciliar').addEventListener('click', () => {
                 const unidade = document.getElementById('filter-unidade').value.trim();
+                const tipo = document.getElementById('filter-tipo').value;
                 const warningDiv = document.getElementById('unit-reconciled-warning');
 
                 if (!unidade) {
@@ -2238,6 +2242,9 @@
                 } else {
                     warningDiv.classList.add('hidden');
                 }
+
+                activeConciliationUnit = unidade;
+                activeConciliationType = tipo;
                 
                 document.getElementById('giap-list-unit-name').textContent = unidade;
                 const mappedGiapUnits = unitMapping[unidade] || [unidade];
@@ -2369,9 +2376,9 @@
             document.getElementById('import-giap-btn').addEventListener('click', async () => {
                 if (giapItemsForImport.length === 0) return showNotification('Nenhum item GIAP selecionado para importar.', 'warning');
                 
-                const tipo = document.getElementById('filter-tipo').value;
-                const unidade = document.getElementById('filter-unidade').value.trim();
-                if (!unidade || !tipo) return showNotification('Selecione um Tipo e uma Unidade de destino nos filtros acima.', 'warning');
+                const tipo = activeConciliationType;
+                const unidade = activeConciliationUnit;
+                if (!unidade || !tipo) return showNotification('Por favor, carregue uma unidade primeiro antes de importar.', 'warning');
                 
                 const estado = document.getElementById('import-estado-select').value;
 
@@ -3030,4 +3037,5 @@
     </script>
 </body>
 </html>
+
 
