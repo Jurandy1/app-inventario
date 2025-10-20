@@ -276,6 +276,7 @@
                                 Carregar
                             </button>
                         </div>
+                        <div id="unit-reconciled-warning" class="hidden my-4 p-3 text-sm font-semibold text-amber-800 bg-amber-100 border-l-4 border-amber-500 rounded-r-lg"></div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -780,6 +781,7 @@
         let normalizedSystemUnits = new Map();
         let padroesConciliacao = []; // IA LEARNING
         let linksToCreate = []; // Armazena vínculos pendentes
+        let reconciledUnits = []; // Armazena unidades já finalizadas
         
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
@@ -1053,21 +1055,23 @@
 
             if (!forceRefresh && !isCacheStale) {
                 feedbackStatus.textContent = 'Carregando dados do cache local...';
-                [fullInventory, giapInventory, unitMapping, customGiapUnits] = await Promise.all([
+                [fullInventory, giapInventory, unitMapping, customGiapUnits, reconciledUnits] = await Promise.all([
                     idb.patrimonio.toArray(), 
                     idb.giap.toArray(), 
                     loadUnitMappingFromFirestore(),
-                    loadCustomGiapUnits()
+                    loadCustomGiapUnits(),
+                    loadReconciledUnits()
                 ]);
                 showNotification('Dados carregados do cache.', 'info');
             } else {
                 feedbackStatus.textContent = 'Buscando dados atualizados do servidor...';
                 try {
-                    [fullInventory, giapInventory, unitMapping, customGiapUnits] = await Promise.all([
+                    [fullInventory, giapInventory, unitMapping, customGiapUnits, reconciledUnits] = await Promise.all([
                         loadFirebaseInventory(), 
                         loadGiapInventory(), 
                         loadUnitMappingFromFirestore(),
-                        loadCustomGiapUnits()
+                        loadCustomGiapUnits(),
+                        loadReconciledUnits()
                     ]);
                     await idb.transaction('rw', idb.patrimonio, idb.giap, idb.metadata, async () => {
                         await idb.patrimonio.clear(); await idb.patrimonio.bulkAdd(fullInventory);
@@ -1106,6 +1110,17 @@
                 const docSnap = await getDoc(docRef);
                 return docSnap.exists() ? docSnap.data().mappings || {} : {};
             } catch (error) { console.error("Error loading unit mapping:", error); return {}; }
+        }
+
+        async function loadReconciledUnits() {
+            try {
+                const docRef = doc(db, 'config', 'reconciledUnits');
+                const docSnap = await getDoc(docRef);
+                return docSnap.exists() ? docSnap.data().units || [] : [];
+            } catch (error) {
+                console.error("Erro ao carregar unidades conciliadas:", error);
+                return [];
+            }
         }
         
         async function loadCustomGiapUnits() {
@@ -1949,7 +1964,7 @@
                     }
                     dirtyItems.clear();
                     showNotification(`${itemsToCache.length} alterações salvas!`, 'success');
-                    saveAllChangesBtn.disabled = false;
+                    saveAllChangesBtn.disabled = true;
                     renderEditableTable();
                 } catch (error) {
                     console.error("Erro ao salvar alterações em lote:", error);
@@ -2211,7 +2226,19 @@
 
             document.getElementById('load-conciliar').addEventListener('click', () => {
                 const unidade = document.getElementById('filter-unidade').value.trim();
-                if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
+                const warningDiv = document.getElementById('unit-reconciled-warning');
+
+                if (!unidade) {
+                    warningDiv.classList.add('hidden');
+                    return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
+                }
+                
+                if(reconciledUnits.includes(unidade)) {
+                    warningDiv.textContent = `Aviso: Esta unidade já foi finalizada. Para continuar a conciliá-la, vá para a aba "Conciliar com Sobras".`;
+                    warningDiv.classList.remove('hidden');
+                } else {
+                    warningDiv.classList.add('hidden');
+                }
                 
                 document.getElementById('giap-list-unit-name').textContent = unidade;
                 const mappedGiapUnits = unitMapping[unidade] || [unidade];
@@ -2290,9 +2317,23 @@
             });
 
             document.getElementById('finish-reconciliation-btn').addEventListener('click', async () => {
+                const unidade = document.getElementById('filter-unidade').value.trim();
                 const success = await savePendingLinks('unidade');
                 if (success) {
-                    showOverlay('Inventário salvo. Recarregando e preparando conciliação de sobras...');
+                    showOverlay('Finalizando unidade...');
+                    if (unidade && !reconciledUnits.includes(unidade)) {
+                        reconciledUnits.push(unidade);
+                        try {
+                            await setDoc(doc(db, 'config', 'reconciledUnits'), { units: reconciledUnits });
+                            showNotification(`Unidade "${unidade}" movida para a conciliação de sobras.`, 'info');
+                        } catch (error) {
+                            hideOverlay();
+                            showNotification('Erro ao salvar o estado da unidade.', 'error');
+                            console.error(error);
+                            return;
+                        }
+                    }
+                    
                     await loadData(true); 
                     
                     const subTab = 'conciliacao_sobras';
@@ -2306,6 +2347,7 @@
                     showNotification('Pronto para conciliar com os itens sobrando.', 'info');
                 }
             });
+
 
             document.getElementById('created-links').addEventListener('click', (e) => {
                 const deleteBtn = e.target.closest('.delete-link-btn');
@@ -2370,21 +2412,28 @@
             // --- LISTENERS DA ABA CONCILIAR SOBRAS ---
             
             function populateSobrantesTab() {
-                const tipos = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
+                const reconciledTypes = [...new Set(fullInventory.filter(i => reconciledUnits.includes(i.Unidade)).map(i => i.Tipo).filter(Boolean))].sort();
                 const sobrasTipoSelect = document.getElementById('sobras-filter-tipo');
-                sobrasTipoSelect.innerHTML = '<option value="">Selecione um Tipo</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+                sobrasTipoSelect.innerHTML = '<option value="">Selecione um Tipo</option>' + reconciledTypes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
 
                 const sobrasGiapTypeSelect = document.getElementById('sobras-giap-type-filter');
-                sobrasGiapTypeSelect.innerHTML = '<option value="">Todos os Tipos</option>' + tipos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+                const allTypes = [...new Set(fullInventory.map(i => i.Tipo).filter(Boolean))].sort();
+                sobrasGiapTypeSelect.innerHTML = '<option value="">Todos os Tipos</option>' + allTypes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
 
                 sobrasTipoSelect.onchange = () => {
                     const selectedTipo = sobrasTipoSelect.value;
                     const sobrasUnidadeSelect = document.getElementById('sobras-filter-unidade');
-                    const unidades = [...new Set(fullInventory.filter(i => i.Tipo === selectedTipo).map(i => i.Unidade).filter(Boolean))].sort();
-                    sobrasUnidadeSelect.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                    
+                    const unitsToShow = reconciledUnits.filter(unitName => {
+                        if (!selectedTipo) return true;
+                        const item = fullInventory.find(i => i.Unidade === unitName);
+                        return item && item.Tipo === selectedTipo;
+                    }).sort();
+                    
+                    sobrasUnidadeSelect.innerHTML = '<option value="">Selecione uma Unidade</option>' + unitsToShow.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
                     sobrasUnidadeSelect.disabled = !selectedTipo;
                 };
-
+                
                 document.getElementById('sobras-system-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Selecione Tipo e Unidade e clique em Carregar.</p>`;
                 document.getElementById('sobras-giap-list').innerHTML = `<p class="p-4 text-slate-500 text-center">Os tombos sobrando aparecerão aqui após carregar os itens do sistema.</p>`;
             }
