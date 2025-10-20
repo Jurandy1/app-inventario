@@ -261,7 +261,7 @@
                     
                     <div id="subtab-conciliar-conciliacao_main">
                         <div id="reconciliation-view">
-                            <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens por Unidade</h2>
+                            <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
                             <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo.</p>
                             <div class="flex flex-wrap items-end gap-2 mb-4">
                                 <div class="flex-grow">
@@ -294,17 +294,7 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Visão de Tombos Sobrando (nova) -->
-                        <div id="leftover-view" class="hidden">
-                            <h2 class="text-xl font-bold text-slate-800 mb-2">⚠️ Tombos Sobrando no Inventário Geral</h2>
-                            <p class="text-sm text-slate-600 mb-4">Estes são todos os tombos da planilha GIAP que ainda não foram vinculados a nenhum item no sistema, agrupados por tipo de unidade.</p>
-                            <button id="back-to-reconciliation-btn" class="mb-4 text-sm bg-slate-200 text-slate-700 px-3 py-1 rounded-md hover:bg-slate-300">&larr; Voltar para a conciliação da unidade</button>
-                            <div id="leftover-giap-list" class="reconciliation-container border p-2 space-y-4 rounded-lg bg-slate-50 overflow-y-auto" style="max-height: calc(100vh - 450px);">
-                                <!-- Tombos sobrando serão renderizados aqui -->
-                            </div>
-                        </div>
-
+                        
                         <div id="quick-actions" class="mt-6 border-t pt-4 hidden">
                             <h3 class="font-semibold text-slate-800 mb-2">Vínculos Criados nesta Sessão</h3>
                             <div id="created-links" class="space-y-2 mb-4 max-h-40 overflow-y-auto"></div>
@@ -1616,6 +1606,90 @@
             });
         }
         
+        function renderGlobalLeftoversInGiapList() {
+            document.getElementById('giap-list-unit-name').textContent = 'Inventário Geral'; // Update title
+            document.getElementById('giap-list-filter').value = ''; // Clear filter
+
+            const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
+            const leftovers = giapInventory.filter(g => {
+                const tombo = normalizeTombo(g.TOMBAMENTO);
+                return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo);
+            });
+
+            const giapUnitToSystemType = {};
+            // Create a map from GIAP unit name to System unit Type (CRAS, CREAS, etc.)
+            for (const systemUnit in unitMapping) {
+                const systemUnitType = fullInventory.find(i => i.Unidade === systemUnit)?.Tipo || 'Outros';
+                unitMapping[systemUnit].forEach(giapUnit => {
+                    giapUnitToSystemType[giapUnit] = systemUnitType;
+                });
+            }
+            
+            const groupedLeftovers = leftovers.reduce((acc, item) => {
+                const type = giapUnitToSystemType[item.Unidade] || 'Unidade Não Mapeada';
+                if (!acc[type]) {
+                    acc[type] = [];
+                }
+                acc[type].push(item);
+                return acc;
+            }, {});
+
+            const container = document.getElementById('giap-list');
+            container.innerHTML = ''; // Clear the list
+
+            if (leftovers.length === 0) {
+                container.innerHTML = `<p class="p-4 text-slate-500 text-center">Nenhum tombo sobrando encontrado no inventário geral.</p>`;
+                return;
+            }
+            
+            // Render by sorted type keys
+            Object.keys(groupedLeftovers).sort().forEach(type => {
+                const items = groupedLeftovers[type];
+                const typeHeader = document.createElement('h3');
+                typeHeader.className = 'text-md font-bold text-slate-600 p-2 bg-slate-200 rounded-t-lg mt-3 first:mt-0 sticky top-0 z-10';
+                typeHeader.textContent = `${type} (${items.length})`;
+                container.appendChild(typeHeader);
+
+                items.forEach(item => {
+                    const id = item['TOMBAMENTO'];
+                    const div = document.createElement('div');
+                    div.className = 'reconciliation-list-item card p-2 text-sm border-t';
+                    div.dataset.id = id;
+
+                    const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
+                    const dataCadastro = escapeHtml(item.Cadastro || 'N/D');
+                    const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
+                    const tombo = escapeHtml(item['TOMBAMENTO']);
+                    const valorNf = escapeHtml(item['Valor NF'] || 'N/A');
+                    const nf = escapeHtml(item['NF'] || 'N/A');
+                    const unidadeOriginal = escapeHtml(item['Unidade'] || 'N/A');
+
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <strong>${tombo} - ${descricao}</strong>
+                                <p class="text-xs text-blue-600 mt-1">
+                                    <strong>Unidade GIAP:</strong> ${unidadeOriginal}
+                                </p>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    Cadastro: <strong>${dataCadastro}</strong> | NF: <strong>${nf}</strong>
+                                </p>
+                                 <p class="text-xs text-slate-500 mt-1">
+                                    Fornecedor: <strong>${fornecedor}</strong>
+                                </p>
+                            </div>
+                            <div class="text-right ml-2">
+                                <p class="text-xs text-slate-500">Valor NF</p>
+                                <strong class="text-sm text-green-700">${valorNf}</strong>
+                            </div>
+                        </div>`;
+                    
+                    div.onclick = (event) => handleSelect('giap-list', id, item, event.currentTarget);
+                    container.appendChild(div);
+                });
+            });
+        }
+        
         function getConciliationData() {
             const unidade = document.getElementById('filter-unidade').value.trim();
             if (!unidade) return { systemItems: [], giapItems: [] };
@@ -1726,7 +1800,7 @@
                             </span>
                             <button class="delete-link-btn" data-index="${index}" title="Remover Vínculo">
                                 <svg class="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
                                     <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/>
                                 </svg>
                             </button>
@@ -2212,83 +2286,26 @@
             document.getElementById('save-links').addEventListener('click', async () => {
                 const success = await savePendingLinks();
                 if (success) {
-                    await idb.metadata.clear();
-                    showNotification('Vínculos salvos! A página será recarregada.', 'success');
-                    setTimeout(() => window.location.reload(), 2000);
+                    showNotification('Vínculos salvos! Atualizando listas...', 'success');
+                    showOverlay('Atualizando dados...');
+                    await loadData(true); // Força a atualização dos dados
+                    document.getElementById('load-conciliar').click(); // Recarrega a visualização da unidade atual
+                    hideOverlay();
                 }
             });
-            
-            function renderGlobalLeftovers() {
-                const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
-                const leftovers = giapInventory.filter(g => {
-                    const tombo = normalizeTombo(g.TOMBAMENTO);
-                    return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo);
-                });
-
-                const giapUnitToSystemType = {};
-                for (const systemUnit in unitMapping) {
-                    const systemUnitType = fullInventory.find(i => i.Unidade === systemUnit)?.Tipo || 'Outros';
-                    unitMapping[systemUnit].forEach(giapUnit => {
-                        giapUnitToSystemType[giapUnit] = systemUnitType;
-                    });
-                }
-                
-                const groupedLeftovers = leftovers.reduce((acc, item) => {
-                    const type = giapUnitToSystemType[item.Unidade] || 'Não Mapeado';
-                    if (!acc[type]) {
-                        acc[type] = [];
-                    }
-                    acc[type].push(item);
-                    return acc;
-                }, {});
-
-                const container = document.getElementById('leftover-giap-list');
-                container.innerHTML = '';
-                
-                Object.keys(groupedLeftovers).sort().forEach(type => {
-                    const items = groupedLeftovers[type];
-                    const typeHeader = document.createElement('h3');
-                    typeHeader.className = 'text-lg font-bold text-slate-700 p-2 bg-slate-200 rounded-t-lg mt-4 first:mt-0';
-                    typeHeader.textContent = `Tombos Sobrando - ${type} (${items.length})`;
-                    container.appendChild(typeHeader);
-
-                    items.forEach(item => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'p-3 border-b bg-white text-sm';
-                        const tombo = escapeHtml(item.TOMBAMENTO);
-                        const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
-                        const unidade = escapeHtml(item.Unidade);
-                        const nf = escapeHtml(item.NF || 'N/A');
-                        const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/A');
-                        const cadastro = escapeHtml(item.Cadastro || 'N/D');
-
-                        itemDiv.innerHTML = `
-                             <p><strong>Tombo:</strong> <span class="font-mono text-blue-700">${tombo}</span> - ${descricao}</p>
-                             <p class="text-xs text-slate-600 mt-1"><strong>Unidade Original (GIAP):</strong> ${unidade}</p>
-                             <p class="text-xs text-slate-500 mt-1"><strong>NF:</strong> ${nf} | <strong>Fornecedor:</strong> ${fornecedor} | <strong>Cadastro:</strong> ${cadastro}</p>
-                        `;
-                        container.appendChild(itemDiv);
-                    });
-                });
-            }
-
 
             document.getElementById('finish-reconciliation-btn').addEventListener('click', async () => {
                 const success = await savePendingLinks();
                 if (success) {
                     hideOverlay();
                     showNotification('Inventário salvo. Exibindo tombos sobrando de todas as unidades.', 'info');
-                    renderGlobalLeftovers();
-                    document.getElementById('reconciliation-view').classList.add('hidden');
-                    document.getElementById('leftover-view').classList.remove('hidden');
-                }
-            });
+                    
+                    showOverlay('Recarregando inventário geral...');
+                    await loadData(true); 
 
-            document.getElementById('back-to-reconciliation-btn').addEventListener('click', () => {
-                 document.getElementById('reconciliation-view').classList.remove('hidden');
-                 document.getElementById('leftover-view').classList.add('hidden');
-                 // Recarrega os dados da unidade selecionada para refletir os links salvos.
-                 document.getElementById('load-conciliar').click();
+                    renderGlobalLeftoversInGiapList();
+                    hideOverlay();
+                }
             });
 
 
@@ -2338,10 +2355,14 @@
 
                 try {
                     await batch.commit();
-                    await idb.metadata.clear();
-                    showNotification(`${giapItemsForImport.length} itens importados com sucesso! A página será recarregada.`, 'success');
+                    showNotification(`${giapItemsForImport.length} itens importados com sucesso! Atualizando...`, 'success');
                     clearGiapImportSelection();
-                    setTimeout(() => window.location.reload(), 2000);
+                    
+                    showOverlay('Atualizando dados...');
+                    await loadData(true); // Força a atualização dos dados
+                    document.getElementById('load-conciliar').click(); // Recarrega a visualização da unidade atual
+                    hideOverlay();
+
                 } catch (e) {
                     hideOverlay();
                     showNotification('Erro ao importar itens.', 'error'); 
@@ -2874,3 +2895,4 @@
     </script>
 </body>
 </html>
+
