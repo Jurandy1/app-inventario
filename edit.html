@@ -1698,12 +1698,11 @@
             const mappedGiapUnits = unitMapping[unidade] || [unidade];
 
             const systemItems = fullInventory.filter(i => {
-                const tombo = (i.Tombamento || '').trim();
+                const tombo = (i.Tombamento || '').trim().toLowerCase();
                 const isPending = linksToCreate.some(l => l.systemItem.id === i.id);
                 return !isPending &&
-                       i.Unidade === unidade && 
-                       (!tombo || tombo.toLowerCase() === 's/t') &&
-                       !normalizeStr(tombo).includes('permuta') &&
+                       i.Unidade === unidade &&
+                       (tombo === '' || tombo === 's/t') &&
                        normalizeStr(i.Descrição).includes(systemFilterText);
             });
 
@@ -2472,8 +2471,12 @@
 
                 const systemFilterText = normalizeStr(document.getElementById('sobras-system-list-filter').value);
                 const systemItems = fullInventory.filter(i => {
-                    const tombo = (i.Tombamento || '').trim();
-                    return i.Unidade === unidade && (!tombo || tombo.toLowerCase() === 's/t') && !normalizeStr(tombo).includes('permuta') && normalizeStr(i.Descrição).includes(systemFilterText);
+                    const tombo = (i.Tombamento || '').trim().toLowerCase();
+                    const isPending = linksToCreate.some(l => l.systemItem.id === i.id);
+                    return !isPending &&
+                           i.Unidade === unidade && 
+                           (tombo === '' || tombo === 's/t') && 
+                           normalizeStr(i.Descrição).includes(systemFilterText);
                 });
                 renderList('sobras-system-list', systemItems, 'id', 'Descrição', null, 'sobras');
                 document.getElementById('sobras-quick-actions').classList.remove('hidden');
@@ -3027,4 +3030,5 @@
     </script>
 </body>
 </html>
+
 
