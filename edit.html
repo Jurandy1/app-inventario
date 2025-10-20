@@ -260,49 +260,65 @@
                     </div>
                     
                     <div id="subtab-conciliar-conciliacao_main">
-                        <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens</h2>
-                        <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo. O sistema irá sugerir os melhores tombos para o item selecionado.</p>
-                        <div class="flex flex-wrap items-end gap-2 mb-4">
-                            <div class="flex-grow">
-                                <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
-                                <select id="filter-tipo" class="w-full border p-2 rounded-lg mt-1">
-                                    <option value="">Todos os Tipos</option>
-                                </select>
+                        <div id="reconciliation-view">
+                            <h2 class="text-xl font-bold text-slate-800 mb-2">🤝 Conciliar Itens por Unidade</h2>
+                            <p class="text-sm text-slate-600 mb-4">Filtre por tipo e unidade, carregue os dados e depois clique em um item de cada lista para criar um vínculo.</p>
+                            <div class="flex flex-wrap items-end gap-2 mb-4">
+                                <div class="flex-grow">
+                                    <label for="filter-tipo" class="text-sm font-medium">Tipo</label>
+                                    <select id="filter-tipo" class="w-full border p-2 rounded-lg mt-1">
+                                        <option value="">Todos os Tipos</option>
+                                    </select>
+                                </div>
+                                <div class="flex-grow">
+                                    <label for="filter-unidade" class="text-sm font-medium">Unidade</label>
+                                    <select id="filter-unidade" class="w-full border p-2 rounded-lg mt-1">
+                                        <option value="">Selecione o Tipo Primeiro</option>
+                                    </select>
+                                </div>
+                                <button id="load-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                    Carregar
+                                </button>
                             </div>
-                            <div class="flex-grow">
-                                <label for="filter-unidade" class="text-sm font-medium">Unidade</label>
-                                <select id="filter-unidade" class="w-full border p-2 rounded-lg mt-1">
-                                    <option value="">Selecione o Tipo Primeiro</option>
-                                </select>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento no Sistema</h3>
+                                    <input type="text" id="system-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
+                                    <div id="system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">Tombos Disponíveis (GIAP) para <span id="giap-list-unit-name" class="text-blue-600 font-bold"></span></h3>
+                                    <input type="text" id="giap-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
+                                    <div id="giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+                                </div>
                             </div>
-                            <button id="load-conciliar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                                Carregar
-                            </button>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <h3 class="font-semibold text-slate-800 mb-2">Itens sem Tombamento no Sistema</h3>
-                                <input type="text" id="system-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                <div id="system-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
-                            </div>
-                            <div>
-                                <h3 class="font-semibold text-slate-800 mb-2">Tombos Disponíveis (GIAP)</h3>
-                                <input type="text" id="giap-list-filter" class="w-full p-2 border rounded-lg mb-2" placeholder="Filtrar por descrição...">
-                                <div id="giap-list" class="reconciliation-container border p-2 space-y-2 rounded-lg bg-slate-50 overflow-y-auto"></div>
+
+                        <!-- Visão de Tombos Sobrando (nova) -->
+                        <div id="leftover-view" class="hidden">
+                            <h2 class="text-xl font-bold text-slate-800 mb-2">⚠️ Tombos Sobrando no Inventário Geral</h2>
+                            <p class="text-sm text-slate-600 mb-4">Estes são todos os tombos da planilha GIAP que ainda não foram vinculados a nenhum item no sistema, agrupados por tipo de unidade.</p>
+                            <button id="back-to-reconciliation-btn" class="mb-4 text-sm bg-slate-200 text-slate-700 px-3 py-1 rounded-md hover:bg-slate-300">&larr; Voltar para a conciliação da unidade</button>
+                            <div id="leftover-giap-list" class="reconciliation-container border p-2 space-y-4 rounded-lg bg-slate-50 overflow-y-auto" style="max-height: calc(100vh - 450px);">
+                                <!-- Tombos sobrando serão renderizados aqui -->
                             </div>
                         </div>
+
                         <div id="quick-actions" class="mt-6 border-t pt-4 hidden">
-                            <h3 class="font-semibold text-slate-800 mb-2">Vínculos Criados</h3>
-                            <div id="created-links" class="space-y-2 mb-4"></div>
-                            <div class="flex items-center gap-2">
+                            <h3 class="font-semibold text-slate-800 mb-2">Vínculos Criados nesta Sessão</h3>
+                            <div id="created-links" class="space-y-2 mb-4 max-h-40 overflow-y-auto"></div>
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <button id="save-links" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Vínculos</button>
                                 <button id="clear-selections" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Limpar Seleções</button>
+                                <button id="finish-reconciliation-btn" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Salvar Inventário e Ver Sobras</button>
                             </div>
                         </div>
+                        
                         <!-- Seção de Importação GIAP -->
                         <div id="giap-import-section" class="mt-6 border-t pt-4">
                             <h3 class="font-semibold text-slate-800 mb-2">📥 Importar Tombos do GIAP para esta Unidade</h3>
-                            <p class="text-sm text-slate-600 mb-4">Selecione um ou mais itens da lista "Tombos Disponíveis" (sem selecionar um item da lista à esquerda) para importá-los diretamente.</p>
+                            <p class="text-sm text-slate-600 mb-4">Selecione um ou mais itens da lista "Tombos Disponíveis" (sem selecionar um item da lista à esquerda) para importá-los diretamente como novos itens no sistema.</p>
                             <div class="flex items-end gap-4">
                                 <div>
                                     <label for="import-estado-select" class="block text-sm font-medium mb-1">Estado dos Itens a Importar</label>
@@ -697,7 +713,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, addDoc, orderBy, limit, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
@@ -1562,12 +1578,16 @@
                     const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
                     const tombo = escapeHtml(item[keyField]);
                     const valorNf = escapeHtml(item['Valor NF'] || 'N/A');
+                    const nf = escapeHtml(item['NF'] || 'N/A');
                     detailsHtml = `
                         <div class="flex justify-between items-start">
                             <div class="flex-1">
                                 <strong>${tombo} - ${descricao}</strong>
                                 <p class="text-xs text-slate-500 mt-1">
-                                    Cadastro: <strong>${dataCadastro}</strong> | Fornecedor: <strong>${fornecedor}</strong>
+                                    Cadastro: <strong>${dataCadastro}</strong> | NF: <strong>${nf}</strong>
+                                </p>
+                                 <p class="text-xs text-slate-500 mt-1">
+                                    Fornecedor: <strong>${fornecedor}</strong>
                                 </p>
                             </div>
                             <div class="text-right ml-2">
@@ -1582,11 +1602,10 @@
                 // Lógica de destaque da sugestão
                 if (suggestionInfo && suggestionInfo.suggestions.has(id)) {
                     const score = suggestionInfo.suggestions.get(id);
-                     // Destaque mais forte APENAS para a melhor sugestão (o primeiro da lista)
                     if (index === 0 && score > 0.7) { 
                         div.style.backgroundColor = '#dbeafe'; 
                         div.style.borderLeft = '4px solid #3b82f6';
-                    } else if (score > 0.5) { // Lighter highlight for other good matches
+                    } else if (score > 0.5) {
                         div.style.backgroundColor = '#e0f2fe';
                         div.style.borderLeft = '4px solid #0ea5e9';
                     }
@@ -1605,7 +1624,6 @@
             const giapFilterText = normalizeStr(document.getElementById('giap-list-filter').value);
 
             const usedTombamentos = new Set(fullInventory.map(i => normalizeStr(i.Tombamento)).filter(Boolean));
-            // Adiciona tombos pendentes de vínculo para não serem mostrados como disponíveis
             linksToCreate.forEach(link => usedTombamentos.add(normalizeTombo(link.giapItem.TOMBAMENTO)));
 
             const mappedGiapUnits = unitMapping[unidade] || [unidade];
@@ -1638,15 +1656,12 @@
             if (containerId === 'system-list') {
                 clearGiapImportSelection();
                 selSys = { id, obj };
-                selGiap = null; // Limpa seleção anterior do GIAP
+                selGiap = null; 
 
-                // Limpa visualmente a seleção na lista GIAP
                 document.querySelectorAll('#giap-list .selected').forEach(el => el.classList.remove('selected'));
-                
                 document.querySelectorAll('#system-list .selected, #system-list .selected-for-import').forEach(el => el.classList.remove('selected', 'selected-for-import'));
                 element.classList.add('selected');
                 
-                // Dispara a lógica de sugestão com IA
                 suggestGiapMatchesComAprendizado(obj); 
 
             } else if (containerId === 'giap-list' && selSys) {
@@ -2128,6 +2143,8 @@
                 const unidade = document.getElementById('filter-unidade').value.trim();
                 if (!unidade) return showNotification('Por favor, selecione uma unidade para carregar.', 'warning');
                 
+                document.getElementById('giap-list-unit-name').textContent = unidade;
+
                 const mappedGiapUnits = unitMapping[unidade] || [unidade];
                 if(mappedGiapUnits.length === 1 && mappedGiapUnits[0] === unidade && !unitMapping[unidade]) {
                     showNotification('Esta unidade não está mapeada. Vá para a aba "Ligar Unidades".', 'warning');
@@ -2155,10 +2172,10 @@
                 showNotification('Seleções limpas.', 'info');
             });
             
-            document.getElementById('save-links').addEventListener('click', async () => {
-                if (linksToCreate.length === 0) return showNotification('Nenhum novo link para salvar.', 'info');
+            async function savePendingLinks() {
+                if (linksToCreate.length === 0) return true;
 
-                showOverlay(`Salvando ${linksToCreate.length} links...`);
+                showOverlay(`Salvando ${linksToCreate.length} vínculos...`);
                 const batch = writeBatch(db);
 
                 linksToCreate.forEach(link => {
@@ -2167,34 +2184,114 @@
                     
                     const newDesc = useGiapDescription ? (giapItem.Descrição || giapItem.Espécie) : systemItem.Descrição;
 
-                    // Ação: Apenas atualiza o item existente, não cria um novo, evitando duplicatas.
                     batch.update(docRef, {
                         Tombamento: giapItem.TOMBAMENTO,
                         Descrição: newDesc,
                         Fornecedor: giapItem['Nome Fornecedor'],
                         NF: giapItem['NF'],
-                        etiquetaPendente: true, // Flag para a aba "Itens a Tombar"
+                        etiquetaPendente: true,
                         updatedAt: serverTimestamp()
                     });
-
-                    // Salva o padrão de conciliação para a IA
+                    
                     const score = calculateSimilarity(systemItem.Descrição, (giapItem.Descrição || giapItem.Espécie));
                     salvarPadraoConciliacao(systemItem, giapItem, score);
                 });
 
                 try {
                     await batch.commit();
-                    await idb.metadata.clear();
-                    showNotification(`${linksToCreate.length} links salvos! A página será recarregada.`, 'success');
-                    setTimeout(() => window.location.reload(), 2000);
+                    linksToCreate = [];
+                    return true;
                 } catch (error) {
                     hideOverlay();
-                    showNotification('Erro ao salvar os links.', 'error');
-                    console.error("Erro ao salvar links:", error);
+                    showNotification('Erro ao salvar os vínculos.', 'error');
+                    console.error("Erro ao salvar vínculos:", error);
+                    return false;
+                }
+            }
+            
+            document.getElementById('save-links').addEventListener('click', async () => {
+                const success = await savePendingLinks();
+                if (success) {
+                    await idb.metadata.clear();
+                    showNotification('Vínculos salvos! A página será recarregada.', 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                }
+            });
+            
+            function renderGlobalLeftovers() {
+                const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
+                const leftovers = giapInventory.filter(g => {
+                    const tombo = normalizeTombo(g.TOMBAMENTO);
+                    return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo);
+                });
+
+                const giapUnitToSystemType = {};
+                for (const systemUnit in unitMapping) {
+                    const systemUnitType = fullInventory.find(i => i.Unidade === systemUnit)?.Tipo || 'Outros';
+                    unitMapping[systemUnit].forEach(giapUnit => {
+                        giapUnitToSystemType[giapUnit] = systemUnitType;
+                    });
+                }
+                
+                const groupedLeftovers = leftovers.reduce((acc, item) => {
+                    const type = giapUnitToSystemType[item.Unidade] || 'Não Mapeado';
+                    if (!acc[type]) {
+                        acc[type] = [];
+                    }
+                    acc[type].push(item);
+                    return acc;
+                }, {});
+
+                const container = document.getElementById('leftover-giap-list');
+                container.innerHTML = '';
+                
+                Object.keys(groupedLeftovers).sort().forEach(type => {
+                    const items = groupedLeftovers[type];
+                    const typeHeader = document.createElement('h3');
+                    typeHeader.className = 'text-lg font-bold text-slate-700 p-2 bg-slate-200 rounded-t-lg mt-4 first:mt-0';
+                    typeHeader.textContent = `Tombos Sobrando - ${type} (${items.length})`;
+                    container.appendChild(typeHeader);
+
+                    items.forEach(item => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'p-3 border-b bg-white text-sm';
+                        const tombo = escapeHtml(item.TOMBAMENTO);
+                        const descricao = escapeHtml(item.Descrição || item.Espécie || 'N/A');
+                        const unidade = escapeHtml(item.Unidade);
+                        const nf = escapeHtml(item.NF || 'N/A');
+                        const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/A');
+                        const cadastro = escapeHtml(item.Cadastro || 'N/D');
+
+                        itemDiv.innerHTML = `
+                             <p><strong>Tombo:</strong> <span class="font-mono text-blue-700">${tombo}</span> - ${descricao}</p>
+                             <p class="text-xs text-slate-600 mt-1"><strong>Unidade Original (GIAP):</strong> ${unidade}</p>
+                             <p class="text-xs text-slate-500 mt-1"><strong>NF:</strong> ${nf} | <strong>Fornecedor:</strong> ${fornecedor} | <strong>Cadastro:</strong> ${cadastro}</p>
+                        `;
+                        container.appendChild(itemDiv);
+                    });
+                });
+            }
+
+
+            document.getElementById('finish-reconciliation-btn').addEventListener('click', async () => {
+                const success = await savePendingLinks();
+                if (success) {
+                    hideOverlay();
+                    showNotification('Inventário salvo. Exibindo tombos sobrando de todas as unidades.', 'info');
+                    renderGlobalLeftovers();
+                    document.getElementById('reconciliation-view').classList.add('hidden');
+                    document.getElementById('leftover-view').classList.remove('hidden');
                 }
             });
 
-            // Listener para deletar um vínculo pendente
+            document.getElementById('back-to-reconciliation-btn').addEventListener('click', () => {
+                 document.getElementById('reconciliation-view').classList.remove('hidden');
+                 document.getElementById('leftover-view').classList.add('hidden');
+                 // Recarrega os dados da unidade selecionada para refletir os links salvos.
+                 document.getElementById('load-conciliar').click();
+            });
+
+
             document.getElementById('created-links').addEventListener('click', (e) => {
                 const deleteBtn = e.target.closest('.delete-link-btn');
                 if (!deleteBtn) return;
@@ -2777,4 +2874,3 @@
     </script>
 </body>
 </html>
-
