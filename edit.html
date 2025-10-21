@@ -189,23 +189,33 @@
                             <input type="text" id="edit-filter-descricao" class="w-full p-2 border rounded-lg" placeholder="Digite para buscar...">
                         </div>
                     </div>
-                    <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 flex items-center gap-2" disabled>
-                        <span id="save-btn-spinner" class="hidden saving-spinner"></span>
-                        <span id="save-btn-text">Salvar Alterações</span>
-                    </button>
+                    <div class="flex items-center gap-4">
+                        <button id="save-all-changes-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 flex items-center gap-2" disabled>
+                            <span id="save-btn-spinner" class="hidden saving-spinner"></span>
+                            <span id="save-btn-text">Salvar Alterações</span>
+                        </button>
+                        <button id="delete-selected-btn" class="hidden bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg>
+                           Excluir Selecionados (<span id="delete-selected-count">0</span>)
+                        </button>
+                    </div>
                 </div>
                 <div class="card mt-6 p-0 overflow-hidden">
                     <div class="table-container overflow-y-auto">
                         <table class="w-full text-sm min-w-[1900px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
+                                    <th class="p-3 text-left font-semibold w-12">
+                                        <input type="checkbox" id="select-all-checkbox" class="h-4 w-4 rounded border-gray-300">
+                                    </th>
                                     <th class="p-3 text-left font-semibold">Ações</th>
                                     <th class="p-3 text-left font-semibold">Tombamento</th>
+                                    <th class="p-3 text-left font-semibold">Opções</th>
                                     <th class="p-3 text-left font-semibold">Descrição</th>
                                     <th class="p-3 text-left font-semibold">Tipo</th>
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Localização</th>
-                                    <th class="p-3 text-left font-semibold">Fornecedor</th>
+                                    <th class="p-3 text-left font-semibold">Fornecedor (ou da Permuta)</th>
                                     <th class="p-3 text-left font-semibold">NF</th>
                                     <th class="p-3 text-left font-semibold">Origem da Doação</th>
                                     <th class="p-3 text-left font-semibold">Estado</th>
@@ -744,7 +754,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3>
+                <h3 id="delete-modal-title" class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir?</h3>
                 <p id="delete-item-info-edit" class="mb-5 text-sm font-bold text-gray-800"></p>
                 <button id="confirm-delete-btn-edit" type="button" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 mr-2">Sim, excluir</button>
                 <button type="button" class="js-close-modal-delete bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300">Cancelar</button>
@@ -790,25 +800,26 @@
             giap: '++_id, TOMBAMENTO, *Unidade',
             metadata: 'key' 
         });
-        const CACHE_DURATION_MS = 2 * 60 * 60 * 1000;
+        const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // Aumentado para 6 horas
 
         let fullInventory = [], giapInventory = [], customGiapUnits = [];
         let giapMap = new Map();
-        let giapMapAllItems = new Map(); // NOVO: Mapa com todos os itens do GIAP
+        let giapMapAllItems = new Map();
         let unitMapping = {};
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
-        let padroesConciliacao = []; // IA LEARNING
-        let linksToCreate = []; // Armazena vínculos pendentes
-        let reconciledUnits = []; // Armazena unidades já finalizadas
+        let padroesConciliacao = [];
+        let linksToCreate = [];
+        let reconciledUnits = [];
         let activeConciliationUnit = null;
         let activeConciliationType = null;
         
         let selSys = null, selGiap = null;
         let giapItemsForImport = [];
         let itemsToReplace = [];
-        let processedNfData = {}; // To store processed NF data
-        let updatesToProcess = []; // For the new "Edit by Desc" tool
+        let processedNfData = {};
+        let updatesToProcess = [];
+        let currentDeleteItemIds = []; // Para exclusão em massa
 
         // --- DOM Elements ---
         const loadingScreen = document.getElementById('loading-or-error-screen');
@@ -835,16 +846,16 @@
         const giapTableBody = document.getElementById('giap-table-body');
         const fullPageOverlay = document.getElementById('full-page-overlay');
         const overlayMessage = document.getElementById('overlay-message');
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+        const deleteSelectedCount = document.getElementById('delete-selected-count');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
 
         const syncConfirmModal = document.getElementById('sync-confirm-modal');
         const syncUpdateAllBtn = document.getElementById('sync-update-all-btn');
         const syncKeepDescBtn = document.getElementById('sync-keep-desc-btn');
         const syncCancelBtn = document.getElementById('sync-cancel-btn');
         
-        // Modal de Exclusão
         const deleteConfirmModal = document.getElementById('delete-confirm-modal-edit');
-
-        // Modal de escolha de descrição
         const descChoiceModal = document.getElementById('desc-choice-modal');
 
 
@@ -1176,12 +1187,10 @@
                 }
             }
             
-            // ATUALIZAÇÃO CRÍTICA: O giapMap principal agora contém APENAS itens disponíveis para as ferramentas ativas.
             giapMap = new Map(giapInventory
                 .filter(item => normalizeStr(item.Status).includes(normalizeStr('Disponível')))
                 .map(item => [normalizeTombo(item['TOMBAMENTO']), item])
             );
-            // CORREÇÃO: Cria um mapa com TODOS os itens do GIAP para a função de sincronização.
             giapMapAllItems = new Map(giapInventory.map(item => [normalizeTombo(item['TOMBAMENTO']), item]));
             
             normalizedSystemUnits.clear();
@@ -1275,45 +1284,50 @@
             addItemBtn.classList.toggle('hidden', !unidade);
             
             const isSpecificFilterApplied = !!(unidade || desc || estado || tipo);
-            const itemsToRender = isSpecificFilterApplied ? filtered : filtered.slice(0, 200);
+            const itemsToRender = isSpecificFilterApplied ? filtered : filtered;
 
-            const headers = ['Ações', 'Tombamento', 'Descrição', 'Tipo', 'Unidade', 'Localização', 'Fornecedor', 'NF', 'Origem da Doação', 'Estado', 'Quantidade', 'Observação'];
             const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
             
             editTableBody.innerHTML = itemsToRender.map(item => {
                 const itemData = dirtyItems.get(item.id) || item;
                 const isDirty = dirtyItems.has(item.id);
+                const isSt = (itemData.Tombamento || '').toUpperCase() === 'S/T';
+
                 const estadoSelect = `<select data-field="Estado" class="w-full p-1 border rounded bg-white">${estadoOptions.map(opt => `<option value="${opt}" ${itemData.Estado === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>`;
                 
-                const cells = headers.map(h => {
-                    if (h === 'Ações') {
-                        // NOVO: Adicionado botão de edição
-                        return `<td class="p-2 border-b">
-                                    <div class="flex items-center gap-1">
-                                        <button title="Editar Item" class="edit-item-btn p-2 rounded-md hover:bg-yellow-100 text-yellow-700" data-doc-id="${item.id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
-                                        </button>
-                                        <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
-                                        </button>
-                                        <button title="Excluir Item" class="delete-item-btn p-2 rounded-md hover:bg-red-100 text-red-600" data-doc-id="${item.id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg>
-                                        </button>
-                                    </div>
-                                </td>`;
-                    }
-                    if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
-                    const value = escapeHtml(itemData[h]);
-                    const inputType = (h === 'Quantidade') ? 'number' : 'text';
-                    return `<td class="p-2 border-b"><input type="${inputType}" data-field="${h}" class="w-full p-1 border rounded" value="${value}"></td>`;
-                }).join('');
-
-                return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">${cells}</tr>`;
+                return `<tr id="row-${item.id}" data-doc-id="${item.id}" class="${isDirty ? 'is-dirty' : ''}">
+                    <td class="p-2 border-b text-center">
+                        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 row-checkbox" data-doc-id="${item.id}">
+                    </td>
+                    <td class="p-2 border-b">
+                        <div class="flex items-center gap-1">
+                            <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
+                            </button>
+                            <button title="Excluir Item" class="delete-item-btn p-2 rounded-md hover:bg-red-100 text-red-600" data-doc-id="${item.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="p-2 border-b"><input type="text" data-field="Tombamento" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Tombamento)}" ${isSt ? 'disabled' : ''}></td>
+                    <td class="p-2 border-b text-center">
+                        <div class="flex flex-col">
+                            <label class="inline-flex items-center text-xs"><input type="checkbox" data-field="isPermuta" class="h-4 w-4 rounded border-gray-300 permuta-checkbox" ${itemData.isPermuta ? 'checked' : ''}> <span class="ml-1">Permuta</span></label>
+                            <label class="inline-flex items-center text-xs"><input type="checkbox" class="h-4 w-4 rounded border-gray-300 st-checkbox" ${isSt ? 'checked' : ''}> <span class="ml-1">S/T</span></label>
+                        </div>
+                    </td>
+                    <td class="p-2 border-b"><input type="text" data-field="Descrição" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Descrição)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Tipo" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Tipo)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Unidade" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Unidade)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Localização" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Localização)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Fornecedor" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Fornecedor)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="NF" class="w-full p-1 border rounded" value="${escapeHtml(itemData.NF)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Origem da Doação" class="w-full p-1 border rounded" value="${escapeHtml(itemData['Origem da Doação'])}"></td>
+                    <td class="p-2 border-b">${estadoSelect}</td>
+                    <td class="p-2 border-b"><input type="number" data-field="Quantidade" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Quantidade)}"></td>
+                    <td class="p-2 border-b"><input type="text" data-field="Observação" class="w-full p-1 border rounded" value="${escapeHtml(itemData.Observação)}"></td>
+                </tr>`;
             }).join('');
-
-            if(!isSpecificFilterApplied && filtered.length > 200) {
-                 editTableBody.innerHTML += `<tr><td colspan="${headers.length}" class="text-center p-4 font-semibold text-orange-600">Apenas os primeiros 200 de ${filtered.length} resultados são exibidos. Refine sua busca.</td></tr>`;
-            }
         }
 
         function populateEditableInventoryTab() {
@@ -1896,7 +1910,6 @@
             const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
             linksToCreate.forEach(link => usedTombamentos.add(normalizeTombo(link.giapItem.TOMBAMENTO)));
             
-            // Apenas sobras 'Disponíveis'
             return giapInventory.filter(g => {
                 const tombo = normalizeTombo(g.TOMBAMENTO);
                 return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo) && normalizeStr(g.Status).includes(normalizeStr('Disponível'));
@@ -1919,12 +1932,12 @@
                 const tombo = (i.Tombamento || '').trim().toLowerCase();
                 const isPending = linksToCreate.some(l => l.systemItem.id === i.id);
                 return !isPending &&
+                       !i.isPermuta && // <-- EXCLUI PERMUTA
                        i.Unidade === unidade &&
                        (tombo === '' || tombo === 's/t') &&
                        normalizeStr(i.Descrição).includes(systemFilterText);
             });
             
-            // Apenas itens do GIAP 'Disponíveis'
             const giapItems = giapInventory.filter(g => {
                 const tomboTrimmed = normalizeTombo(g.TOMBAMENTO);
                 const giapDesc = normalizeStr(g.Descrição || g.Espécie);
@@ -2193,16 +2206,37 @@
                 }
             });
             
-            document.getElementById('edit-table-body').addEventListener('change', (e) => {
+            editTableBody.addEventListener('change', (e) => {
                 const input = e.target.closest('input, select');
                 if (!input) return;
                 
                 const row = input.closest('tr');
                 const docId = row.dataset.docId;
                 const field = input.dataset.field;
-                const value = (input.type === 'number' ? Number(input.value) : input.value).trim();
+                let value = (input.type === 'number') ? Number(input.value) : input.value;
                 
-                if (field === 'Tombamento' && value && !normalizeStr(value).includes('permuta') && value.toLowerCase() !== 's/t') {
+                // Handle checkboxes
+                if (input.type === 'checkbox') {
+                    value = input.checked;
+                    if(input.classList.contains('st-checkbox')) {
+                        const tomboInput = row.querySelector('[data-field="Tombamento"]');
+                        if(value) { // checked
+                            tomboInput.value = 'S/T';
+                            tomboInput.disabled = true;
+                        } else {
+                            tomboInput.value = '';
+                            tomboInput.disabled = false;
+                        }
+                        // Trigger change on tombo input as well
+                        const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
+                        const updatedItem = { ...currentItem, Tombamento: tomboInput.value, isPermuta: row.querySelector('.permuta-checkbox').checked };
+                        dirtyItems.set(docId, updatedItem);
+                    }
+                } else {
+                     value = value.trim();
+                }
+
+                if (field === 'Tombamento' && value && !normalizeStr(value).includes('permuta') && value.toUpperCase() !== 'S/T') {
                     const duplicate = fullInventory.find(item => item.id !== docId && item.Tombamento === value);
                     if (duplicate) {
                         showNotification(`Atenção: Tombamento ${value} já alocado na unidade ${duplicate.Unidade}.`, 'warning', 5000);
@@ -2232,11 +2266,9 @@
 
                     if (!tomboValue) return showNotification('O campo Tombamento está vazio.', 'warning');
                     
-                    // CORREÇÃO: Usa o mapa com todos os itens do GIAP para a busca.
                     const giapItem = giapMapAllItems.get(tomboValue);
 
                     if (giapItem) {
-                        // AVISA sobre o status se não for 'Disponível', mas continua a operação.
                         const isAvailable = normalizeStr(giapItem.Status).includes(normalizeStr('Disponível'));
                         if (!isAvailable) {
                             showNotification(`Aviso: Tombo ${tomboValue} tem status '${giapItem.Status || 'N/D'}', não 'Disponível'.`, 'warning', 5000);
@@ -2253,31 +2285,21 @@
                         syncKeepDescBtn.dataset.docId = docId;
                         syncConfirmModal.classList.remove('hidden');
                     } else {
-                        // MENSAGEM DE ERRO CORRIGIDA: Agora mais precisa.
                         showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
                     }
                 } else if (button.classList.contains('delete-item-btn')) {
+                     currentDeleteItemIds = [docId];
+                    document.getElementById('delete-modal-title').textContent = 'Tem certeza que deseja excluir este item?';
                     document.getElementById('delete-item-info-edit').textContent = `${item.Descrição} (Tombo: ${item.Tombamento || 'S/T'})`;
-                    document.getElementById('confirm-delete-btn-edit').dataset.docId = docId;
                     deleteConfirmModal.classList.remove('hidden');
-                } else if (button.classList.contains('edit-item-btn')) { // NOVO: Ação do botão de editar
-                    const row = document.getElementById(`row-${docId}`);
-                    const firstInput = row.querySelector('input, select');
-                    if (firstInput) {
-                        firstInput.focus();
-                        firstInput.select();
-                        showNotification('Você pode editar os campos diretamente na tabela.', 'info');
-                    }
                 }
             });
-
 
             const handleSync = (docId, updateDescription) => {
                  const row = document.getElementById(`row-${docId}`);
                  if (!row) return;
 
                 const tomboValue = row.querySelector('[data-field="Tombamento"]').value.trim();
-                 // CORREÇÃO: Usa o mapa com todos os itens do GIAP.
                 const giapItem = giapMapAllItems.get(tomboValue);
                 if (!giapItem) return;
 
@@ -2317,22 +2339,36 @@
             syncKeepDescBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, false));
             syncCancelBtn.addEventListener('click', () => syncConfirmModal.classList.add('hidden'));
 
-            // NOVO: Listeners para exclusão
+            // Listener para exclusão (única e em massa)
             document.querySelector('.js-close-modal-delete').addEventListener('click', () => deleteConfirmModal.classList.add('hidden'));
-            document.getElementById('confirm-delete-btn-edit').addEventListener('click', async (e) => {
-                const docId = e.target.dataset.docId;
-                if (!docId) return;
+            document.getElementById('confirm-delete-btn-edit').addEventListener('click', async () => {
+                if (currentDeleteItemIds.length === 0) return;
 
-                showOverlay('Excluindo item...');
+                showOverlay(`Excluindo ${currentDeleteItemIds.length} item(s)...`);
+                
+                const batch = writeBatch(db);
+                currentDeleteItemIds.forEach(id => {
+                    batch.delete(doc(db, 'patrimonio', id));
+                });
+
                 try {
-                    await deleteDoc(doc(db, 'patrimonio', docId));
-                    await idb.metadata.clear(); // Força recarregamento do servidor
-                    showNotification('Item excluído com sucesso! Recarregando...', 'success');
-                    setTimeout(() => window.location.reload(), 1500);
+                    await batch.commit();
+                    
+                    // Remove from local inventory
+                    fullInventory = fullInventory.filter(item => !currentDeleteItemIds.includes(item.id));
+                    
+                    await idb.patrimonio.bulkDelete(currentDeleteItemIds);
+
+                    showNotification(`${currentDeleteItemIds.length} item(s) excluído(s)!`, 'success');
+                    renderEditableTable(); // Re-render without full reload
                 } catch (error) {
-                    hideOverlay();
-                    showNotification('Erro ao excluir o item.', 'error');
+                    showNotification('Erro ao excluir o(s) item(ns).', 'error');
                     console.error("Erro ao excluir:", error);
+                } finally {
+                    hideOverlay();
+                    deleteConfirmModal.classList.add('hidden');
+                    currentDeleteItemIds = [];
+                    updateBulkDeleteButton();
                 }
             });
 
@@ -2346,7 +2382,7 @@
 
             document.getElementById('add-item-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const newItem = {
+                const newItemData = {
                     Tombamento: document.getElementById('add-item-tombamento').value,
                     Descrição: document.getElementById('add-item-descricao').value,
                     Estado: document.getElementById('add-item-estado').value,
@@ -2354,18 +2390,24 @@
                     Tipo: document.getElementById('add-item-tipo').value,
                     Localização: '', Fornecedor: '', NF: '', 'Origem da Doação': '', Quantidade: 1,
                     Observação: 'Adicionado via edição rápida.',
+                    isPermuta: false,
                     createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                 };
                 try {
                     showOverlay('Salvando novo item...');
-                    await addDoc(collection(db, 'patrimonio'), newItem);
-                    await idb.metadata.clear();
-                    showNotification('Item adicionado com sucesso! Recarregando...', 'success');
-                    setTimeout(() => window.location.reload(), 1500);
+                    const docRef = await addDoc(collection(db, 'patrimonio'), newItemData);
+                    const newItemWithId = { ...newItemData, id: docRef.id };
+                    fullInventory.push(newItemWithId);
+                    await idb.patrimonio.add(newItemWithId);
+                    
+                    showNotification('Item adicionado com sucesso!', 'success');
+                    closeAddItemModal();
+                    renderEditableTable();
                 } catch (error) {
-                    hideOverlay();
                     showNotification('Erro ao adicionar item.', 'error');
                     console.error("Erro ao adicionar item:", error);
+                } finally {
+                    hideOverlay();
                 }
             });
 
@@ -2650,7 +2692,7 @@
                         Tipo: tipo, Unidade: unidade, Localização: '',
                         Fornecedor: giapItem['Nome Fornecedor'] || '', NF: giapItem.NF || '', 'Origem da Doação': '',
                         Estado: estado, Quantidade: 1, Observação: `Importado do GIAP. Unidade original: ${giapItem.Unidade || 'N/A'}`,
-                        etiquetaPendente: true,
+                        etiquetaPendente: true, isPermuta: false,
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItem);
@@ -2739,6 +2781,7 @@
                     const tombo = (i.Tombamento || '').trim().toLowerCase();
                     const isPending = linksToCreate.some(l => l.systemItem.id === i.id);
                     return !isPending &&
+                           !i.isPermuta &&
                            i.Unidade === unidade && 
                            (tombo === '' || tombo === 's/t') && 
                            normalizeStr(i.Descrição).includes(systemFilterText);
@@ -2876,7 +2919,7 @@
                             Tipo: massTransferTipo.value || '', Unidade: destinationUnit, Localização: '',
                             Fornecedor: giapItem['Nome Fornecedor'] || '', NF: giapItem.NF || '', 'Origem da Doação': '',
                             Estado: select.value, Quantidade: 1, Observação: `Importado em massa. Unidade GIAP: ${giapItem.Unidade || 'N/A'}`,
-                            etiquetaPendente: true,
+                            etiquetaPendente: true, isPermuta: false,
                             createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                         };
                         batch.set(newItemRef, newItem);
@@ -2963,6 +3006,7 @@
                         Quantidade: 1, Fornecedor: '', NF: '', 
                         Observação: 'Importado via substituição de planilha.',
                         etiquetaPendente: (item.TOMBO && item.TOMBO.toLowerCase() !== 's/t'),
+                        isPermuta: false,
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItemData);
@@ -3297,7 +3341,38 @@
                 document.getElementById('nf-date-end').value = '';
                 renderNfList();
             });
+
+            // Listeners para seleção em massa
+            function updateBulkDeleteButton() {
+                const selectedCount = editTableBody.querySelectorAll('.row-checkbox:checked').length;
+                deleteSelectedCount.textContent = selectedCount;
+                deleteSelectedBtn.classList.toggle('hidden', selectedCount === 0);
+            }
+
+            selectAllCheckbox.addEventListener('change', (e) => {
+                editTableBody.querySelectorAll('.row-checkbox').forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+                updateBulkDeleteButton();
+            });
+
+            editTableBody.addEventListener('change', (e) => {
+                if(e.target.classList.contains('row-checkbox')) {
+                    updateBulkDeleteButton();
+                }
+            });
+
+            deleteSelectedBtn.addEventListener('click', () => {
+                const selectedIds = [...editTableBody.querySelectorAll('.row-checkbox:checked')].map(cb => cb.dataset.docId);
+                if(selectedIds.length === 0) return;
+
+                currentDeleteItemIds = selectedIds;
+                document.getElementById('delete-modal-title').textContent = `Excluir ${selectedIds.length} itens?`;
+                document.getElementById('delete-item-info-edit').textContent = 'Esta ação não pode ser desfeita.';
+                deleteConfirmModal.classList.remove('hidden');
+            });
         });
     </script>
 </body>
 </html>
+
