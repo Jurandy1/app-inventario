@@ -501,7 +501,7 @@
 
                         <div id="edit-by-desc-results" class="hidden mt-6 border-t pt-4">
                              <h3 class="font-bold text-slate-700 mb-2">Pré-visualização das Atualizações (<span id="edit-by-desc-preview-count">0</span> itens)</h3>
-                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados ou a correspondência é ambígua. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso por outro item.</p>
+                             <p class="text-sm text-slate-600 mb-4">Revise as alterações. Itens em <span class="text-yellow-600 font-semibold">amarelo</span> não foram encontrados ou a correspondência é ambígua. Itens em <span class="text-red-600 font-semibold">vermelho</span> possuem um tombamento que já está em uso por outro item. Itens em <span class="text-orange-600 font-semibold">laranja</span> possuem um tombo que pertence a outra unidade no GIAP.</p>
                             <div id="edit-by-desc-preview-table-container" class="reconciliation-container overflow-y-auto space-y-2 p-2 bg-slate-50 border rounded-lg">
                                 <!-- A tabela de pré-visualização será inserida aqui -->
                             </div>
@@ -970,6 +970,59 @@
             const suggestionMap = new Map(scoredItems.map(si => [si.item.TOMBAMENTO, si.finalScore]));
             
             renderList(giapListId, scoredItems.map(si => si.item), 'TOMBAMENTO', 'Descrição', { suggestions: suggestionMap, topScore: topScore }, context);
+        }
+
+        function findBestMatchForItem(pastedItem, availableSystemItems) {
+            const pastedDescNorm = normalizeStr(pastedItem.descricao);
+            const pastedLocalNorm = normalizeStr(pastedItem.localizacao);
+            const pastedEstadoNorm = normalizeStr(pastedItem.estado);
+
+            // Prioriza itens que ainda não foram combinados
+            const findAndMark = (predicate) => {
+                const index = availableSystemItems.findIndex(wrapper => !wrapper.isMatched && predicate(wrapper.item));
+                if (index > -1) {
+                    availableSystemItems[index].isMatched = true;
+                    return availableSystemItems[index];
+                }
+                return null;
+            };
+
+            // Passo 1: Correspondência Perfeita (Descrição + Localização + Estado)
+            let wrapper = findAndMark(item => 
+                normalizeStr(item.Descrição) === pastedDescNorm &&
+                normalizeStr(item.Localização) === pastedLocalNorm &&
+                normalizeStr(item.Estado) === pastedEstadoNorm
+            );
+            if (wrapper) return { wrapper, matchType: 'Correspondência Perfeita' };
+            
+            // Passo 2: Confiança Alta (Descrição + Localização)
+            wrapper = findAndMark(item => 
+                normalizeStr(item.Descrição) === pastedDescNorm &&
+                normalizeStr(item.Localização) === pastedLocalNorm
+            );
+            if (wrapper) return { wrapper, matchType: 'Correspondência Alta (Descrição e Local)' };
+            
+            // Passo 3: Correspondência Exata de Descrição
+            wrapper = findAndMark(item => normalizeStr(item.Descrição) === pastedDescNorm);
+            if (wrapper) return { wrapper, matchType: 'Correspondência Exata (Descrição)' };
+
+            // Passo 4: Fallback por Similaridade
+            const potentialMatches = availableSystemItems
+                .filter(w => !w.isMatched)
+                .map(w => ({ wrapper: w, score: calculateSimilarity(w.item.Descrição, pastedItem.descricao) }))
+                .filter(match => match.score > 0.65)
+                .sort((a, b) => b.score - a.score);
+
+            if (potentialMatches.length > 0) {
+                if (potentialMatches.length > 1 && (potentialMatches[0].score - potentialMatches[1].score) < 0.1) {
+                    return { wrapper: null, matchType: 'Ambigua (Similaridade)' };
+                }
+                const bestMatch = potentialMatches[0];
+                bestMatch.wrapper.isMatched = true;
+                return { wrapper: bestMatch.wrapper, matchType: `Por Similaridade (${(bestMatch.score * 100).toFixed(0)}%)` };
+            }
+            
+            return { wrapper: null, matchType: 'Não Encontrado' };
         }
         
         // FIM DAS FUNÇÕES DE IA
@@ -2815,6 +2868,8 @@
                 if (!unidade) return showNotification('Selecione uma unidade de destino.', 'warning');
                 if (!data) return showNotification('Cole os dados da planilha.', 'warning');
 
+                const mappedGiapUnits = (unitMapping[unidade] || [unidade]).map(u => normalizeStr(u));
+
                 Papa.parse(data, {
                     header: true,
                     skipEmptyLines: true,
@@ -2844,47 +2899,31 @@
                                 return { id: rowIndex, status: 'empty_row' };
                             }
                             
-                            const potentialMatches = availableItems
-                                .filter(wrapper => !wrapper.isMatched)
-                                .map(wrapper => {
-                                    const systemDesc = (wrapper.item.Descrição || '').trim();
-                                    const systemLocal = (wrapper.item.Localização || '').trim();
-                                    const systemEstado = (wrapper.item.Estado || '').trim();
-
-                                    let score = calculateSimilarity(systemDesc, pastedDesc) * 100;
-                                    if (systemDesc === pastedDesc) score += 50; 
-                                    if (systemLocal === pastedLocal && pastedLocal) score += 15;
-                                    if (systemEstado === pastedEstado) score += 10;
-                                    
-                                    return { wrapper, score };
-                                })
-                                .filter(match => match.score > 60) 
-                                .sort((a, b) => b.score - a.score);
-
-                            let bestMatchWrapper = null;
-                            let matchType = 'not_found';
-                            
-                            if (potentialMatches.length > 0) {
-                                bestMatchWrapper = potentialMatches[0].wrapper;
-                                bestMatchWrapper.isMatched = true; 
-                                
-                                if (potentialMatches[0].score > 140) {
-                                    matchType = 'exact';
-                                } else if (potentialMatches.length > 1 && potentialMatches[0].score - potentialMatches[1].score < 10) {
-                                    matchType = 'ambiguous';
-                                } else {
-                                    matchType = 'possible';
-                                }
-                            }
+                            const pastedItemForMatching = { descricao: pastedDesc, localizacao: pastedLocal, estado: pastedEstado };
+                            const { wrapper: bestMatchWrapper, matchType } = findBestMatchForItem(pastedItemForMatching, availableItems);
                             
                             const systemItem = bestMatchWrapper ? bestMatchWrapper.item : null;
                             const giapItem = pastedTombo ? giapMap.get(pastedTombo) : null;
                             const tomboInUse = pastedTombo && pastedTombo !== 'S/T' && existingTombos.has(pastedTombo) && existingTombos.get(pastedTombo).id !== systemItem?.id;
                             
+                            let tomboWrongLocation = false;
+                            if (giapItem) {
+                                const giapUnitForTombo = normalizeStr(giapItem.Unidade);
+                                if (!mappedGiapUnits.includes(giapUnitForTombo)) {
+                                    tomboWrongLocation = true;
+                                }
+                            }
+
                             let status = 'ok';
-                            if (!systemItem) status = 'not_found';
-                            else if (matchType === 'ambiguous') status = 'multiple_found';
-                            else if (tomboInUse) status = 'tombo_in_use';
+                            if (!systemItem) {
+                                status = 'not_found';
+                            } else if (matchType.includes('Ambigua')) {
+                                status = 'multiple_found';
+                            } else if (tomboInUse) {
+                                status = 'tombo_in_use';
+                            } else if (tomboWrongLocation) {
+                                status = 'tombo_wrong_location';
+                            }
 
                             return {
                                 id: rowIndex,
@@ -2918,12 +2957,28 @@
                     let statusHtml = '';
 
                     switch(upd.status) {
-                        case 'not_found': rowClass = 'bg-yellow-100'; statusHtml = '<span class="font-bold text-yellow-700">Item não encontrado</span>'; break;
-                        case 'multiple_found': rowClass = 'bg-yellow-100'; statusHtml = '<span class="font-bold text-yellow-700">Correspondência ambígua</span>'; break;
-                        case 'tombo_in_use': rowClass = 'bg-red-100'; statusHtml = `<span class="font-bold text-red-700">Tombo já existe em:<br>${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`; break;
+                        case 'not_found': 
+                            rowClass = 'bg-yellow-100'; 
+                            statusHtml = `<span class="font-bold text-yellow-700">${upd.matchType}</span>`; 
+                            break;
+                        case 'multiple_found': 
+                            rowClass = 'bg-yellow-100'; 
+                            statusHtml = `<span class="font-bold text-yellow-700">${upd.matchType}</span>`; 
+                            break;
+                        case 'tombo_in_use': 
+                            rowClass = 'bg-red-100'; 
+                            statusHtml = `<span class="font-bold text-red-700">Tombo já existe em:<br>${escapeHtml(existingTombos.get(upd.pastedData.tombamento)?.Unidade)}</span>`; 
+                            break;
+                         case 'tombo_wrong_location':
+                            rowClass = 'bg-orange-100';
+                            statusHtml = `<span class="font-bold text-orange-700">Tombo em Local Errado</span><br>GIAP aponta para: <br><strong>${escapeHtml(upd.giapItem?.Unidade || 'N/A')}</strong>`;
+                            break;
                         case 'ok':
-                            if (upd.matchType === 'exact') statusHtml = '<span class="font-bold text-green-700">Correspondência Exata</span>';
-                            else statusHtml = '<span class="font-bold text-blue-700">Melhor Correspondência</span>';
+                            if (upd.matchType.includes('Perfeita') || upd.matchType.includes('Exata')) {
+                                statusHtml = `<span class="font-bold text-green-700">${upd.matchType}</span>`;
+                            } else {
+                                statusHtml = `<span class="font-bold text-blue-700">${upd.matchType}</span>`;
+                            }
                             
                             if(!upd.giapItem && upd.pastedData.tombamento && upd.pastedData.tombamento !== 'S/T') {
                                 statusHtml += '<br><span class="text-orange-600">Aviso: Tombo não localizado no GIAP.</span>';
@@ -3037,5 +3092,3 @@
     </script>
 </body>
 </html>
-
-
