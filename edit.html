@@ -574,7 +574,7 @@
             <div id="content-notas_fiscais" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
-                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha, com status de disponibilidade dos itens para o inventário.</p>
+                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha, com status de disponibilidade e localização dos itens no inventário.</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-4 border-b">
                         <div>
@@ -1602,29 +1602,34 @@
                         const tombo = item.TOMBAMENTO?.trim();
                         const allocatedItem = tombo ? tomboMap.get(tombo) : undefined;
                         const status = item.Status || 'N/D';
-                        const isAvailable = normalizeStr(status).includes(normalizeStr('Disponível'));
+                        const isAvailableForUse = normalizeStr(status).includes(normalizeStr('disponível'));
 
                         let statusHtml = '';
-                        let itemClass = 'bg-slate-50/50';
-                        let descClass = '';
-
-                        if (isAvailable) {
-                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Disponível</span>`;
-                        } else {
-                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">${escapeHtml(status)}</span>`;
-                            itemClass = 'bg-slate-100 opacity-70';
-                            descClass = 'line-through';
-                        }
-
+                        let itemClass = '';
                         let allocationHtml = '';
+                        let descClass = '';
+                        
                         if (allocatedItem) {
-                             allocationHtml = `
+                            // Encontrado no "Inventário Editável" - Verde
+                            itemClass = 'bg-green-50 border-green-200';
+                            allocationHtml = `
                                 <div>
-                                    <span class="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Alocado no Sistema</span>
+                                    <p class="px-2 py-1 text-xs font-bold text-green-800 bg-green-200 rounded-full text-center">ENCONTRADO</p>
                                     <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(allocatedItem.Unidade)}</strong></p>
+                                    <p class="text-xs text-slate-500 mt-1 text-right">(${escapeHtml(allocatedItem.Estado)})</p>
                                 </div>`;
-                        } else if (isAvailable) {
-                            allocationHtml = `<div><span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Não Alocado</span></div>`;
+                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Status GIAP: ${escapeHtml(status)}</span>`;
+                        } else if (isAvailableForUse) {
+                            // Não encontrado, mas disponível no GIAP - Amarelo
+                            itemClass = 'bg-yellow-50 border-yellow-200';
+                            allocationHtml = `<p class="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full text-center">NÃO ALOCADO</p>`;
+                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Disponível para uso</span>`;
+                        } else {
+                            // Não encontrado e não disponível - Cinza
+                            itemClass = 'bg-slate-100 opacity-60';
+                            descClass = 'line-through';
+                            allocationHtml = `<p class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full text-center">NÃO ALOCADO</p>`;
+                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Indisponível (${escapeHtml(status)})</span>`;
                         }
                         
                         const itemDiv = document.createElement('div');
@@ -1638,7 +1643,7 @@
                                 <p class="text-xs text-slate-500">Valor</p>
                                 <p class="font-semibold text-green-700">${itemValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                             </div>
-                            <div class="text-right ml-4 space-y-1.5 min-w-[120px]">
+                            <div class="text-right ml-4 space-y-1.5 min-w-[150px]">
                                 ${statusHtml}
                                 ${allocationHtml}
                             </div>
