@@ -574,7 +574,7 @@
             <div id="content-notas_fiscais" class="hidden fade-in">
                 <div class="card">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
-                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, agrupadas por categoria. Verifique quais itens já foram alocados no inventário.</p>
+                    <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha, com status de disponibilidade dos itens para o inventário.</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-4 border-b">
                         <div>
@@ -631,6 +631,7 @@
                                     <th class="p-3 text-left font-semibold">Unidade</th>
                                     <th class="p-3 text-left font-semibold">Valor NF</th>
                                     <th class="p-3 text-left font-semibold">Espécie</th>
+                                    <th class="p-3 text-left font-semibold">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="giap-table-body"></tbody>
@@ -834,6 +835,10 @@
         const normalizeStr = (str) => (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
         const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>func.apply(this,a),delay);}};
         const escapeHtml = (unsafe) => (unsafe === undefined || unsafe === null) ? '' : unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        const parseCurrency = (value) => {
+            if (typeof value !== 'string' || value.trim() === '') return 0;
+            return parseFloat(value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+        };
         
         // --- NOVAS FUNÇÕES DE SIMILARIDADE E IA ---
         function levenshteinDistance(s1, s2) {
@@ -1144,7 +1149,8 @@
                     return;
                 }
             }
-            // MODIFICAÇÃO: O giapMap principal agora contém APENAS itens disponíveis para as ferramentas ativas.
+            
+            // ATUALIZAÇÃO CRÍTICA: O giapMap principal agora contém APENAS itens disponíveis para as ferramentas ativas.
             giapMap = new Map(giapInventory
                 .filter(item => normalizeStr(item.Status).includes(normalizeStr('Disponível')))
                 .map(item => [normalizeTombo(item['TOMBAMENTO']), item])
@@ -1463,8 +1469,15 @@
             if (!dateStr || typeof dateStr !== 'string') return new Date(0); 
             const parts = dateStr.split('/');
             if (parts.length === 3) {
+                // Formato DD/MM/AAAA
                 return new Date(parts[2], parts[1] - 1, parts[0]);
             }
+            // Tenta formato AAAA-MM-DD (de input type="date")
+            const isoParts = dateStr.split('-');
+            if(isoParts.length === 3) {
+                return new Date(isoParts[0], isoParts[1] - 1, isoParts[2]);
+            }
+
             return new Date(0);
         }
 
@@ -1504,10 +1517,10 @@
             const startDateStr = document.getElementById('nf-date-start').value;
             const endDateStr = document.getElementById('nf-date-end').value;
 
-            const startDate = startDateStr ? new Date(startDateStr) : null;
-            const endDate = endDateStr ? new Date(endDateStr) : null;
-            if (endDate) { endDate.setHours(23, 59, 59, 999); }
-            if (startDate) { startDate.setHours(0, 0, 0, 0); }
+            // Adiciona um dia ao final para incluir o dia inteiro
+            const startDate = startDateStr ? parsePtBrDate(startDateStr) : null;
+            let endDate = endDateStr ? parsePtBrDate(endDateStr) : null;
+            if (endDate) { endDate.setDate(endDate.getDate() + 1); }
 
             const filteredNfs = Object.keys(processedNfData).filter(nf => {
                 const nfGroup = processedNfData[nf];
@@ -1524,11 +1537,11 @@
                     if (!itemMatch) return false;
                 }
 
-                if (nfTipoEntrada && nfGroup.tipoEntrada !== nfTipoEntrada) return false;
+                if (nfTipoEntrada && (nfGroup.tipoEntrada || '').trim() !== nfTipoEntrada) return false;
                 
                 const nfDate = parsePtBrDate(nfGroup.dataCadastro);
                 if (startDate && nfDate < startDate) return false;
-                if (endDate && nfDate > endDate) return false;
+                if (endDate && nfDate >= endDate) return false;
                 
                 return true;
             });
@@ -1557,6 +1570,7 @@
 
                 const nfsInCategory = categorizedNfs[category];
                 nfsInCategory.forEach(nf => {
+                    let totalNfValue = 0;
                     const nfGroup = processedNfData[nf];
                     const nfDetails = document.createElement('details');
                     nfDetails.className = 'bg-white rounded-lg shadow-sm border mb-3 border-t-0 rounded-t-none';
@@ -1582,6 +1596,9 @@
                     itemsListContainer.className = 'p-4 border-t border-slate-200 space-y-2';
 
                     nfGroup.items.forEach(item => {
+                        const itemValue = parseCurrency(item['Valor NF']);
+                        totalNfValue += itemValue;
+
                         const tombo = item.TOMBAMENTO?.trim();
                         const allocatedItem = tombo ? tomboMap.get(tombo) : undefined;
                         const status = item.Status || 'N/D';
@@ -1611,19 +1628,32 @@
                         }
                         
                         const itemDiv = document.createElement('div');
-                        itemDiv.className = `p-3 border rounded-md flex justify-between items-center ${itemClass}`;
+                        itemDiv.className = `p-3 border rounded-md flex justify-between items-start gap-4 ${itemClass}`;
                         itemDiv.innerHTML = `
                             <div class="flex-1">
                                 <p class="font-bold text-slate-800 ${descClass}">${escapeHtml(item.Descrição || item.Espécie)}</p>
                                 <p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p>
                             </div>
-                            <div class="text-right ml-4 space-y-1.5">
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">Valor</p>
+                                <p class="font-semibold text-green-700">${itemValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            </div>
+                            <div class="text-right ml-4 space-y-1.5 min-w-[120px]">
                                 ${statusHtml}
                                 ${allocationHtml}
                             </div>
                         `;
                         itemsListContainer.appendChild(itemDiv);
                     });
+
+                    // Adiciona o valor total da nota
+                    const totalDiv = document.createElement('div');
+                    totalDiv.className = 'p-3 border-t-2 mt-2 font-bold text-slate-800 flex justify-between items-center';
+                    totalDiv.innerHTML = `
+                        <span>VALOR TOTAL DA NOTA</span>
+                        <span>${totalNfValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    `;
+                    itemsListContainer.appendChild(totalDiv);
 
                     nfDetails.appendChild(itemsListContainer);
                     container.appendChild(nfDetails);
@@ -1633,7 +1663,7 @@
 
 
         function populateGiapTab() {
-            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie'];
+            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie', 'Status'];
             giapTableBody.innerHTML = giapInventory.map(item => `<tr class="border-b">${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}</tr>`).join('');
         }
         
@@ -1710,7 +1740,7 @@
                     const dataCadastro = escapeHtml(item.Cadastro || 'N/D');
                     const fornecedor = escapeHtml(item['Nome Fornecedor'] || 'N/D');
                     const tombo = escapeHtml(item[keyField]);
-                    const valorNf = escapeHtml(item['Valor NF'] || 'N/A');
+                    const valorNf = parseCurrency(item['Valor NF']).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
                     const nf = escapeHtml(item['NF'] || 'N/A');
                     detailsHtml = `
                         <div class="flex justify-between items-start">
@@ -2110,7 +2140,7 @@
                     syncConfirmModal.classList.remove('hidden');
 
                 } else {
-                    showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
+                    showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP ou não está 'Disponível'.`, 'error');
                 }
             });
 
