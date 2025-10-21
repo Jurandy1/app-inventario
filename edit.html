@@ -1140,7 +1140,11 @@
                     return;
                 }
             }
-            giapMap = new Map(giapInventory.map(item => [normalizeTombo(item['TOMBAMENTO']), item]));
+            // MODIFICAÇÃO: O giapMap principal agora contém APENAS itens disponíveis para as ferramentas ativas.
+            giapMap = new Map(giapInventory
+                .filter(item => normalizeStr(item.Status).includes(normalizeStr('Disponível')))
+                .map(item => [normalizeTombo(item['TOMBAMENTO']), item])
+            );
             
             normalizedSystemUnits.clear();
             fullInventory.forEach(item => {
@@ -1572,29 +1576,42 @@
 
                     nfGroup.items.forEach(item => {
                         const tombo = item.TOMBAMENTO?.trim();
-                        const allocatedItem = tombo ? giapMap.get(tombo) : undefined;
-                        
-                        let allocationHtml = `<span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Não Alocado</span>`;
-                        if (allocatedItem) {
-                            const systemItem = fullInventory.find(i => i.Tombamento?.trim() === tombo);
-                             if (systemItem) {
-                                allocationHtml = `
-                                    <div>
-                                        <span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado</span>
-                                        <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(systemItem.Unidade)}</strong> (${escapeHtml(systemItem.Tipo)})</p>
-                                    </div>
-                                `;
-                             }
+                        const allocatedItem = tombo ? tomboMap.get(tombo) : undefined;
+                        const status = item.Status || 'N/D';
+                        const isAvailable = normalizeStr(status).includes(normalizeStr('Disponível'));
+
+                        let statusHtml = '';
+                        let itemClass = 'bg-slate-50/50';
+                        let descClass = '';
+
+                        if (isAvailable) {
+                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Disponível</span>`;
+                        } else {
+                            statusHtml = `<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">${escapeHtml(status)}</span>`;
+                            itemClass = 'bg-slate-100 opacity-70';
+                            descClass = 'line-through';
                         }
 
+                        let allocationHtml = '';
+                        if (allocatedItem) {
+                             allocationHtml = `
+                                <div>
+                                    <span class="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Alocado no Sistema</span>
+                                    <p class="text-xs text-slate-600 mt-1 text-right">→ <strong>${escapeHtml(allocatedItem.Unidade)}</strong></p>
+                                </div>`;
+                        } else if (isAvailable) {
+                            allocationHtml = `<div><span class="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-200 rounded-full">Não Alocado</span></div>`;
+                        }
+                        
                         const itemDiv = document.createElement('div');
-                        itemDiv.className = 'p-3 border rounded-md flex justify-between items-center bg-slate-50/50';
+                        itemDiv.className = `p-3 border rounded-md flex justify-between items-center ${itemClass}`;
                         itemDiv.innerHTML = `
                             <div class="flex-1">
-                                <p class="font-bold text-slate-800">${escapeHtml(item.Descrição || item.Espécie)}</p>
+                                <p class="font-bold text-slate-800 ${descClass}">${escapeHtml(item.Descrição || item.Espécie)}</p>
                                 <p class="text-sm text-slate-500">Tombamento: <span class="font-mono">${escapeHtml(tombo || 'N/D')}</span></p>
                             </div>
-                            <div class="text-right ml-4">
+                            <div class="text-right ml-4 space-y-1.5">
+                                ${statusHtml}
                                 ${allocationHtml}
                             </div>
                         `;
@@ -1734,9 +1751,10 @@
             const usedTombamentos = new Set(fullInventory.map(i => normalizeTombo(i.Tombamento)).filter(Boolean));
             linksToCreate.forEach(link => usedTombamentos.add(normalizeTombo(link.giapItem.TOMBAMENTO)));
             
+            // Apenas sobras 'Disponíveis'
             return giapInventory.filter(g => {
                 const tombo = normalizeTombo(g.TOMBAMENTO);
-                return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo);
+                return tombo && !tombo.includes('permuta') && !usedTombamentos.has(tombo) && normalizeStr(g.Status).includes(normalizeStr('Disponível'));
             });
         }
         
@@ -1760,13 +1778,15 @@
                        (tombo === '' || tombo === 's/t') &&
                        normalizeStr(i.Descrição).includes(systemFilterText);
             });
-
+            
+            // Apenas itens do GIAP 'Disponíveis'
             const giapItems = giapInventory.filter(g => {
                 const tomboTrimmed = normalizeTombo(g.TOMBAMENTO);
                 const giapDesc = normalizeStr(g.Descrição || g.Espécie);
                 return tomboTrimmed && 
                        !usedTombamentos.has(tomboTrimmed) && 
                        mappedGiapUnits.map(normalizeStr).includes(normalizeStr(g.Unidade)) &&
+                       normalizeStr(g.Status).includes(normalizeStr('Disponível')) &&
                        giapDesc.includes(giapFilterText);
             });
 
