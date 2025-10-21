@@ -622,16 +622,7 @@
                         <table class="w-full text-sm min-w-[1800px]">
                             <thead class="bg-slate-100 sticky top-0">
                                 <tr>
-                                    <th class="p-3 text-left font-semibold">TOMBAMENTO</th>
-                                    <th class="p-3 text-left font-semibold">Descrição</th>
-                                    <th class="p-3 text-left font-semibold">Cadastro</th>
-                                    <th class="p-3 text-left font-semibold">NF</th>
-                                    <th class="p-3 text-left font-semibold">Nome Fornecedor</th>
-                                    <th class="p-3 text-left font-semibold">Tipo Entrada</th>
-                                    <th class="p-3 text-left font-semibold">Unidade</th>
-                                    <th class="p-3 text-left font-semibold">Valor NF</th>
-                                    <th class="p-3 text-left font-semibold">Espécie</th>
-                                    <th class="p-3 text-left font-semibold">Status</th>
+                                    <!-- Headers will be populated by JS -->
                                 </tr>
                             </thead>
                             <tbody id="giap-table-body"></tbody>
@@ -739,6 +730,22 @@
         </div>
     </div>
     
+    <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (NOVO) -->
+    <div id="delete-confirm-modal-edit" class="modal fixed inset-0 z-[70] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black/60"></div>
+        <div class="modal-container bg-white w-full max-w-md rounded-lg shadow-2xl flex flex-col transform scale-95">
+            <div class="p-6 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-red-500 w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 class="mb-5 text-lg font-normal text-gray-600">Tem certeza que deseja excluir este item?</h3>
+                <p id="delete-item-info-edit" class="mb-5 text-sm font-bold text-gray-800"></p>
+                <button id="confirm-delete-btn-edit" type="button" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 mr-2">Sim, excluir</button>
+                <button type="button" class="js-close-modal-delete bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Full Page Overlay for saving -->
     <div id="full-page-overlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
         <div class="text-center text-white">
@@ -826,6 +833,9 @@
         const syncUpdateAllBtn = document.getElementById('sync-update-all-btn');
         const syncKeepDescBtn = document.getElementById('sync-keep-desc-btn');
         const syncCancelBtn = document.getElementById('sync-cancel-btn');
+        
+        // Modal de Exclusão
+        const deleteConfirmModal = document.getElementById('delete-confirm-modal-edit');
 
         // Modal de escolha de descrição
         const descChoiceModal = document.getElementById('desc-choice-modal');
@@ -1258,9 +1268,14 @@
                 const cells = headers.map(h => {
                     if (h === 'Ações') {
                         return `<td class="p-2 border-b">
-                                    <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
-                                    </button>
+                                    <div class="flex items-center gap-1">
+                                        <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
+                                        </button>
+                                        <button title="Excluir Item" class="delete-item-btn p-2 rounded-md hover:bg-red-100 text-red-600" data-doc-id="${item.id}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3h11V2h-11v1z"/></svg>
+                                        </button>
+                                    </div>
                                 </td>`;
                     }
                     if (h === 'Estado') return `<td class="p-2 border-b">${estadoSelect}</td>`;
@@ -1668,8 +1683,34 @@
 
 
         function populateGiapTab() {
-            const headers = ['TOMBAMENTO', 'Descrição', 'Cadastro', 'NF', 'Nome Fornecedor', 'Tipo Entrada', 'Unidade', 'Valor NF', 'Espécie', 'Status'];
-            giapTableBody.innerHTML = giapInventory.map(item => `<tr class="border-b">${headers.map(h => `<td class="p-2 text-slate-700">${escapeHtml(item[h])}</td>`).join('')}</tr>`).join('');
+            const headers = ['TOMBAMENTO', 'Descrição', 'Unidade', 'Status', 'Alocação', 'Cadastro', 'NF', 'Nome Fornecedor'];
+            const thead = giapTableBody.closest('table').querySelector('thead tr');
+            thead.innerHTML = headers.map(h => `<th class="p-3 text-left font-semibold">${h}</th>`).join('');
+
+            const tomboMap = new Map(fullInventory.map(item => [normalizeTombo(item.Tombamento), item]));
+            
+            giapTableBody.innerHTML = giapInventory.map(item => {
+                const tombo = normalizeTombo(item.TOMBAMENTO);
+                const allocatedItem = tomboMap.get(tombo);
+                
+                let alocacaoHtml = `<span class="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">Não Alocado</span>`;
+                if (allocatedItem) {
+                    alocacaoHtml = `<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Alocado em: <strong>${escapeHtml(allocatedItem.Unidade)}</strong></span>`;
+                }
+
+                const cells = {
+                    'TOMBAMENTO': escapeHtml(item.TOMBAMENTO),
+                    'Descrição': escapeHtml(item.Descrição),
+                    'Unidade': escapeHtml(item.Unidade),
+                    'Status': escapeHtml(item.Status),
+                    'Alocação': alocacaoHtml,
+                    'Cadastro': escapeHtml(item.Cadastro),
+                    'NF': escapeHtml(item.NF),
+                    'Nome Fornecedor': escapeHtml(item['Nome Fornecedor'])
+                };
+
+                return `<tr class="border-b hover:bg-slate-50">${headers.map(h => `<td class="p-2">${cells[h] || ''}</td>`).join('')}</tr>`;
+            }).join('');
         }
         
         function populateImportAndReplaceTab() {
@@ -2114,40 +2155,43 @@
                 saveAllChangesBtn.disabled = false;
             });
 
-            document.getElementById('edit-table-body').addEventListener('click', (e) => {
-                const syncBtn = e.target.closest('.sync-giap-btn');
-                if (!syncBtn) return;
+            editTableBody.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
 
-                const docId = syncBtn.dataset.docId;
-                const row = document.getElementById(`row-${docId}`);
-                if (!row) return;
+                const docId = button.dataset.docId;
+                const item = fullInventory.find(i => i.id === docId);
+                if (!item) return;
 
-                const tomboInput = row.querySelector('[data-field="Tombamento"]');
-                const tomboValue = tomboInput.value.trim();
+                if (button.classList.contains('sync-giap-btn')) {
+                    const row = document.getElementById(`row-${docId}`);
+                    const tomboInput = row.querySelector('[data-field="Tombamento"]');
+                    const tomboValue = tomboInput.value.trim();
 
-                if (!tomboValue) {
-                    showNotification('O campo Tombamento está vazio.', 'warning');
-                    return;
-                }
-                const giapItem = giapMap.get(tomboValue);
-
-                if (giapItem) {
-                    const currentDesc = row.querySelector('[data-field="Descrição"]').value;
-                    const newDesc = giapItem.Descrição || giapItem.Espécie || '';
+                    if (!tomboValue) return showNotification('O campo Tombamento está vazio.', 'warning');
                     
-                    document.getElementById('sync-item-tombo').textContent = tomboValue;
-                    document.getElementById('sync-current-desc').textContent = currentDesc;
-                    document.getElementById('sync-new-desc').textContent = newDesc;
-                    
-                    syncUpdateAllBtn.dataset.docId = docId;
-                    syncKeepDescBtn.dataset.docId = docId;
-
-                    syncConfirmModal.classList.remove('hidden');
-
-                } else {
-                    showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP ou não está 'Disponível'.`, 'error');
+                    const giapItem = giapMap.get(tomboValue);
+                    if (giapItem) {
+                        const currentDesc = row.querySelector('[data-field="Descrição"]').value;
+                        const newDesc = giapItem.Descrição || giapItem.Espécie || '';
+                        
+                        document.getElementById('sync-item-tombo').textContent = tomboValue;
+                        document.getElementById('sync-current-desc').textContent = currentDesc;
+                        document.getElementById('sync-new-desc').textContent = newDesc;
+                        
+                        syncUpdateAllBtn.dataset.docId = docId;
+                        syncKeepDescBtn.dataset.docId = docId;
+                        syncConfirmModal.classList.remove('hidden');
+                    } else {
+                        showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP ou não está 'Disponível'.`, 'error');
+                    }
+                } else if (button.classList.contains('delete-item-btn')) {
+                    document.getElementById('delete-item-info-edit').textContent = `${item.Descrição} (Tombo: ${item.Tombamento || 'S/T'})`;
+                    document.getElementById('confirm-delete-btn-edit').dataset.docId = docId;
+                    deleteConfirmModal.classList.remove('hidden');
                 }
             });
+
 
             const handleSync = (docId, updateDescription) => {
                  const row = document.getElementById(`row-${docId}`);
@@ -2192,6 +2236,25 @@
             syncUpdateAllBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, true));
             syncKeepDescBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, false));
             syncCancelBtn.addEventListener('click', () => syncConfirmModal.classList.add('hidden'));
+
+            // NOVO: Listeners para exclusão
+            document.querySelector('.js-close-modal-delete').addEventListener('click', () => deleteConfirmModal.classList.add('hidden'));
+            document.getElementById('confirm-delete-btn-edit').addEventListener('click', async (e) => {
+                const docId = e.target.dataset.docId;
+                if (!docId) return;
+
+                showOverlay('Excluindo item...');
+                try {
+                    await deleteDoc(doc(db, 'patrimonio', docId));
+                    await idb.metadata.clear(); // Força recarregamento do servidor
+                    showNotification('Item excluído com sucesso! Recarregando...', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch (error) {
+                    hideOverlay();
+                    showNotification('Erro ao excluir o item.', 'error');
+                    console.error("Erro ao excluir:", error);
+                }
+            });
 
 
             document.getElementById('add-item-to-unit-btn').addEventListener('click', () => {
