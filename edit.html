@@ -788,6 +788,7 @@
 
         let fullInventory = [], giapInventory = [], customGiapUnits = [];
         let giapMap = new Map();
+        let giapMapAllItems = new Map(); // NOVO: Mapa com todos os itens do GIAP
         let unitMapping = {};
         let dirtyItems = new Map();
         let normalizedSystemUnits = new Map();
@@ -1165,6 +1166,8 @@
                 .filter(item => normalizeStr(item.Status).includes(normalizeStr('Disponível')))
                 .map(item => [normalizeTombo(item['TOMBAMENTO']), item])
             );
+            // CORREÇÃO: Cria um mapa com TODOS os itens do GIAP para a função de sincronização.
+            giapMapAllItems = new Map(giapInventory.map(item => [normalizeTombo(item['TOMBAMENTO']), item]));
             
             normalizedSystemUnits.clear();
             fullInventory.forEach(item => {
@@ -1267,8 +1270,12 @@
                 
                 const cells = headers.map(h => {
                     if (h === 'Ações') {
+                        // NOVO: Adicionado botão de edição
                         return `<td class="p-2 border-b">
                                     <div class="flex items-center gap-1">
+                                        <button title="Editar Item" class="edit-item-btn p-2 rounded-md hover:bg-yellow-100 text-yellow-700" data-doc-id="${item.id}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
+                                        </button>
                                         <button title="Sincronizar com GIAP" class="sync-giap-btn p-2 rounded-md hover:bg-blue-100 text-blue-600" data-doc-id="${item.id}">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="pointer-events-none" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z m-6.534 8.25.042.033a.25.25 0 0 1 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192V11.53a.25.25 0 0 1 .41-.192l2.36 1.966a.25.25 0 0 1-.042.033z"/></svg>
                                         </button>
@@ -2170,8 +2177,16 @@
 
                     if (!tomboValue) return showNotification('O campo Tombamento está vazio.', 'warning');
                     
-                    const giapItem = giapMap.get(tomboValue);
+                    // CORREÇÃO: Usa o mapa com todos os itens do GIAP para a busca.
+                    const giapItem = giapMapAllItems.get(tomboValue);
+
                     if (giapItem) {
+                        // AVISA sobre o status se não for 'Disponível', mas continua a operação.
+                        const isAvailable = normalizeStr(giapItem.Status).includes(normalizeStr('Disponível'));
+                        if (!isAvailable) {
+                            showNotification(`Aviso: Tombo ${tomboValue} tem status '${giapItem.Status || 'N/D'}', não 'Disponível'.`, 'warning', 5000);
+                        }
+                        
                         const currentDesc = row.querySelector('[data-field="Descrição"]').value;
                         const newDesc = giapItem.Descrição || giapItem.Espécie || '';
                         
@@ -2183,12 +2198,21 @@
                         syncKeepDescBtn.dataset.docId = docId;
                         syncConfirmModal.classList.remove('hidden');
                     } else {
-                        showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP ou não está 'Disponível'.`, 'error');
+                        // MENSAGEM DE ERRO CORRIGIDA: Agora mais precisa.
+                        showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
                     }
                 } else if (button.classList.contains('delete-item-btn')) {
                     document.getElementById('delete-item-info-edit').textContent = `${item.Descrição} (Tombo: ${item.Tombamento || 'S/T'})`;
                     document.getElementById('confirm-delete-btn-edit').dataset.docId = docId;
                     deleteConfirmModal.classList.remove('hidden');
+                } else if (button.classList.contains('edit-item-btn')) { // NOVO: Ação do botão de editar
+                    const row = document.getElementById(`row-${docId}`);
+                    const firstInput = row.querySelector('input, select');
+                    if (firstInput) {
+                        firstInput.focus();
+                        firstInput.select();
+                        showNotification('Você pode editar os campos diretamente na tabela.', 'info');
+                    }
                 }
             });
 
@@ -2198,7 +2222,8 @@
                  if (!row) return;
 
                 const tomboValue = row.querySelector('[data-field="Tombamento"]').value.trim();
-                const giapItem = giapMap.get(tomboValue);
+                 // CORREÇÃO: Usa o mapa com todos os itens do GIAP.
+                const giapItem = giapMapAllItems.get(tomboValue);
                 if (!giapItem) return;
 
                 const descInput = row.querySelector('[data-field="Descrição"]');
