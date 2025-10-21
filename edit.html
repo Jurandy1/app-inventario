@@ -800,8 +800,7 @@
             giap: '++_id, TOMBAMENTO, *Unidade',
             metadata: 'key' 
         });
-        
-        const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // Cache de 24 horas
+        const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // Aumentado para 6 horas
 
         let fullInventory = [], giapInventory = [], customGiapUnits = [];
         let giapMap = new Map();
@@ -1209,7 +1208,6 @@
             feedbackStatus.textContent = `Pronto. ${fullInventory.length} itens carregados.`;
             initializeUI();
             loadingScreen.classList.add('hidden');
-            mostrarInfoCache();
         }
         
         async function loadUnitMappingFromFirestore() {
@@ -1254,25 +1252,6 @@
             });
         }
         
-        async function mostrarInfoCache() {
-            try {
-                const metadata = await idb.metadata.get('lastFetch');
-                const statusEl = document.getElementById('feedback-status');
-                if (!metadata || !statusEl) return;
-                
-                const agora = Date.now();
-                const tempoDecorrido = agora - metadata.timestamp;
-                const horas = Math.floor(tempoDecorrido / (60 * 60 * 1000));
-                const minutos = Math.floor((tempoDecorrido % (60 * 60 * 1000)) / (60 * 1000));
-                
-                let statusHTML = `Cache local ativo <span class="text-xs text-gray-500">(atualizado há ${horas}h ${minutos}min)</span>`;
-                statusEl.innerHTML = statusHTML;
-                
-            } catch (error) {
-                console.error('Erro ao mostrar info do cache:', error);
-            }
-        }
-
         function initializeUI() {
             populateEditableInventoryTab();
             populateUnitMappingTab();
@@ -1284,23 +1263,8 @@
         }
 
         function renderEditableTable() {
-            const unidade = editFilterUnidade.value;
-            // Otimização: Se nenhuma unidade for selecionada, mostra uma mensagem e para.
-            if (!unidade) {
-                editTableBody.innerHTML = `<tr><td colspan="14" class="text-center p-10 text-slate-500 font-semibold">
-                    Para começar, por favor, selecione um "Tipo" e uma "Unidade" nos filtros acima.
-                </td></tr>`;
-                document.getElementById('unit-item-count').textContent = '';
-                const addItemBtn = document.getElementById('add-item-to-unit-btn');
-                if (addItemBtn) addItemBtn.classList.add('hidden');
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.disabled = true;
-                updateBulkDeleteButton();
-                return;
-            }
-            selectAllCheckbox.disabled = false;
-
             const tipo = editFilterTipo.value;
+            const unidade = editFilterUnidade.value;
             const estado = editFilterEstado.value;
             const desc = normalizeStr(editFilterDescricao.value);
             
@@ -1319,7 +1283,8 @@
             const addItemBtn = document.getElementById('add-item-to-unit-btn');
             addItemBtn.classList.toggle('hidden', !unidade);
             
-            const itemsToRender = filtered;
+            const isSpecificFilterApplied = !!(unidade || desc || estado || tipo);
+            const itemsToRender = isSpecificFilterApplied ? filtered : filtered;
 
             const estadoOptions = ['Bom', 'Regular', 'Avariado', 'Novo'];
             
@@ -1381,7 +1346,7 @@
                         }
                     });
                 const unidades = [...unidadesMap.values()].sort((a, b) => a.localeCompare(b));
-                editFilterUnidade.innerHTML = '<option value="">Selecione uma Unidade</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+                editFilterUnidade.innerHTML = '<option value="">Todas as Unidades</option>' + unidades.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
             };
 
             const tiposMap = new Map();
@@ -1404,7 +1369,7 @@
             editFilterEstado.onchange = renderEditableTable;
             editFilterDescricao.oninput = debouncedRenderTable;
             updateUnidades();
-            renderEditableTable(); // Chamada inicial que agora mostrará a mensagem de seleção
+            renderEditableTable();
         }
 
         function populateUnitMappingTab() {
@@ -2192,51 +2157,6 @@
             container.innerHTML = html;
         }
 
-        // --- SISTEMA DUAL-WRITE PARA SINCRONIZAÇÃO ---
-        async function atualizarItemCompleto(itemId, updates) {
-            try {
-                // 1. Write to Firestore
-                await updateDoc(doc(db, 'patrimonio', itemId), { ...updates, updatedAt: serverTimestamp() });
-
-                // 2. Update Dexie cache
-                await idb.patrimonio.update(itemId, updates);
-
-                // 3. Update in-memory array
-                const index = fullInventory.findIndex(i => i.id === itemId);
-                if (index !== -1) {
-                    fullInventory[index] = { ...fullInventory[index], ...updates };
-                }
-                return { success: true };
-            } catch (error) {
-                console.error(`Erro ao atualizar item ${itemId}:`, error);
-                return { success: false, error };
-            }
-        }
-
-        async function excluirMultiplosCompleto(itemIds) {
-             if (itemIds.length === 0) return { success: true, count: 0 };
-            try {
-                showOverlay(`Excluindo ${itemIds.length} item(s)...`);
-                
-                const batch = writeBatch(db);
-                itemIds.forEach(id => {
-                    batch.delete(doc(db, 'patrimonio', id));
-                });
-                await batch.commit();
-
-                await idb.patrimonio.bulkDelete(itemIds);
-                
-                fullInventory = fullInventory.filter(i => !itemIds.includes(i.id));
-
-                hideOverlay();
-                return { success: true, count: itemIds.length };
-            } catch (error) {
-                hideOverlay();
-                console.error(`Erro ao excluir ${itemIds.length} itens:`, error);
-                return { success: false, error };
-            }
-        }
-
 
         // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -2255,29 +2175,27 @@
                 if (dirtyItems.size === 0) return;
                 showOverlay(`Salvando ${dirtyItems.size} alterações...`);
                 const batch = writeBatch(db);
-                const itemsParaCache = [];
-                
                 dirtyItems.forEach((item, id) => {
-                    const { id: itemId, ...itemData } = item; // Remove ID from data object
                     const docRef = doc(db, 'patrimonio', id);
-                    const updateData = { ...itemData, updatedAt: serverTimestamp() };
-                    batch.update(docRef, updateData);
-                    itemsParaCache.push(item);
+                    batch.update(docRef, {...item, updatedAt: serverTimestamp()});
                 });
 
                 try {
                     await batch.commit();
-                    await idb.patrimonio.bulkPut(itemsParaCache);
 
-                    itemsParaCache.forEach(updatedItem => {
-                        const index = fullInventory.findIndex(item => item.id === updatedItem.id);
+                    const itemsToCache = [];
+                    dirtyItems.forEach((updates, id) => {
+                        const index = fullInventory.findIndex(item => item.id === id);
                         if (index !== -1) {
-                            fullInventory[index] = { ...fullInventory[index], ...updatedItem };
+                            fullInventory[index] = { ...fullInventory[index], ...updates };
+                            itemsToCache.push(fullInventory[index]);
                         }
                     });
-                    
+                    if (itemsToCache.length > 0) {
+                        await idb.patrimonio.bulkPut(itemsToCache);
+                    }
                     dirtyItems.clear();
-                    showNotification(`${itemsParaCache.length} alterações salvas!`, 'success');
+                    showNotification(`${itemsToCache.length} alterações salvas!`, 'success');
                     saveAllChangesBtn.disabled = true;
                     renderEditableTable();
                 } catch (error) {
@@ -2297,15 +2215,21 @@
                 const field = input.dataset.field;
                 let value = (input.type === 'number') ? Number(input.value) : input.value;
                 
+                // Handle checkboxes
                 if (input.type === 'checkbox') {
                     value = input.checked;
-                    if (input.classList.contains('st-checkbox')) {
+                    if(input.classList.contains('st-checkbox')) {
                         const tomboInput = row.querySelector('[data-field="Tombamento"]');
-                        tomboInput.value = value ? 'S/T' : '';
-                        tomboInput.disabled = value;
-                        // Forçar a atualização do valor do tombamento no objeto sujo
+                        if(value) { // checked
+                            tomboInput.value = 'S/T';
+                            tomboInput.disabled = true;
+                        } else {
+                            tomboInput.value = '';
+                            tomboInput.disabled = false;
+                        }
+                        // Trigger change on tombo input as well
                         const currentItem = dirtyItems.get(docId) || fullInventory.find(i => i.id === docId);
-                        const updatedItem = { ...currentItem, Tombamento: tomboInput.value };
+                        const updatedItem = { ...currentItem, Tombamento: tomboInput.value, isPermuta: row.querySelector('.permuta-checkbox').checked };
                         dirtyItems.set(docId, updatedItem);
                     }
                 } else {
@@ -2327,17 +2251,57 @@
                 saveAllChangesBtn.disabled = false;
             });
 
-            // FIX: Adiciona a função handleSync e os listeners ausentes
+            editTableBody.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                const docId = button.dataset.docId;
+                const item = fullInventory.find(i => i.id === docId);
+                if (!item) return;
+
+                if (button.classList.contains('sync-giap-btn')) {
+                    const row = document.getElementById(`row-${docId}`);
+                    const tomboInput = row.querySelector('[data-field="Tombamento"]');
+                    const tomboValue = tomboInput.value.trim();
+
+                    if (!tomboValue) return showNotification('O campo Tombamento está vazio.', 'warning');
+                    
+                    const giapItem = giapMapAllItems.get(tomboValue);
+
+                    if (giapItem) {
+                        const isAvailable = normalizeStr(giapItem.Status).includes(normalizeStr('Disponível'));
+                        if (!isAvailable) {
+                            showNotification(`Aviso: Tombo ${tomboValue} tem status '${giapItem.Status || 'N/D'}', não 'Disponível'.`, 'warning', 5000);
+                        }
+                        
+                        const currentDesc = row.querySelector('[data-field="Descrição"]').value;
+                        const newDesc = giapItem.Descrição || giapItem.Espécie || '';
+                        
+                        document.getElementById('sync-item-tombo').textContent = tomboValue;
+                        document.getElementById('sync-current-desc').textContent = currentDesc;
+                        document.getElementById('sync-new-desc').textContent = newDesc;
+                        
+                        syncUpdateAllBtn.dataset.docId = docId;
+                        syncKeepDescBtn.dataset.docId = docId;
+                        syncConfirmModal.classList.remove('hidden');
+                    } else {
+                        showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
+                    }
+                } else if (button.classList.contains('delete-item-btn')) {
+                     currentDeleteItemIds = [docId];
+                    document.getElementById('delete-modal-title').textContent = 'Tem certeza que deseja excluir este item?';
+                    document.getElementById('delete-item-info-edit').textContent = `${item.Descrição} (Tombo: ${item.Tombamento || 'S/T'})`;
+                    deleteConfirmModal.classList.remove('hidden');
+                }
+            });
+
             const handleSync = (docId, updateDescription) => {
-                const row = document.getElementById(`row-${docId}`);
-                if (!row) return;
+                 const row = document.getElementById(`row-${docId}`);
+                 if (!row) return;
 
                 const tomboValue = row.querySelector('[data-field="Tombamento"]').value.trim();
                 const giapItem = giapMapAllItems.get(tomboValue);
-                if (!giapItem) {
-                    showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
-                    return;
-                }
+                if (!giapItem) return;
 
                 const descInput = row.querySelector('[data-field="Descrição"]');
                 const fornInput = row.querySelector('[data-field="Fornecedor"]');
@@ -2368,64 +2332,44 @@
                 saveAllChangesBtn.disabled = false;
                 
                 syncConfirmModal.classList.add('hidden');
-                showNotification(`Dados do Tombo ${tomboValue} sincronizados e prontos para salvar!`, 'success');
+                showNotification(`Dados do Tombo ${tomboValue} sincronizados!`, 'success');
             };
 
             syncUpdateAllBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, true));
             syncKeepDescBtn.addEventListener('click', (e) => handleSync(e.target.dataset.docId, false));
             syncCancelBtn.addEventListener('click', () => syncConfirmModal.classList.add('hidden'));
 
-            editTableBody.addEventListener('click', (e) => {
-                const button = e.target.closest('button');
-                if (!button) return;
-
-                const docId = button.dataset.docId;
-                const item = fullInventory.find(i => i.id === docId);
-                if (!item) return;
-
-                if (button.classList.contains('sync-giap-btn')) {
-                    const row = document.getElementById(`row-${docId}`);
-                    const tomboInput = row.querySelector('[data-field="Tombamento"]');
-                    const tomboValue = tomboInput.value.trim();
-
-                    if (!tomboValue) return showNotification('O campo Tombamento está vazio.', 'warning');
-                    
-                    const giapItem = giapMapAllItems.get(tomboValue);
-
-                    if (giapItem) {
-                        const currentDesc = row.querySelector('[data-field="Descrição"]').value;
-                        const newDesc = giapItem.Descrição || giapItem.Espécie || '';
-                        
-                        document.getElementById('sync-item-tombo').textContent = tomboValue;
-                        document.getElementById('sync-current-desc').textContent = currentDesc;
-                        document.getElementById('sync-new-desc').textContent = newDesc;
-                        
-                        syncUpdateAllBtn.dataset.docId = docId;
-                        syncKeepDescBtn.dataset.docId = docId;
-                        syncConfirmModal.classList.remove('hidden');
-                    } else {
-                        showNotification(`Tombo ${tomboValue} não encontrado na planilha GIAP.`, 'error');
-                    }
-                } else if (button.classList.contains('delete-item-btn')) {
-                     currentDeleteItemIds = [docId];
-                    document.getElementById('delete-modal-title').textContent = 'Tem certeza que deseja excluir este item?';
-                    document.getElementById('delete-item-info-edit').textContent = `${item.Descrição} (Tombo: ${item.Tombamento || 'S/T'})`;
-                    deleteConfirmModal.classList.remove('hidden');
-                }
-            });
-
             // Listener para exclusão (única e em massa)
             document.querySelector('.js-close-modal-delete').addEventListener('click', () => deleteConfirmModal.classList.add('hidden'));
             document.getElementById('confirm-delete-btn-edit').addEventListener('click', async () => {
-                const result = await excluirMultiplosCompleto(currentDeleteItemIds);
-                if (result.success) {
-                     showNotification(`${result.count} item(s) excluído(s)!`, 'success');
-                     renderEditableTable();
-                     updateBulkDeleteButton();
-                } else {
-                     showNotification('Erro ao excluir o(s) item(ns).', 'error');
+                if (currentDeleteItemIds.length === 0) return;
+
+                showOverlay(`Excluindo ${currentDeleteItemIds.length} item(s)...`);
+                
+                const batch = writeBatch(db);
+                currentDeleteItemIds.forEach(id => {
+                    batch.delete(doc(db, 'patrimonio', id));
+                });
+
+                try {
+                    await batch.commit();
+                    
+                    // Remove from local inventory
+                    fullInventory = fullInventory.filter(item => !currentDeleteItemIds.includes(item.id));
+                    
+                    await idb.patrimonio.bulkDelete(currentDeleteItemIds);
+
+                    showNotification(`${currentDeleteItemIds.length} item(s) excluído(s)!`, 'success');
+                    renderEditableTable(); // Re-render without full reload
+                } catch (error) {
+                    showNotification('Erro ao excluir o(s) item(ns).', 'error');
+                    console.error("Erro ao excluir:", error);
+                } finally {
+                    hideOverlay();
+                    deleteConfirmModal.classList.add('hidden');
+                    currentDeleteItemIds = [];
+                    updateBulkDeleteButton();
                 }
-                deleteConfirmModal.classList.add('hidden');
             });
 
 
@@ -2452,7 +2396,7 @@
                 try {
                     showOverlay('Salvando novo item...');
                     const docRef = await addDoc(collection(db, 'patrimonio'), newItemData);
-                    const newItemWithId = { ...newItemData, id: docRef.id, createdAt: { seconds: Date.now()/1000 }, updatedAt: { seconds: Date.now()/1000 } };
+                    const newItemWithId = { ...newItemData, id: docRef.id };
                     fullInventory.push(newItemWithId);
                     await idb.patrimonio.add(newItemWithId);
                     
@@ -2532,7 +2476,7 @@
                 let actionDescription = '';
 
                 if (actionButton.classList.contains('keep-selected-btn')) {
-                    actionDescription = `Mantendo ${selectedCheckboxes.length} item(ns) na unidade de origem...`;
+                    actionDescription = `Mantendo ${selectedCheckboxes.length} iten(s) na unidade de origem...`;
                     selectedCheckboxes.forEach(cb => {
                         const docRef = doc(db, 'patrimonio', cb.dataset.id);
                         batch.update(docRef, { 
@@ -2541,7 +2485,7 @@
                         });
                     });
                 } else if (actionButton.classList.contains('transfer-selected-btn')) {
-                    actionDescription = `Transferindo ${selectedCheckboxes.length} item(ns)...`;
+                    actionDescription = `Transferindo ${selectedCheckboxes.length} iten(s)...`;
                     selectedCheckboxes.forEach(cb => {
                         const docRef = doc(db, 'patrimonio', cb.dataset.id);
                         const newUnit = cb.dataset.giapUnit;
@@ -3041,18 +2985,14 @@
                 if (!unidade || itemsToReplace.length === 0) return showNotification('Dados inválidos ou unidade não selecionada.', 'error');
 
                 showOverlay(`Substituindo inventário de ${unidade}...`);
-                const itemsToDelete = fullInventory.filter(item => item.Unidade.trim() === unidade).map(i => i.id);
+                const itemsToDelete = fullInventory.filter(item => item.Unidade.trim() === unidade);
                 
-                const deleteResult = await excluirMultiplosCompleto(itemsToDelete);
-                if(!deleteResult.success) {
-                    showNotification('Falha ao apagar itens antigos. A operação foi cancelada.', 'error');
-                    hideOverlay();
-                    return;
-                }
-
-                showOverlay(`Adicionando ${itemsToReplace.length} novos itens...`);
                 const batch = writeBatch(db);
-                const newItemsForCache = [];
+
+                itemsToDelete.forEach(item => {
+                    const docRef = doc(db, 'patrimonio', item.id);
+                    batch.delete(docRef);
+                });
 
                 itemsToReplace.forEach(item => {
                     const newItemRef = doc(collection(db, 'patrimonio'));
@@ -3070,18 +3010,16 @@
                         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     };
                     batch.set(newItemRef, newItemData);
-                    newItemsForCache.push({ ...newItemData, id: newItemRef.id });
                 });
 
                 try {
                     await batch.commit();
-                    await idb.patrimonio.bulkAdd(newItemsForCache);
-
+                    await idb.metadata.clear();
                     showNotification(`Inventário de ${unidade} substituído com sucesso! Recarregando...`, 'success');
                     setTimeout(() => window.location.reload(), 2000);
                 } catch(e) {
                     hideOverlay();
-                    showNotification('Erro ao adicionar os novos itens.', 'error');
+                    showNotification('Erro ao substituir o inventário.', 'error');
                     console.error(e);
                 }
             });
@@ -3119,7 +3057,7 @@
                     hideOverlay();
                 }
             });
-            
+
             // --- LISTENERS MODAL ESCOLHA DESCRIÇÃO ---
             document.getElementById('desc-choice-cancel-btn').addEventListener('click', () => {
                 selSys = selGiap = null;
@@ -3155,12 +3093,17 @@
                 btn.disabled = true;
                 btn.textContent = 'Salvando...';
 
-                const result = await atualizarItemCompleto(id, { etiquetaPendente: false });
+                try {
+                    const docRef = doc(db, 'patrimonio', id);
+                    await updateDoc(docRef, { etiquetaPendente: false });
+                    
+                    const itemInInventory = fullInventory.find(i => i.id === id);
+                    if(itemInInventory) itemInInventory.etiquetaPendente = false;
 
-                if (result.success) {
                     showNotification('Tombamento confirmado!', 'success');
                     renderItensATombar();
-                } else {
+                } catch (error) {
+                    console.error('Erro ao confirmar tombamento:', error);
                     showNotification('Erro ao confirmar.', 'error');
                     btn.disabled = false;
                     btn.textContent = 'Confirmar Tombamento';
@@ -3432,3 +3375,4 @@
     </script>
 </body>
 </html>
+
