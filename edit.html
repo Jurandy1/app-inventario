@@ -576,7 +576,7 @@
                     <h2 class="text-xl font-bold text-slate-800 mb-2">📋 Notas Fiscais</h2>
                     <p class="text-sm text-slate-600 mb-4">Lista de notas fiscais da Planilha GIAP, agrupadas por categoria. Verifique quais itens já foram alocados no inventário.</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-4 border-b">
                         <div>
                             <label for="nf-search" class="block text-sm font-medium mb-1">Pesquisar por Nº da NF</label>
                             <input type="text" id="nf-search" placeholder="Digite o número..." class="w-full p-2 border rounded-lg">
@@ -586,15 +586,16 @@
                             <input type="text" id="nf-item-search" placeholder="Digite o nome do item..." class="w-full p-2 border rounded-lg">
                         </div>
                         <div>
+                            <label for="nf-fornecedor-search" class="block text-sm font-medium mb-1">Pesquisar por Fornecedor</label>
+                            <input type="text" id="nf-fornecedor-search" placeholder="Digite o nome do fornecedor..." class="w-full p-2 border rounded-lg">
+                        </div>
+                        <div>
                             <label for="nf-tipo-entrada" class="block text-sm font-medium mb-1">Tipo de Entrada</label>
                             <select id="nf-tipo-entrada" class="w-full p-2 border rounded-lg bg-white">
                                 <option value="">Todas</option>
                                 <option value="Compra">Compra</option>
                                 <option value="Doação">Doação</option>
                             </select>
-                        </div>
-                        <div class="self-end">
-                            <button id="clear-nf-filters-btn" class="w-full bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300">Limpar Filtros</button>
                         </div>
                         <div>
                             <label for="nf-date-start" class="block text-sm font-medium mb-1">Data de Início (Cadastro)</label>
@@ -603,6 +604,9 @@
                         <div>
                             <label for="nf-date-end" class="block text-sm font-medium mb-1">Data de Fim (Cadastro)</label>
                             <input type="date" id="nf-date-end" class="w-full p-2 border rounded-lg">
+                        </div>
+                         <div class="md:col-span-3">
+                            <button id="clear-nf-filters-btn" class="w-full md:w-auto bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300">Limpar Filtros</button>
                         </div>
                     </div>
 
@@ -1495,6 +1499,7 @@
             
             const nfSearchTerm = document.getElementById('nf-search').value.toLowerCase();
             const nfItemSearchTerm = document.getElementById('nf-item-search').value.toLowerCase();
+            const nfFornecedorTerm = document.getElementById('nf-fornecedor-search').value.toLowerCase();
             const nfTipoEntrada = document.getElementById('nf-tipo-entrada').value;
             const startDateStr = document.getElementById('nf-date-start').value;
             const endDateStr = document.getElementById('nf-date-end').value;
@@ -1509,6 +1514,8 @@
                 
                 if (nfSearchTerm && !nf.toLowerCase().includes(nfSearchTerm)) return false;
                 
+                if (nfFornecedorTerm && !(nfGroup.fornecedor || '').toLowerCase().includes(nfFornecedorTerm)) return false;
+
                 if (nfItemSearchTerm) {
                     const itemMatch = nfGroup.items.some(item => 
                         (item.Descrição || '').toLowerCase().includes(nfItemSearchTerm) || 
@@ -3096,6 +3103,7 @@
             const debouncedRenderNf = debounce(renderNfList, 300);
             document.getElementById('nf-search').addEventListener('input', debouncedRenderNf);
             document.getElementById('nf-item-search').addEventListener('input', debouncedRenderNf);
+            document.getElementById('nf-fornecedor-search').addEventListener('input', debouncedRenderNf);
             document.getElementById('nf-tipo-entrada').addEventListener('change', renderNfList);
             document.getElementById('nf-date-start').addEventListener('change', renderNfList);
             document.getElementById('nf-date-end').addEventListener('change', renderNfList);
@@ -3103,6 +3111,7 @@
             document.getElementById('clear-nf-filters-btn').addEventListener('click', () => {
                 document.getElementById('nf-search').value = '';
                 document.getElementById('nf-item-search').value = '';
+                document.getElementById('nf-fornecedor-search').value = '';
                 document.getElementById('nf-tipo-entrada').value = '';
                 document.getElementById('nf-date-start').value = '';
                 document.getElementById('nf-date-end').value = '';
