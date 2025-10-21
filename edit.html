@@ -1048,11 +1048,20 @@
         // FIM DAS FUNÇÕES DE IA
 
         const normalizeTombo = (tombo) => {
-            if (!tombo) return '';
-            let str = String(tombo).trim();
-            if (str.endsWith('.0')) {
-                str = str.slice(0, -2);
+            if (tombo === undefined || tombo === null || String(tombo).trim() === '') {
+                return '';
             }
+            // Converte para string e remove espaços
+            let str = String(tombo).trim();
+
+            // Verifica se é uma string que parece um número (pode ter zero na frente ou .0 no final)
+            if (/^0?\d+(\.0)?$/.test(str)) {
+                // Converte para número para remover o zero à esquerda e/ou .0, e depois de volta para string.
+                // Isso padroniza "0123", "123", e "123.0" todos para "123".
+                return String(parseInt(str, 10));
+            }
+            
+            // Se não for um número simples (ex: contém letras), retorna como está.
             return str;
         };
 
@@ -3244,3 +3253,4 @@
     </script>
 </body>
 </html>
+
